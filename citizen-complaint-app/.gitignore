@@ -1,0 +1,140 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+.env
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+app-example
+
+# generated native folders
+/ios
+/android
+
+
+# ========== SECURITY & SENSITIVE DATA ==========
+
+secrets/
+keys/
+certificates/
+*.key
+*.pem
+*.crt
+*.cert
+*.p12
+*.keystore
+*.jks
+debug.keystore
+google-services.json
+GoogleService-Info.plist
+firebase-config.json
+sentry.properties
+app.config.js  # If contains secrets
+eas.json       # If contains secrets
+
+# ========== EXPO ==========
+.expo/
+.expo-shared/
+web-build/
+credentials.json
+
+# ========== ANDROID ==========
+android/.gradle
+android/local.properties
+android/**/*.hprof
+android/**/.cxx/
+android/**/build/
+android/app/build/
+android/app/debug.keystore
+android/app/*.jks
+android/key.properties
+
+# ========== iOS ==========
+ios/Pods/
+ios/build/
+ios/*.xcworkspace
+ios/*.xcodeproj/xcuserdata
+ios/*.xcodeproj/project.xcworkspace/xcuserdata
+ios/**/*.mode1v3
+ios/**/*.mode2v3
+ios/**/*.pbxuser
+ios/**/*.perspectivev3
+
+# ========== BUILD OUTPUTS ==========
+build/
+dist/
+*.apk
+*.ipa
+*.aab
+*.jsbundle
+*.map
+*.dSYM.zip
+
+# ========== OS & EDITOR ==========
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ========== TESTING ==========
+coverage/
+.nyc_output
+__snapshots__/
+*.snap
+artifacts/
+cypress/videos/
+cypress/screenshots/
+
+# ========== DOCUMENTATION ==========
+_site/
+.sass-cache/
+
+# ========== TYPEsCRIPT ==========
+*.tsbuildinfo
+
+# ========== ENTERPRISE SPECIFIC ==========
+audit/
+compliance/drafts/
+tools/internal/
+*.backup
+tmp/
