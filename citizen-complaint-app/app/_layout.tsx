@@ -4,6 +4,9 @@ import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useCurrentUser } from "@/store/useCurrentUserStore";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import "../lib/localization/i18n";
+
+
 
 import queryClient from "@/lib/api/queryClient";
 
