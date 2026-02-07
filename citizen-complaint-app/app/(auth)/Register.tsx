@@ -10,7 +10,9 @@ import {
     ActivityIndicator,
     Image,
     Modal,
+  
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useTranslation } from 'react-i18next';
 import { useSubmitForm } from '@/hooks/general/useSubmitForm';
@@ -18,6 +20,23 @@ import { useRouter } from 'expo-router';
 import { RegistrationFormData } from '@/types/auth/register';
 import { BARANGAYS } from '@/constants/auth/registration';
 import { ID_TYPES } from '@/constants/auth/registration';
+import { 
+    User, 
+    Mail, 
+    Phone, 
+    Lock, 
+    MapPin, 
+    CreditCard, 
+    Camera, 
+    Image as ImageIcon,
+    ChevronDown,
+    X,
+    Check,
+    AlertCircle,
+    Calendar,
+    FileText
+} from 'lucide-react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function RegisterScreen({ navigation }: any) {
     const router = useRouter();
@@ -26,6 +45,12 @@ export default function RegisterScreen({ navigation }: any) {
     const [showGenderModal, setShowGenderModal] = useState(false);
     const [showBarangayModal, setShowBarangayModal] = useState(false);
     const [showIdTypeModal, setShowIdTypeModal] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
+    const [age, setAge] = useState<number | null>(null);
+    const [showImagePickerModal, setShowImagePickerModal] = useState(false);
+    const [currentImageField, setCurrentImageField] = useState<'idFrontImage' | 'idBackImage' | 'selfieImage' | null>(null);
+    
     const [formData, setFormData] = useState<RegistrationFormData>({
         firstName: '',
         middleName: '',
@@ -101,7 +126,68 @@ export default function RegisterScreen({ navigation }: any) {
         i18n.changeLanguage(lang);
     };
 
+    const calculateAge = (birthDate: Date): number => {
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        
+        return age;
+    };
+
+    const handleDateChange = (event: any, selectedDate?: Date) => {
+        if (Platform.OS === 'android') {
+            setShowDatePicker(false);
+        }
+
+        if (selectedDate) {
+            setDateOfBirth(selectedDate);
+            const calculatedAge = calculateAge(selectedDate);
+            setAge(calculatedAge);
+            
+            // Format date as MM/DD/YYYY
+            const formattedDate = `${String(selectedDate.getMonth() + 1).padStart(2, '0')}/${String(selectedDate.getDate()).padStart(2, '0')}/${selectedDate.getFullYear()}`;
+            
+            setFormData({ ...formData, dateOfBirth: formattedDate });
+            setErrors({ ...errors, dateOfBirth: '' });
+        }
+    };
+
     const handleImagePick = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
+        setCurrentImageField(field);
+        setShowImagePickerModal(true);
+    };
+
+    const pickFromCamera = async () => {
+        if (!currentImageField) return;
+
+        const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+        
+        if (permissionResult.granted === false) {
+            alert("Camera permission is required!");
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+        });
+
+        if (!result.canceled) {
+            setFormData({ ...formData, [currentImageField]: result.assets[0].uri });
+        }
+        
+        setShowImagePickerModal(false);
+        setCurrentImageField(null);
+    };
+
+    const pickFromLibrary = async () => {
+        if (!currentImageField) return;
+
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
@@ -110,8 +196,21 @@ export default function RegisterScreen({ navigation }: any) {
         });
 
         if (!result.canceled) {
-            setFormData({ ...formData, [field]: result.assets[0].uri });
+            setFormData({ ...formData, [currentImageField]: result.assets[0].uri });
         }
+        
+        setShowImagePickerModal(false);
+        setCurrentImageField(null);
+    };
+
+    const removeImage = (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
+        setFormData({ ...formData, [field]: undefined });
+    };
+
+    const getFileName = (uri: string | undefined) => {
+        if (!uri) return '';
+        const parts = uri.split('/');
+        return parts[parts.length - 1];
     };
 
     const updateField = (field: keyof RegistrationFormData, value: any) => {
@@ -133,104 +232,222 @@ export default function RegisterScreen({ navigation }: any) {
 
     const renderStep1 = () => (
         <View>
-            <Text className="text-xl font-bold text-gray-900 mb-6">
+            <Text className="text-xl font-bold text-neutral-900 mb-6">
                 {t('personalInfo')}
             </Text>
 
             {/* First Name */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('firstName')} *
                 </Text>
-                <TextInput
-                    className={`border-2 rounded-xl px-4 py-3 text-base ${errors.firstName ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                    value={formData.firstName}
-                    onChangeText={(text) => updateField('firstName', text)}
-                    placeholder="Juan"
-                />
+                <View
+                    className={`flex-row items-center border-2 rounded-xl px-4 py-3.5 bg-white ${
+                        errors.firstName ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                    }`}
+                >
+                    <View className="mr-3 flex-shrink-0">
+                        <User size={20} color={errors.firstName ? '#EF4444' : '#9CA3AF'} />
+                    </View>
+                    <TextInput
+                        className="flex-1 text-base text-neutral-900"
+                        value={formData.firstName}
+                        onChangeText={(text) => updateField('firstName', text)}
+                        placeholder="Juan"
+                        placeholderTextColor="#9CA3AF"
+                    />
+                </View>
                 {errors.firstName && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.firstName}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.firstName}</Text>
+                    </View>
                 )}
             </View>
 
             {/* Middle Name */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('middleName')}
                 </Text>
-                <TextInput
-                    className="border-2 border-gray-300 rounded-xl px-4 py-3 text-base"
-                    value={formData.middleName}
-                    onChangeText={(text) => updateField('middleName', text)}
-                    placeholder="Santos"
-                />
+                <View className="flex-row items-center border-2 border-neutral-200 rounded-xl px-4 py-3.5 bg-white">
+                    <View className="mr-3 flex-shrink-0">
+                        <User size={20} color="#9CA3AF" />
+                    </View>
+                    <TextInput
+                        className="flex-1 text-base text-neutral-900"
+                        value={formData.middleName}
+                        onChangeText={(text) => updateField('middleName', text)}
+                        placeholder="Santos"
+                        placeholderTextColor="#9CA3AF"
+                    />
+                </View>
             </View>
 
             {/* Last Name */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('lastName')} *
                 </Text>
-                <TextInput
-                    className={`border-2 rounded-xl px-4 py-3 text-base ${errors.lastName ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                    value={formData.lastName}
-                    onChangeText={(text) => updateField('lastName', text)}
-                    placeholder="Dela Cruz"
-                />
+                <View
+                    className={`flex-row items-center border-2 rounded-xl px-4 py-3.5 bg-white ${
+                        errors.lastName ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                    }`}
+                >
+                    <View className="mr-3 flex-shrink-0">
+                        <User size={20} color={errors.lastName ? '#EF4444' : '#9CA3AF'} />
+                    </View>
+                    <TextInput
+                        className="flex-1 text-base text-neutral-900"
+                        value={formData.lastName}
+                        onChangeText={(text) => updateField('lastName', text)}
+                        placeholder="Dela Cruz"
+                        placeholderTextColor="#9CA3AF"
+                    />
+                </View>
                 {errors.lastName && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.lastName}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.lastName}</Text>
+                    </View>
                 )}
             </View>
 
             {/* Suffix */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('suffix')}
                 </Text>
                 <TextInput
-                    className="border-2 border-gray-300 rounded-xl px-4 py-3 text-base"
+                    className="border-2 border-neutral-200 rounded-xl px-4 py-3.5 text-base bg-white text-neutral-900"
                     value={formData.suffix}
                     onChangeText={(text) => updateField('suffix', text)}
                     placeholder="Jr., Sr., III"
+                    placeholderTextColor="#9CA3AF"
                 />
             </View>
 
             {/* Date of Birth */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('dateOfBirth')} *
                 </Text>
-                <TextInput
-                    className={`border-2 rounded-xl px-4 py-3 text-base ${errors.dateOfBirth ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                    value={formData.dateOfBirth}
-                    onChangeText={(text) => updateField('dateOfBirth', text)}
-                    placeholder="MM/DD/YYYY"
-                />
+                <TouchableOpacity
+                    onPress={() => setShowDatePicker(true)}
+                    className={`flex-row items-center border-2 rounded-xl px-4 py-3.5 bg-white ${
+                        errors.dateOfBirth ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                    }`}
+                    activeOpacity={0.7}
+                >
+                    <View className="mr-3 flex-shrink-0">
+                        <Calendar size={20} color={errors.dateOfBirth ? '#EF4444' : '#9CA3AF'} />
+                    </View>
+                    <Text className={formData.dateOfBirth ? 'text-neutral-900 text-base flex-1' : 'text-neutral-400 text-base flex-1'}>
+                        {formData.dateOfBirth || 'MM/DD/YYYY'}
+                    </Text>
+                    <ChevronDown size={20} color="#9CA3AF" />
+                </TouchableOpacity>
                 {errors.dateOfBirth && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.dateOfBirth}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.dateOfBirth}</Text>
+                    </View>
+                )}
+
+                {/* Date Picker */}
+                {showDatePicker && (
+                    <DateTimePicker
+                        value={dateOfBirth || new Date()}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                        onChange={handleDateChange}
+                        maximumDate={new Date()}
+                        minimumDate={new Date(1900, 0, 1)}
+                    />
+                )}
+
+                {/* iOS Date Picker Modal */}
+                {Platform.OS === 'ios' && showDatePicker && (
+                    <Modal
+                        visible={showDatePicker}
+                        transparent={true}
+                        animationType="slide"
+                        onRequestClose={() => setShowDatePicker(false)}
+                    >
+                        <View className="flex-1 justify-end bg-black/50">
+                            <View className="bg-white rounded-t-3xl p-6">
+                                <View className="flex-row justify-between items-center mb-4">
+                                    <Text className="text-lg font-bold text-neutral-900">
+                                        {t('Select Date of Birth')}
+                                    </Text>
+                                    <TouchableOpacity onPress={() => setShowDatePicker(false)} activeOpacity={0.7}>
+                                        <Text className="text-primary-600 text-base font-semibold">Done</Text>
+                                    </TouchableOpacity>
+                                </View>
+                                <DateTimePicker
+                                    value={dateOfBirth || new Date()}
+                                    mode="date"
+                                    display="spinner"
+                                    onChange={handleDateChange}
+                                    maximumDate={new Date()}
+                                    minimumDate={new Date(1900, 0, 1)}
+                                    textColor="#000000"
+                                />
+                            </View>
+                        </View>
+                    </Modal>
                 )}
             </View>
 
+            {/* Age (Auto-calculated, Disabled) */}
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
+                    {t('age')}
+                </Text>
+                <View className="flex-row items-center border-2 border-neutral-200 rounded-xl px-4 py-3.5 bg-neutral-100">
+                    <TextInput
+                        className="flex-1 text-base text-neutral-500"
+                        value={age !== null ? age.toString() : ''}
+                        placeholder="Auto-calculated"
+                        placeholderTextColor="#9CA3AF"
+                        editable={false}
+                    />
+                </View>
+                <Text className="text-xs text-neutral-400 mt-1.5 px-1">
+                    Age is automatically calculated from your date of birth
+                </Text>
+            </View>
+
             {/* Gender */}
-            <View className="mb-6">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-8">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('gender')} *
                 </Text>
                 <TouchableOpacity
                     onPress={() => setShowGenderModal(true)}
-                    className={`border-2 rounded-xl px-4 py-3 flex-row justify-between items-center ${errors.gender ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                    className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${
+                        errors.gender ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                    }`}
+                    activeOpacity={0.7}
                 >
-                    <Text className={formData.gender ? 'text-gray-900 text-base' : 'text-gray-400 text-base'}>
+                    <Text className={formData.gender ? 'text-neutral-900 text-base' : 'text-neutral-400 text-base'}>
                         {formData.gender ? t(formData.gender) : t('Select Gender')}
                     </Text>
-                    <Text className="text-gray-400">▼</Text>
+                    <ChevronDown size={20} color="#9CA3AF" />
                 </TouchableOpacity>
                 {errors.gender && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.gender}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.gender}</Text>
+                    </View>
                 )}
 
                 {/* Gender Modal */}
@@ -243,11 +460,11 @@ export default function RegisterScreen({ navigation }: any) {
                     <View className="flex-1 justify-end bg-black/50">
                         <View className="bg-white rounded-t-3xl p-6 max-h-96">
                             <View className="flex-row justify-between items-center mb-4">
-                                <Text className="text-lg font-bold text-gray-900">
+                                <Text className="text-lg font-bold text-neutral-900">
                                     {t('Select Gender')}
                                 </Text>
-                                <TouchableOpacity onPress={() => setShowGenderModal(false)}>
-                                    <Text className="text-2xl text-gray-500">×</Text>
+                                <TouchableOpacity onPress={() => setShowGenderModal(false)} activeOpacity={0.7}>
+                                    <X size={24} color="#6B7280" />
                                 </TouchableOpacity>
                             </View>
                             <ScrollView>
@@ -262,14 +479,15 @@ export default function RegisterScreen({ navigation }: any) {
                                             updateField('gender', option.value);
                                             setShowGenderModal(false);
                                         }}
-                                        className={`py-4 border-b border-gray-200 ${
-                                            formData.gender === option.value ? 'bg-blue-50' : ''
+                                        className={`py-4 border-b border-neutral-200 ${
+                                            formData.gender === option.value ? 'bg-primary-50' : ''
                                         }`}
+                                        activeOpacity={0.7}
                                     >
                                         <Text className={`text-base ${
                                             formData.gender === option.value
-                                                ? 'text-blue-700 font-semibold'
-                                                : 'text-gray-700'
+                                                ? 'text-primary-600 font-semibold'
+                                                : 'text-neutral-700'
                                         }`}>
                                             {option.label}
                                         </Text>
@@ -283,7 +501,8 @@ export default function RegisterScreen({ navigation }: any) {
 
             <TouchableOpacity
                 onPress={() => setStep(2)}
-                className="bg-blue-700 rounded-xl py-4 items-center"
+                className="bg-primary-600 rounded-xl py-4 items-center shadow-sm"
+                activeOpacity={0.85}
             >
                 <Text className="text-white text-base font-bold">
                     {t('continue')}
@@ -294,95 +513,153 @@ export default function RegisterScreen({ navigation }: any) {
 
     const renderStep2 = () => (
         <View>
-            <Text className="text-xl font-bold text-gray-900 mb-6">
+            <Text className="text-xl font-bold text-neutral-900 mb-6">
                 {t('contactInfo')}
             </Text>
 
             {/* Email */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('email')} *
                 </Text>
-                <TextInput
-                    className={`border-2 rounded-xl px-4 py-3 text-base ${errors.email ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                    value={formData.email}
-                    onChangeText={(text) => updateField('email', text)}
-                    placeholder="juan.delacruz@email.com"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                />
+                <View
+                    className={`flex-row items-center border-2 rounded-xl px-4 py-3.5 bg-white ${
+                        errors.email ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                    }`}
+                >
+                    <View className="mr-3 flex-shrink-0">
+                        <Mail size={20} color={errors.email ? '#EF4444' : '#9CA3AF'} />
+                    </View>
+                    <TextInput
+                        className="flex-1 text-base text-neutral-900"
+                        value={formData.email}
+                        onChangeText={(text) => updateField('email', text)}
+                        placeholder="juan.delacruz@email.com"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                    />
+                </View>
                 {errors.email && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.email}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.email}</Text>
+                    </View>
                 )}
             </View>
 
             {/* Phone Number */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('phoneNumber')} *
                 </Text>
-                <TextInput
-                    className={`border-2 rounded-xl px-4 py-3 text-base ${errors.phoneNumber ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                    value={formData.phoneNumber}
-                    onChangeText={(text) => updateField('phoneNumber', text)}
-                    placeholder="+63 912 345 6789"
-                    keyboardType="phone-pad"
-                />
+                <View
+                    className={`flex-row items-center border-2 rounded-xl px-4 py-3.5 bg-white ${
+                        errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                    }`}
+                >
+                    <View className="mr-3 flex-shrink-0">
+                        <Phone size={20} color={errors.phoneNumber ? '#EF4444' : '#9CA3AF'} />
+                    </View>
+                    <TextInput
+                        className="flex-1 text-base text-neutral-900"
+                        value={formData.phoneNumber}
+                        onChangeText={(text) => updateField('phoneNumber', text)}
+                        placeholder="+63 912 345 6789"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="phone-pad"
+                    />
+                </View>
                 {errors.phoneNumber && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.phoneNumber}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.phoneNumber}</Text>
+                    </View>
                 )}
             </View>
 
             {/* Password */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('password')} *
                 </Text>
-                <TextInput
-                    className={`border-2 rounded-xl px-4 py-3 text-base ${errors.password ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                    value={formData.password}
-                    onChangeText={(text) => updateField('password', text)}
-                    placeholder="••••••••"
-                    secureTextEntry
-                />
+                <View
+                    className={`flex-row items-center border-2 rounded-xl px-4 py-3.5 bg-white ${
+                        errors.password ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                    }`}
+                >
+                    <View className="mr-3 flex-shrink-0">
+                        <Lock size={20} color={errors.password ? '#EF4444' : '#9CA3AF'} />
+                    </View>
+                    <TextInput
+                        className="flex-1 text-base text-neutral-900"
+                        value={formData.password}
+                        onChangeText={(text) => updateField('password', text)}
+                        placeholder="••••••••"
+                        placeholderTextColor="#9CA3AF"
+                        secureTextEntry
+                    />
+                </View>
                 {errors.password && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.password}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.password}</Text>
+                    </View>
                 )}
             </View>
 
             {/* Confirm Password */}
-            <View className="mb-6">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-8">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('confirmPassword')} *
                 </Text>
-                <TextInput
-                    className={`border-2 rounded-xl px-4 py-3 text-base ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                    value={formData.confirmPassword}
-                    onChangeText={(text) => updateField('confirmPassword', text)}
-                    placeholder="••••••••"
-                    secureTextEntry
-                />
+                <View
+                    className={`flex-row items-center border-2 rounded-xl px-4 py-3.5 bg-white ${
+                        errors.confirmPassword ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                    }`}
+                >
+                    <View className="mr-3 flex-shrink-0">
+                        <Lock size={20} color={errors.confirmPassword ? '#EF4444' : '#9CA3AF'} />
+                    </View>
+                    <TextInput
+                        className="flex-1 text-base text-neutral-900"
+                        value={formData.confirmPassword}
+                        onChangeText={(text) => updateField('confirmPassword', text)}
+                        placeholder="••••••••"
+                        placeholderTextColor="#9CA3AF"
+                        secureTextEntry
+                    />
+                </View>
                 {errors.confirmPassword && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.confirmPassword}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.confirmPassword}</Text>
+                    </View>
                 )}
             </View>
 
             <View className="flex-row gap-3">
                 <TouchableOpacity
                     onPress={() => setStep(1)}
-                    className="flex-1 bg-gray-200 rounded-xl py-4 items-center"
+                    className="flex-1 bg-neutral-100 rounded-xl py-4 items-center"
+                    activeOpacity={0.7}
                 >
-                    <Text className="text-gray-700 text-base font-bold">
+                    <Text className="text-neutral-700 text-base font-bold">
                         {t('back')}
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     onPress={() => setStep(3)}
-                    className="flex-1 bg-blue-700 rounded-xl py-4 items-center"
+                    className="flex-1 bg-primary-600 rounded-xl py-4 items-center shadow-sm"
+                    activeOpacity={0.85}
                 >
                     <Text className="text-white text-base font-bold">
                         {t('continue')}
@@ -394,27 +671,39 @@ export default function RegisterScreen({ navigation }: any) {
 
     const renderStep3 = () => (
         <View>
-            <Text className="text-xl font-bold text-gray-900 mb-6">
+            <Text className="text-xl font-bold text-neutral-900 mb-6">
                 {t('addressInfo')}
             </Text>
 
             {/* Barangay */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('barangay')} *
                 </Text>
                 <TouchableOpacity
                     onPress={() => setShowBarangayModal(true)}
-                    className={`border-2 rounded-xl px-4 py-3 flex-row justify-between items-center ${errors.barangay ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                    className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${
+                        errors.barangay ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                    }`}
+                    activeOpacity={0.7}
                 >
-                    <Text className={formData.barangay ? 'text-gray-900 text-base' : 'text-gray-400 text-base'}>
-                        {formData.barangay || t('selectBarangay')}
-                    </Text>
-                    <Text className="text-gray-400">▼</Text>
+                    <View className="flex-row items-center flex-1">
+                        <View className="mr-3 flex-shrink-0">
+                            <MapPin size={20} color={errors.barangay ? '#EF4444' : '#9CA3AF'} />
+                        </View>
+                        <Text className={formData.barangay ? 'text-neutral-900 text-base' : 'text-neutral-400 text-base'}>
+                            {formData.barangay || t('selectBarangay')}
+                        </Text>
+                    </View>
+                    <ChevronDown size={20} color="#9CA3AF" />
                 </TouchableOpacity>
                 {errors.barangay && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.barangay}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.barangay}</Text>
+                    </View>
                 )}
 
                 {/* Barangay Modal */}
@@ -427,11 +716,11 @@ export default function RegisterScreen({ navigation }: any) {
                     <View className="flex-1 justify-end bg-black/50">
                         <View className="bg-white rounded-t-3xl p-6 max-h-96">
                             <View className="flex-row justify-between items-center mb-4">
-                                <Text className="text-lg font-bold text-gray-900">
+                                <Text className="text-lg font-bold text-neutral-900">
                                     {t('selectBarangay')}
                                 </Text>
-                                <TouchableOpacity onPress={() => setShowBarangayModal(false)}>
-                                    <Text className="text-2xl text-gray-500">×</Text>
+                                <TouchableOpacity onPress={() => setShowBarangayModal(false)} activeOpacity={0.7}>
+                                    <X size={24} color="#6B7280" />
                                 </TouchableOpacity>
                             </View>
                             <ScrollView>
@@ -442,14 +731,15 @@ export default function RegisterScreen({ navigation }: any) {
                                             updateField('barangay', brgy);
                                             setShowBarangayModal(false);
                                         }}
-                                        className={`py-4 border-b border-gray-200 ${
-                                            formData.barangay === brgy ? 'bg-blue-50' : ''
+                                        className={`py-4 border-b border-neutral-200 ${
+                                            formData.barangay === brgy ? 'bg-primary-50' : ''
                                         }`}
+                                        activeOpacity={0.7}
                                     >
                                         <Text className={`text-base ${
                                             formData.barangay === brgy
-                                                ? 'text-blue-700 font-semibold'
-                                                : 'text-gray-700'
+                                                ? 'text-primary-600 font-semibold'
+                                                : 'text-neutral-700'
                                         }`}>
                                             {brgy}
                                         </Text>
@@ -462,48 +752,58 @@ export default function RegisterScreen({ navigation }: any) {
             </View>
 
             {/* Street Address */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('streetAddress')} *
                 </Text>
                 <TextInput
-                    className={`border-2 rounded-xl px-4 py-3 text-base ${errors.streetAddress ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                    className={`border-2 rounded-xl px-4 py-3.5 text-base bg-white ${
+                        errors.streetAddress ? 'border-error-500 bg-error-50 text-neutral-900' : 'border-neutral-200 text-neutral-900'
+                    }`}
                     value={formData.streetAddress}
                     onChangeText={(text) => updateField('streetAddress', text)}
                     placeholder="123 Rizal Street"
+                    placeholderTextColor="#9CA3AF"
                     multiline
                 />
                 {errors.streetAddress && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.streetAddress}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.streetAddress}</Text>
+                    </View>
                 )}
             </View>
 
             {/* Zone */}
-            <View className="mb-6">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-8">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('zone')}
                 </Text>
                 <TextInput
-                    className="border-2 border-gray-300 rounded-xl px-4 py-3 text-base"
+                    className="border-2 border-neutral-200 rounded-xl px-4 py-3.5 text-base bg-white text-neutral-900"
                     value={formData.zone}
                     onChangeText={(text) => updateField('zone', text)}
                     placeholder="Purok 1"
+                    placeholderTextColor="#9CA3AF"
                 />
             </View>
 
             <View className="flex-row gap-3">
                 <TouchableOpacity
                     onPress={() => setStep(2)}
-                    className="flex-1 bg-gray-200 rounded-xl py-4 items-center"
+                    className="flex-1 bg-neutral-100 rounded-xl py-4 items-center"
+                    activeOpacity={0.7}
                 >
-                    <Text className="text-gray-700 text-base font-bold">
+                    <Text className="text-neutral-700 text-base font-bold">
                         {t('back')}
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     onPress={() => setStep(4)}
-                    className="flex-1 bg-blue-700 rounded-xl py-4 items-center"
+                    className="flex-1 bg-primary-600 rounded-xl py-4 items-center shadow-sm"
+                    activeOpacity={0.85}
                 >
                     <Text className="text-white text-base font-bold">
                         {t('continue')}
@@ -515,30 +815,42 @@ export default function RegisterScreen({ navigation }: any) {
 
     const renderStep4 = () => (
         <View>
-            <Text className="text-xl font-bold text-gray-900 mb-2">
+            <Text className="text-xl font-bold text-neutral-900 mb-2">
                 {t('idVerification')}
             </Text>
-            <Text className="text-sm text-gray-600 mb-6">
+            <Text className="text-sm text-neutral-500 mb-6 leading-5">
                 {t('idVerificationNote')}
             </Text>
 
             {/* ID Type */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('idType')} *
                 </Text>
                 <TouchableOpacity
                     onPress={() => setShowIdTypeModal(true)}
-                    className={`border-2 rounded-xl px-4 py-3 flex-row justify-between items-center ${errors.idType ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                    className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${
+                        errors.idType ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                    }`}
+                    activeOpacity={0.7}
                 >
-                    <Text className={formData.idType ? 'text-gray-900 text-base' : 'text-gray-400 text-base'}>
-                        {formData.idType ? t(formData.idType) : t('selectIdType')}
-                    </Text>
-                    <Text className="text-gray-400">▼</Text>
+                    <View className="flex-row items-center flex-1">
+                        <View className="mr-3 flex-shrink-0">
+                            <CreditCard size={20} color={errors.idType ? '#EF4444' : '#9CA3AF'} />
+                        </View>
+                        <Text className={formData.idType ? 'text-neutral-900 text-base' : 'text-neutral-400 text-base'}>
+                            {formData.idType ? t(formData.idType) : t('selectIdType')}
+                        </Text>
+                    </View>
+                    <ChevronDown size={20} color="#9CA3AF" />
                 </TouchableOpacity>
                 {errors.idType && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.idType}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.idType}</Text>
+                    </View>
                 )}
 
                 {/* ID Type Modal */}
@@ -551,11 +863,11 @@ export default function RegisterScreen({ navigation }: any) {
                     <View className="flex-1 justify-end bg-black/50">
                         <View className="bg-white rounded-t-3xl p-6 max-h-96">
                             <View className="flex-row justify-between items-center mb-4">
-                                <Text className="text-lg font-bold text-gray-900">
+                                <Text className="text-lg font-bold text-neutral-900">
                                     {t('selectIdType')}
                                 </Text>
-                                <TouchableOpacity onPress={() => setShowIdTypeModal(false)}>
-                                    <Text className="text-2xl text-gray-500">×</Text>
+                                <TouchableOpacity onPress={() => setShowIdTypeModal(false)} activeOpacity={0.7}>
+                                    <X size={24} color="#6B7280" />
                                 </TouchableOpacity>
                             </View>
                             <ScrollView>
@@ -566,14 +878,15 @@ export default function RegisterScreen({ navigation }: any) {
                                             updateField('idType', type);
                                             setShowIdTypeModal(false);
                                         }}
-                                        className={`py-4 border-b border-gray-200 ${
-                                            formData.idType === type ? 'bg-blue-50' : ''
+                                        className={`py-4 border-b border-neutral-200 ${
+                                            formData.idType === type ? 'bg-primary-50' : ''
                                         }`}
+                                        activeOpacity={0.7}
                                     >
                                         <Text className={`text-base ${
                                             formData.idType === type
-                                                ? 'text-blue-700 font-semibold'
-                                                : 'text-gray-700'
+                                                ? 'text-primary-600 font-semibold'
+                                                : 'text-neutral-700'
                                         }`}>
                                             {t(type)}
                                         </Text>
@@ -586,150 +899,309 @@ export default function RegisterScreen({ navigation }: any) {
             </View>
 
             {/* ID Number */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('idNumber')} *
                 </Text>
-                <TextInput
-                    className={`border-2 rounded-xl px-4 py-3 text-base ${errors.idNumber ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                    value={formData.idNumber}
-                    onChangeText={(text) => updateField('idNumber', text)}
-                    placeholder="A00-000-000000"
-                />
+                <View
+                    className={`flex-row items-center border-2 rounded-xl px-4 py-3.5 bg-white ${
+                        errors.idNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                    }`}
+                >
+                    <View className="mr-3 flex-shrink-0">
+                        <CreditCard size={20} color={errors.idNumber ? '#EF4444' : '#9CA3AF'} />
+                    </View>
+                    <TextInput
+                        className="flex-1 text-base text-neutral-900"
+                        value={formData.idNumber}
+                        onChangeText={(text) => updateField('idNumber', text)}
+                        placeholder="A00-000-000000"
+                        placeholderTextColor="#9CA3AF"
+                    />
+                </View>
                 {errors.idNumber && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.idNumber}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.idNumber}</Text>
+                    </View>
                 )}
             </View>
 
             {/* ID Front Image */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('uploadIdFront')} *
                 </Text>
-                <TouchableOpacity
-                    onPress={() => handleImagePick('idFrontImage')}
-                    className={`border-2 border-dashed rounded-xl p-6 items-center ${errors.idFrontImage ? 'border-red-500' : 'border-gray-300'
+                {formData.idFrontImage ? (
+                    <View className="border-2 border-neutral-300 rounded-xl p-4 bg-white">
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-row items-center flex-1 mr-3">
+                                <View className="mr-3 flex-shrink-0">
+                                    <FileText size={20} color="#059669" />
+                                </View>
+                                <Text className="text-neutral-900 text-sm flex-1" numberOfLines={1}>
+                                    {getFileName(formData.idFrontImage)}
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => removeImage('idFrontImage')}
+                                className="bg-error-100 rounded-lg p-2"
+                                activeOpacity={0.7}
+                            >
+                                <X size={18} color="#EF4444" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                ) : (
+                    <TouchableOpacity
+                        onPress={() => handleImagePick('idFrontImage')}
+                        className={`border-2 border-dashed rounded-xl p-6 items-center ${
+                            errors.idFrontImage ? 'border-error-500 bg-error-50' : 'border-neutral-300 bg-neutral-50'
                         }`}
-                >
-                    {formData.idFrontImage ? (
-                        <Image
-                            source={{ uri: formData.idFrontImage }}
-                            className="w-full h-40 rounded-lg"
-                            resizeMode="cover"
-                        />
-                    ) : (
+                        activeOpacity={0.7}
+                    >
                         <View className="items-center">
-                            <Text className="text-gray-500 text-sm">📷</Text>
-                            <Text className="text-gray-500 text-sm mt-2">
+                            <ImageIcon size={40} color="#9CA3AF" strokeWidth={1.5} />
+                            <Text className="text-neutral-500 text-sm mt-3 font-medium">
                                 {t('tapToUpload')}
                             </Text>
+                            <Text className="text-neutral-400 text-xs mt-1">
+                                Front side of your ID
+                            </Text>
                         </View>
-                    )}
-                </TouchableOpacity>
+                    </TouchableOpacity>
+                )}
                 {errors.idFrontImage && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.idFrontImage}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.idFrontImage}</Text>
+                    </View>
                 )}
             </View>
 
             {/* ID Back Image */}
-            <View className="mb-4">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+            <View className="mb-5">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('uploadIdBack')}
                 </Text>
-                <TouchableOpacity
-                    onPress={() => handleImagePick('idBackImage')}
-                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 items-center"
-                >
-                    {formData.idBackImage ? (
-                        <Image
-                            source={{ uri: formData.idBackImage }}
-                            className="w-full h-40 rounded-lg"
-                            resizeMode="cover"
-                        />
-                    ) : (
+                {formData.idBackImage ? (
+                    <View className="border-2 border-neutral-300 rounded-xl p-4 bg-white">
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-row items-center flex-1 mr-3">
+                                <View className="mr-3 flex-shrink-0">
+                                    <FileText size={20} color="#059669" />
+                                </View>
+                                <Text className="text-neutral-900 text-sm flex-1" numberOfLines={1}>
+                                    {getFileName(formData.idBackImage)}
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => removeImage('idBackImage')}
+                                className="bg-error-100 rounded-lg p-2"
+                                activeOpacity={0.7}
+                            >
+                                <X size={18} color="#EF4444" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                ) : (
+                    <TouchableOpacity
+                        onPress={() => handleImagePick('idBackImage')}
+                        className="border-2 border-dashed border-neutral-300 rounded-xl p-6 items-center bg-neutral-50"
+                        activeOpacity={0.7}
+                    >
                         <View className="items-center">
-                            <Text className="text-gray-500 text-sm">📷</Text>
-                            <Text className="text-gray-500 text-sm mt-2">
+                            <ImageIcon size={40} color="#9CA3AF" strokeWidth={1.5} />
+                            <Text className="text-neutral-500 text-sm mt-3 font-medium">
                                 {t('tapToUpload')}
                             </Text>
+                            <Text className="text-neutral-400 text-xs mt-1">
+                                Back side of your ID
+                            </Text>
                         </View>
-                    )}
-                </TouchableOpacity>
+                    </TouchableOpacity>
+                )}
             </View>
 
             {/* Selfie with ID */}
             <View className="mb-6">
-                <Text className="text-sm font-semibold text-gray-700 mb-2">
+                <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                     {t('uploadSelfie')} *
                 </Text>
-                <TouchableOpacity
-                    onPress={() => handleImagePick('selfieImage')}
-                    className={`border-2 border-dashed rounded-xl p-6 items-center ${errors.selfieImage ? 'border-red-500' : 'border-gray-300'
+                {formData.selfieImage ? (
+                    <View className="border-2 border-neutral-300 rounded-xl p-4 bg-white">
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-row items-center flex-1 mr-3">
+                                <View className="mr-3 flex-shrink-0">
+                                    <FileText size={20} color="#059669" />
+                                </View>
+                                <Text className="text-neutral-900 text-sm flex-1" numberOfLines={1}>
+                                    {getFileName(formData.selfieImage)}
+                                </Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => removeImage('selfieImage')}
+                                className="bg-error-100 rounded-lg p-2"
+                                activeOpacity={0.7}
+                            >
+                                <X size={18} color="#EF4444" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                ) : (
+                    <TouchableOpacity
+                        onPress={() => handleImagePick('selfieImage')}
+                        className={`border-2 border-dashed rounded-xl p-6 items-center ${
+                            errors.selfieImage ? 'border-error-500 bg-error-50' : 'border-neutral-300 bg-neutral-50'
                         }`}
-                >
-                    {formData.selfieImage ? (
-                        <Image
-                            source={{ uri: formData.selfieImage }}
-                            className="w-full h-40 rounded-lg"
-                            resizeMode="cover"
-                        />
-                    ) : (
+                        activeOpacity={0.7}
+                    >
                         <View className="items-center">
-                            <Text className="text-gray-500 text-sm">🤳</Text>
-                            <Text className="text-gray-500 text-sm mt-2">
+                            <Camera size={40} color="#9CA3AF" strokeWidth={1.5} />
+                            <Text className="text-neutral-500 text-sm mt-3 font-medium">
                                 {t('tapToUpload')}
                             </Text>
+                            <Text className="text-neutral-400 text-xs mt-1">
+                                Selfie holding your ID
+                            </Text>
                         </View>
-                    )}
-                </TouchableOpacity>
+                    </TouchableOpacity>
+                )}
                 {errors.selfieImage && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.selfieImage}</Text>
+                    <View className="flex-row items-center mt-2 px-1">
+                        <View className="mr-1.5 flex-shrink-0">
+                            <AlertCircle size={14} color="#EF4444" />
+                        </View>
+                        <Text className="text-error-600 text-xs flex-1">{errors.selfieImage}</Text>
+                    </View>
                 )}
             </View>
+
+            {/* Image Picker Modal */}
+            <Modal
+                visible={showImagePickerModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => {
+                    setShowImagePickerModal(false);
+                    setCurrentImageField(null);
+                }}
+            >
+                <View className="flex-1 justify-end bg-black/50">
+                    <View className="bg-white rounded-t-3xl p-6">
+                        <View className="flex-row justify-between items-center mb-6">
+                            <Text className="text-lg font-bold text-neutral-900">
+                                Choose Image Source
+                            </Text>
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setShowImagePickerModal(false);
+                                    setCurrentImageField(null);
+                                }} 
+                                activeOpacity={0.7}
+                            >
+                                <X size={24} color="#6B7280" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity
+                            onPress={pickFromCamera}
+                            className="flex-row items-center border-2 border-neutral-200 rounded-xl p-4 mb-4 bg-white"
+                            activeOpacity={0.7}
+                        >
+                            <View className="bg-primary-100 rounded-full p-3 mr-4">
+                                <Camera size={24} color="#2563EB" />
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-base font-semibold text-neutral-900 mb-1">
+                                    Take Photo
+                                </Text>
+                                <Text className="text-sm text-neutral-500">
+                                    Use your camera to capture
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={pickFromLibrary}
+                            className="flex-row items-center border-2 border-neutral-200 rounded-xl p-4 bg-white"
+                            activeOpacity={0.7}
+                        >
+                            <View className="bg-primary-100 rounded-full p-3 mr-4">
+                                <ImageIcon size={24} color="#2563EB" />
+                            </View>
+                            <View className="flex-1">
+                                <Text className="text-base font-semibold text-neutral-900 mb-1">
+                                    Choose from Gallery
+                                </Text>
+                                <Text className="text-sm text-neutral-500">
+                                    Select from your photos
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Terms and Conditions */}
             <TouchableOpacity
                 onPress={() => updateField('agreedToTerms', !formData.agreedToTerms)}
                 className="flex-row items-start mb-6"
+                activeOpacity={0.7}
             >
                 <View
-                    className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${formData.agreedToTerms ? 'bg-blue-700 border-blue-700' : 'border-gray-300'
-                        }`}
+                    className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center flex-shrink-0 ${
+                        formData.agreedToTerms ? 'bg-primary-600 border-primary-600' : 'border-neutral-300 bg-white'
+                    }`}
                 >
                     {formData.agreedToTerms && (
-                        <Text className="text-white text-xs">✓</Text>
+                        <Check size={14} color="#ffffff" strokeWidth={3} />
                     )}
                 </View>
-                <Text className="flex-1 text-sm text-gray-700">
+                <Text className="flex-1 text-sm text-neutral-700 leading-5">
                     {t('agreeTerms')}
                 </Text>
             </TouchableOpacity>
             {errors.agreedToTerms && (
-                <Text className="text-red-500 text-xs mb-4">{errors.agreedToTerms}</Text>
+                <View className="flex-row items-center mb-4 px-1">
+                    <View className="mr-1.5 flex-shrink-0">
+                        <AlertCircle size={14} color="#EF4444" />
+                    </View>
+                    <Text className="text-error-600 text-xs flex-1">{errors.agreedToTerms}</Text>
+                </View>
             )}
 
             {/* General Error */}
             {errors.general && (
-                <View className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                    <Text className="text-red-700 text-sm">{errors.general}</Text>
+                <View className="bg-error-50 border border-error-500 rounded-xl p-4 mb-6 flex-row items-start">
+                    <View className="mr-3 flex-shrink-0">
+                        <AlertCircle size={20} color="#EF4444" />
+                    </View>
+                    <Text className="text-sm text-error-600 flex-1 leading-5">{errors.general}</Text>
                 </View>
             )}
 
             <View className="flex-row gap-3">
                 <TouchableOpacity
                     onPress={() => setStep(3)}
-                    className="flex-1 bg-gray-200 rounded-xl py-4 items-center"
+                    className="flex-1 bg-neutral-100 rounded-xl py-4 items-center"
+                    activeOpacity={0.7}
                 >
-                    <Text className="text-gray-700 text-base font-bold">
+                    <Text className="text-neutral-700 text-base font-bold">
                         {t('back')}
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     onPress={handleSubmit}
                     disabled={registerMutation.isPending}
-                    className={`flex-1 bg-blue-700 rounded-xl py-4 items-center ${registerMutation.isPending ? 'opacity-70' : ''
-                        }`}
+                    className={`flex-1 bg-primary-600 rounded-xl py-4 items-center shadow-sm ${
+                        registerMutation.isPending ? 'opacity-60' : ''
+                    }`}
+                    activeOpacity={0.85}
                 >
                     {registerMutation.isPending ? (
                         <ActivityIndicator color="#ffffff" />
@@ -744,87 +1216,96 @@ export default function RegisterScreen({ navigation }: any) {
     );
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            className="flex-1 bg-white"
-        >
-            <ScrollView
-                contentContainerStyle={{ flexGrow: 1 }}
-                showsVerticalScrollIndicator={false}
+        <SafeAreaView className="flex-1 bg-white">
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                className="flex-1"
             >
-                {/* Language Selector */}
-                <View className="absolute top-12 right-6 z-10 flex-row gap-2">
-                    <TouchableOpacity
-                        onPress={() => changeLanguage('en')}
-                        className={`px-3 py-1.5 rounded-md ${i18n.language === 'en' ? 'bg-blue-700' : 'bg-gray-200'
+                <ScrollView
+                    contentContainerStyle={{ flexGrow: 1 }}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {/* Language Selector */}
+                    <View className="absolute top-4 right-6 z-10 flex-row gap-2">
+                        <TouchableOpacity
+                            onPress={() => changeLanguage('en')}
+                            className={`px-3.5 py-2 rounded-lg ${
+                                i18n.language === 'en' ? 'bg-primary-600' : 'bg-neutral-100'
                             }`}
-                    >
-                        <Text
-                            className={`text-xs font-semibold ${i18n.language === 'en' ? 'text-white' : 'text-gray-700'
-                                }`}
+                            activeOpacity={0.7}
                         >
-                            EN
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => changeLanguage('tl')}
-                        className={`px-3 py-1.5 rounded-md ${i18n.language === 'tl' ? 'bg-blue-700' : 'bg-gray-200'
+                            <Text
+                                className={`text-xs font-semibold ${
+                                    i18n.language === 'en' ? 'text-white' : 'text-neutral-600'
+                                }`}
+                            >
+                                EN
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => changeLanguage('tl')}
+                            className={`px-3.5 py-2 rounded-lg ${
+                                i18n.language === 'tl' ? 'bg-primary-600' : 'bg-neutral-100'
                             }`}
-                    >
-                        <Text
-                            className={`text-xs font-semibold ${i18n.language === 'tl' ? 'text-white' : 'text-gray-700'
-                                }`}
+                            activeOpacity={0.7}
                         >
-                            TL
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Header */}
-                <View className="items-center pt-16 pb-6 bg-gradient-to-b from-blue-50 to-white">
-                    <View className="w-24 h-24 mb-3">
-                        <Image
-                            source={require("../../assets/images/santamarialogo.jpg")}
-                            className="w-full h-full"
-                            resizeMode="contain"
-                        />
-                    </View>
-                    <Text className="text-xl font-bold text-blue-900">
-                        {t('register')}
-                    </Text>
-                </View>
-
-                {/* Progress Indicator */}
-                <View className="flex-row px-6 py-4">
-                    {[1, 2, 3, 4].map((s) => (
-                        <View
-                            key={s}
-                            className={`flex-1 h-2 mx-1 rounded-full ${s <= step ? 'bg-blue-700' : 'bg-gray-200'
+                            <Text
+                                className={`text-xs font-semibold ${
+                                    i18n.language === 'tl' ? 'text-white' : 'text-neutral-600'
                                 }`}
-                        />
-                    ))}
-                </View>
-
-                {/* Form Content */}
-                <View className="px-6 pb-8">
-                    {step === 1 && renderStep1()}
-                    {step === 2 && renderStep2()}
-                    {step === 3 && renderStep3()}
-                    {step === 4 && renderStep4()}
-
-                    {/* Back to Login */}
-                    <View className="flex-row justify-center items-center py-6 mt-4">
-                        <Text className="text-gray-600 text-sm">
-                            {t('haveAccount')}{' '}
-                        </Text>
-                        <TouchableOpacity onPress={() => router.push('/(auth)')}>
-                            <Text className="text-blue-700 text-sm font-bold">
-                                {t('login')}
+                            >
+                                TL
                             </Text>
                         </TouchableOpacity>
                     </View>
-                </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+
+                    {/* Header */}
+                    <View className="items-center pt-16 pb-6 px-6">
+                        <View className="w-24 h-24 mb-4 items-center justify-center bg-white rounded-full shadow-sm border-4 border-primary-50">
+                            <Image
+                                source={require("../../assets/images/santamarialogo.jpg")}
+                                className="w-20 h-20 rounded-full"
+                                resizeMode="cover"
+                            />
+                        </View>
+                        <Text className="text-2xl font-bold text-neutral-900 tracking-tight">
+                            {t('register')}
+                        </Text>
+                    </View>
+
+                    {/* Progress Indicator */}
+                    <View className="flex-row px-6 py-4">
+                        {[1, 2, 3, 4].map((s) => (
+                            <View
+                                key={s}
+                                className={`flex-1 h-2 mx-1 rounded-full ${
+                                    s <= step ? 'bg-primary-600' : 'bg-neutral-200'
+                                }`}
+                            />
+                        ))}
+                    </View>
+
+                    {/* Form Content */}
+                    <View className="px-6 pb-8">
+                        {step === 1 && renderStep1()}
+                        {step === 2 && renderStep2()}
+                        {step === 3 && renderStep3()}
+                        {step === 4 && renderStep4()}
+
+                        {/* Back to Login */}
+                        <View className="flex-row justify-center items-center py-6 mt-4">
+                            <Text className="text-neutral-500 text-sm">
+                                {t('haveAccount')}{' '}
+                            </Text>
+                            <TouchableOpacity onPress={() => router.push('/(auth)')} activeOpacity={0.7}>
+                                <Text className="text-primary-600 text-sm font-bold">
+                                    {t('login')}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 }

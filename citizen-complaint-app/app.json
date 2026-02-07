@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+        "infoPlist": {
+    "NSCameraUsageDescription": "We use the camera so you can upload photos for complaints."
+  }
     },
     "android": {
       "adaptiveIcon": {
@@ -40,7 +43,8 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

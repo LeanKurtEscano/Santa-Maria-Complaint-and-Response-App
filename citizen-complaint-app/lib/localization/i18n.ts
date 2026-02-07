@@ -9,6 +9,7 @@ const resources = {
     translation: {
       // Auth
       login: 'Login',
+      loginSubtitle: 'Sign in to continue to your account',
       register: 'Register',
       email: 'Email Address',
       password: 'Password',
@@ -84,6 +85,7 @@ const resources = {
       // App Title
       appTitle: 'Barangay Santa Maria',
       complaintSystem: 'Complaint System',
+      age: 'Age',
     },
   },
   tl: {
@@ -92,11 +94,13 @@ const resources = {
       login: 'Mag-login',
       register: 'Magparehistro',
       email: 'Email Address',
+      loginSubtitle: 'Mag-sign in upang magpatuloy sa iyong account',
       password: 'Password',
       confirmPassword: 'Kumpirmahin ang Password',
       forgotPassword: 'Nakalimutan ang Password?',
       noAccount: 'Walang account?',
       haveAccount: 'Mayroon nang account?',
+      age: 'Edad',
       
       // Registration
       personalInfo: 'Personal na Impormasyon',
