@@ -47,7 +47,7 @@ export default function LoginScreen({ navigation }: any) {
         ],
         onSuccess: (data) => {
             console.log('Login successful:', data);
-            // navigation.navigate('Home');
+             router.replace('/(tabs)');
         },
     });
 

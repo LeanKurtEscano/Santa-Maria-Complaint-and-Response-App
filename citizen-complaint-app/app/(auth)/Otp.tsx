@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -14,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, AlertCircle, CheckCircle } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { authApiClient } from '@/lib/client/user';
 
 interface OTPVerificationScreenProps {
   navigation?: any;
@@ -75,11 +76,9 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     if (!canResend) return;
 
     try {
-      // TODO: Replace with actual API call
-      // await fetch('/auth/resend-otp', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ email }),
-      // });
+      await authApiClient.post('/auth/resend-otp', {
+        email: email,
+      });
 
       setResendTimer(60);
       setCanResend(false);
@@ -88,6 +87,13 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     } catch (err) {
       setError('Failed to resend OTP. Please try again.');
     }
+  };
+
+  // Helper function to convert base64 to Blob
+  const base64ToBlob = async (base64: string, filename: string): Promise<Blob> => {
+    const response = await fetch(base64);
+    const blob = await response.blob();
+    return blob;
   };
 
   const handleVerifyOtp = async () => {
@@ -102,27 +108,96 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     setError('');
 
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch('/auth/verify-otp', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ email, otp: otpString }),
-      // });
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Simulate success
-      const success = true;
-
-      if (success) {
+   
+      const registrationDataString = await AsyncStorage.getItem('registrationData');
       
-          router.push('/(auth)/VerificationPending');
-        
-      } else {
-        setError('Invalid OTP. Please try again.');
+      if (!registrationDataString) {
+        setError('Registration data not found. Please register again.');
+        setIsVerifying(false);
+        return;
       }
-    } catch (err) {
-      setError('Verification failed. Please try again.');
+
+      const registrationData = JSON.parse(registrationDataString);
+
+   
+      const formData = new FormData();
+
+  
+      const dataObject = {
+        firstName: registrationData.firstName,
+        middleName: registrationData.middleName,
+        lastName: registrationData.lastName,
+        suffix: registrationData.suffix,
+        dateOfBirth: registrationData.dateOfBirth,
+        gender: registrationData.gender,
+        email: registrationData.email,
+        phoneNumber: registrationData.phoneNumber,
+        password: registrationData.password,
+        barangay: registrationData.barangay,
+        streetAddress: registrationData.streetAddress,
+        zone: registrationData.zone,
+        idType: registrationData.idType,
+        idNumber: registrationData.idNumber,
+        agreedToTerms: registrationData.agreedToTerms,
+        age: registrationData.age,
+        otp: otpString,
+      };
+
+    
+      formData.append('data', JSON.stringify(dataObject));
+
+      // Append image files
+      if (registrationData.idFrontImage) {
+        const idFrontBlob = await base64ToBlob(registrationData.idFrontImage, 'id_front.jpg');
+        formData.append('idFrontImage', {
+          uri: registrationData.idFrontImage,
+          type: 'image/jpeg',
+          name: 'id_front.jpg',
+        } as any);
+      }
+
+      if (registrationData.idBackImage) {
+        const idBackBlob = await base64ToBlob(registrationData.idBackImage, 'id_back.jpg');
+        formData.append('idBackImage', {
+          uri: registrationData.idBackImage,
+          type: 'image/jpeg',
+          name: 'id_back.jpg',
+        } as any);
+      }
+
+      if (registrationData.selfieImage) {
+        const selfieBlob = await base64ToBlob(registrationData.selfieImage, 'selfie.jpg');
+        formData.append('selfieImage', {
+          uri: registrationData.selfieImage,
+          type: 'image/jpeg',
+          name: 'selfie.jpg',
+        } as any);
+      }
+
+      const response = await authApiClient.post('/auth/verify-otp', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      console.log('OTP Verification Response:', response.data);
+
+      // If successful, clear AsyncStorage
+      await AsyncStorage.removeItem('registrationData');
+      console.log('Registration data cleared from AsyncStorage');
+
+     
+      //router.push('/(auth)/VerificationPending');
+      router.push('/(tabs)');
+
+    } catch (err: any) {
+      console.error('OTP Verification Error:', err);
+      
+      if (err?.response?.data?.message) {
+        setError(err.response.data.message);
+      } else {
+        setError('Verification failed. Please try again.');
+      }
     } finally {
       setIsVerifying(false);
     }

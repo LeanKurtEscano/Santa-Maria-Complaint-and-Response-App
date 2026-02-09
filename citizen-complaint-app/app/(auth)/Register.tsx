@@ -15,7 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useTranslation } from 'react-i18next';
 import { useForm, Controller } from 'react-hook-form';
-import { useSubmitForm } from '@/hooks/general/useSubmitForm';
 import { useRouter } from 'expo-router';
 import { RegistrationFormData } from '@/types/auth/register';
 import { BARANGAYS } from '@/constants/auth/registration';
@@ -37,7 +36,9 @@ import {
   FileText,
 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-
+import { authApiClient } from '@/lib/client/user';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import convertImageToBase64 from '@/utils/general/image';
 export default function RegisterScreen({ navigation }: any) {
   const router = useRouter();
   const { t, i18n } = useTranslation();
@@ -47,12 +48,11 @@ export default function RegisterScreen({ navigation }: any) {
   const [showIdTypeModal, setShowIdTypeModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
-  const [currentImageField, setCurrentImageField] = useState<
-    'idFrontImage' | 'idBackImage' | 'selfieImage' | null
-  >(null);
+  const [currentImageField, setCurrentImageField] = useState<'idFrontImage' | 'idBackImage' | 'selfieImage' | null>(null);
+  const [submittedEmail, setSubmittedEmail] = useState("");
   const [age, setAge] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Initialize react-hook-form
   const {
     control,
     handleSubmit,
@@ -84,15 +84,6 @@ export default function RegisterScreen({ navigation }: any) {
   });
 
   const password = watch('password');
-
-  const registerMutation = useSubmitForm({
-    url: '/auth/register',
-    method: 'post',
-    onSuccess: (data) => {
-      console.log('Registration successful:', data);
-      navigation.navigate('Login');
-    },
-  });
 
   const changeLanguage = (lang: string) => {
     i18n.changeLanguage(lang);
@@ -186,7 +177,44 @@ export default function RegisterScreen({ navigation }: any) {
     return parts[parts.length - 1];
   };
 
-  const onSubmit = (data: RegistrationFormData) => {
+  const storeRegistrationData = async (data: RegistrationFormData) => {
+     const [idFrontBase64, idBackBase64, selfieBase64] = await Promise.all([
+      data.idFrontImage ? convertImageToBase64(data.idFrontImage) : null,
+      data.idBackImage ? convertImageToBase64(data.idBackImage) : null,
+      data.selfieImage ? convertImageToBase64(data.selfieImage) : null,
+    ]);
+    try {
+      const registrationData = {
+        firstName: data.firstName,
+        middleName: data.middleName,
+        lastName: data.lastName,
+        suffix: data.suffix,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender,
+        email: data.email,
+        phoneNumber: data.phoneNumber,
+        password: data.password,
+        barangay: data.barangay,
+        streetAddress: data.streetAddress,
+        zone: data.zone,
+        idType: data.idType,
+        idNumber: data.idNumber,
+        idFrontImage: idFrontBase64,
+        idBackImage: idBackBase64,
+        selfieImage: selfieBase64,
+        agreedToTerms: data.agreedToTerms,
+        age: age,
+      };
+      
+      await AsyncStorage.setItem('registrationData', JSON.stringify(registrationData));
+      console.log('Registration data stored successfully in AsyncStorage');
+    } catch (error) {
+      console.error('Error storing registration data:', error);
+      throw error;
+    }
+  };
+
+  const onSubmit = async (data: RegistrationFormData) => {
     // Manual validation
     const validationErrors: { [key: string]: string } = {};
 
@@ -241,23 +269,49 @@ export default function RegisterScreen({ navigation }: any) {
       return;
     }
 
-    registerMutation.mutate(data, {
-      onError: (error: any) => {
-        if (error?.type === 'validation' && error.errors) {
-          Object.entries(error.errors).forEach(([key, message]) => {
-            setError(key as keyof RegistrationFormData, {
-              type: 'server',
-              message: message as string,
-            });
-          });
-        } else {
-          setError('root.general', {
+    setIsLoading(true);
+
+    try {
+      // Send only email to backend
+      const response = await authApiClient.post('/auth/register', {
+        email: data.email,
+      });
+
+      console.log('Registration API response:', response.data);
+
+      // Store all registration data in AsyncStorage after successful API call
+      await storeRegistrationData(data);
+
+      // Set submitted email for navigation
+      setSubmittedEmail(data.email);
+
+      // Navigate to OTP screen
+      router.replace({
+        pathname: "/(auth)/Otp",
+        params: { email: data.email },
+      });
+
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      
+      if (error?.response?.data?.errors) {
+        // Handle validation errors from server
+        Object.entries(error.response.data.errors).forEach(([key, message]) => {
+          setError(key as keyof RegistrationFormData, {
             type: 'server',
-            message: error?.general || 'Registration failed',
+            message: message as string,
           });
-        }
-      },
-    });
+        });
+      } else {
+        // Handle general error
+        setError('root.general', {
+          type: 'server',
+          message: error?.response?.data?.message || error?.message || 'Registration failed',
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const renderStep1 = () => (
@@ -433,31 +487,55 @@ export default function RegisterScreen({ navigation }: any) {
       {/* iOS Date Picker Modal */}
       {Platform.OS === 'ios' && showDatePicker && (
         <Modal transparent animationType="slide">
-          <View className="flex-1 justify-end bg-black/50">
-            <View className="bg-white rounded-t-3xl p-6">
-              <Text className="text-xl font-bold text-neutral-900 mb-4">
-                {t('Select Date of Birth')}
-              </Text>
-              <DateTimePicker
-                value={
-                  watch('dateOfBirth')
-                    ? new Date(watch('dateOfBirth'))
-                    : new Date(2000, 0, 1)
-                }
-                mode="date"
-                display="spinner"
-                onChange={handleDateChange}
-                maximumDate={new Date()}
-              />
-              <TouchableOpacity
-                onPress={() => setShowDatePicker(false)}
-                className="bg-primary-600 rounded-xl py-4 items-center mt-4"
-                activeOpacity={0.7}
-              >
-                <Text className="text-white font-semibold text-base">Done</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <TouchableOpacity 
+            className="flex-1 justify-end bg-black/50"
+            activeOpacity={1}
+            onPress={() => setShowDatePicker(false)}
+          >
+            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+              <View className="bg-white rounded-t-3xl p-6 pb-8">
+                <View className="flex-row justify-between items-center mb-4">
+                  <Text className="text-xl font-bold text-neutral-900">
+                    {t('Select Date of Birth')}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setShowDatePicker(false)}
+                    className="p-2"
+                    activeOpacity={0.7}
+                  >
+                    <X size={24} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={{ backgroundColor: 'white' }}>
+                  <DateTimePicker
+                    value={
+                      watch('dateOfBirth')
+                        ? new Date(watch('dateOfBirth'))
+                        : new Date(2000, 0, 1)
+                    }
+                    mode="date"
+                    display="spinner"
+                    onChange={handleDateChange}
+                    maximumDate={new Date()}
+                    textColor="#000000"
+                    style={{ 
+                      backgroundColor: 'white',
+                      height: 200 
+                    }}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => setShowDatePicker(false)}
+                  className="bg-primary-600 rounded-xl py-4 items-center mt-4"
+                  activeOpacity={0.7}
+                >
+                  <Text className="text-white font-semibold text-base">Done</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
         </Modal>
       )}
 
@@ -1293,11 +1371,11 @@ export default function RegisterScreen({ navigation }: any) {
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleSubmit(onSubmit)}
-          disabled={registerMutation.isPending}
+          disabled={isLoading}
           className="flex-1 bg-primary-600 rounded-xl py-4 items-center shadow-sm"
           activeOpacity={0.85}
         >
-          {registerMutation.isPending ? (
+          {isLoading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text className="text-white font-semibold text-base">{t('submit')}</Text>

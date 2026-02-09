@@ -39,27 +39,33 @@
 
 
 import { useMutation } from "@tanstack/react-query";
-import axios from "axios";
 import NetInfo from "@react-native-community/netinfo";
+import type { AxiosInstance } from "axios";
+
 import { handleAxiosError } from "@/utils/general/axiosException";
-import { userApiClient } from "@/lib/client/user";
+
 export type ValidatorFn<T> = (data: T) => { [key: string]: string } | null;
 
 interface UseSubmitFormOptions<T> {
   url: string;
+  client: AxiosInstance;
   method?: "post" | "put" | "patch" | "delete";
   validators?: ValidatorFn<T>[];
   onSuccess?: (data: any) => void;
 }
 
-export function useSubmitForm<T = any>(options: UseSubmitFormOptions<T>) {
-  const { url, method = "post", validators = [], onSuccess } = options;
-
-
+export function useSubmitForm<T = any>({
+  url,
+  client,
+  method = "post",
+  validators = [],
+  onSuccess,
+}: UseSubmitFormOptions<T>) {
   return useMutation({
     mutationFn: async (data: T) => {
-   
-      const errors: { [key: string]: string } = {};
+      // ---- validation
+      const errors: Record<string, string> = {};
+
       for (const validator of validators) {
         const result = validator(data);
         if (result) Object.assign(errors, result);
@@ -69,22 +75,27 @@ export function useSubmitForm<T = any>(options: UseSubmitFormOptions<T>) {
         throw { type: "validation", errors };
       }
 
-
+      // ---- network check
       const netState = await NetInfo.fetch();
       if (!netState.isConnected) {
         throw { type: "network", message: "No internet connection." };
       }
 
+      // ---- request
       let response;
+
       switch (method) {
         case "post":
-          response = await userApiClient.post(url, data);
+          response = await client.post(url, data);
           break;
         case "put":
-          response = await userApiClient.put(url, data);
+          response = await client.put(url, data);
+          break;
+        case "patch":
+          response = await client.patch(url, data);
           break;
         case "delete":
-          response = await userApiClient.delete(url, { data });
+          response = await client.delete(url, { data });
           break;
         default:
           throw new Error(`Unsupported method: ${method}`);
@@ -94,25 +105,13 @@ export function useSubmitForm<T = any>(options: UseSubmitFormOptions<T>) {
     },
 
     onError: (error: any) => {
-
-        {/*  if (error?.type === "validation") {
-        console.log("Validation Errors:", error.errors);
-        return error.errors;
-      }
-
-      if (error?.type === "network") {
-        console.log("Network Error:", error.message);
-        return { network: error.message };
-      }*/}
-     
-
       const message = handleAxiosError(error);
       console.log("Mutation Error:", message);
       return { general: message };
     },
 
     onSuccess: (data) => {
-      if (onSuccess) onSuccess(data);
+      onSuccess?.(data);
     },
   });
 }
