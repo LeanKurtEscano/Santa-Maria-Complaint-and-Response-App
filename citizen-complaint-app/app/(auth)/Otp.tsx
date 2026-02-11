@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Mail, AlertCircle, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, Mail, AlertCircle, CheckCircle, WifiOff } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApiClient } from '@/lib/client/user';
 
@@ -32,6 +32,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
+  const [networkError, setNetworkError] = useState('');
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
 
@@ -40,7 +41,6 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
   const email = route?.params?.email || '';
   const phoneNumber = route?.params?.phoneNumber || '';
 
-  // Timer for resend OTP
   useEffect(() => {
     if (resendTimer > 0) {
       const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
@@ -51,22 +51,20 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
   }, [resendTimer]);
 
   const handleOtpChange = (value: string, index: number) => {
-    // Only allow numbers
     if (!/^\d*$/.test(value)) return;
 
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
     setError('');
+    setNetworkError('');
 
-    // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
   };
 
   const handleKeyPress = (e: any, index: number) => {
-    // Handle backspace
     if (e.nativeEvent.key === 'Backspace' && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
@@ -75,8 +73,11 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
   const handleResendOtp = async () => {
     if (!canResend) return;
 
+    setError('');
+    setNetworkError('');
+
     try {
-      await authApiClient.post('/auth/resend-otp', {
+      await authApiClient.post('/register', {
         email: email,
       });
 
@@ -84,16 +85,40 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
-    } catch (err) {
-      setError('Failed to resend OTP. Please try again.');
+    } catch (err: any) {
+      if (err?.code === 'ECONNABORTED' || err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
+        setNetworkError('Network error. Please check your connection and try again.');
+      } else if (err?.code === 'ETIMEDOUT') {
+        setNetworkError('Request timed out. Please try again.');
+      } else {
+        setError(err?.response?.data?.detail || err?.response?.data?.message || 'Failed to resend OTP. Please try again.');
+      }
     }
   };
 
-  // Helper function to convert base64 to Blob
-  const base64ToBlob = async (base64: string, filename: string): Promise<Blob> => {
-    const response = await fetch(base64);
-    const blob = await response.blob();
-    return blob;
+  // Helper function to convert date from MM/DD/YYYY to YYYY-MM-DD
+  const formatDateForBackend = (dateString: string): string => {
+    if (!dateString) return '';
+    
+    // Check if already in ISO format (YYYY-MM-DD)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+    
+    // Convert from MM/DD/YYYY to YYYY-MM-DD
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+      const [month, day, year] = dateString.split('/');
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    
+    // Convert from DD/MM/YYYY to YYYY-MM-DD (if that's your format)
+    // Uncomment this if your dates are in DD/MM/YYYY format instead
+    // if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) {
+    //   const [day, month, year] = dateString.split('/');
+    //   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    // }
+    
+    return dateString;
   };
 
   const handleVerifyOtp = async () => {
@@ -106,9 +131,9 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
     setIsVerifying(true);
     setError('');
+    setNetworkError('');
 
     try {
-   
       const registrationDataString = await AsyncStorage.getItem('registrationData');
       
       if (!registrationDataString) {
@@ -119,84 +144,97 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
       const registrationData = JSON.parse(registrationDataString);
 
-   
       const formData = new FormData();
 
-  
+      // Match backend field names exactly and format birthdate
       const dataObject = {
-        firstName: registrationData.firstName,
-        middleName: registrationData.middleName,
-        lastName: registrationData.lastName,
-        suffix: registrationData.suffix,
-        dateOfBirth: registrationData.dateOfBirth,
-        gender: registrationData.gender,
         email: registrationData.email,
-        phoneNumber: registrationData.phoneNumber,
         password: registrationData.password,
-        barangay: registrationData.barangay,
-        streetAddress: registrationData.streetAddress,
-        zone: registrationData.zone,
-        idType: registrationData.idType,
-        idNumber: registrationData.idNumber,
-        agreedToTerms: registrationData.agreedToTerms,
+        first_name: registrationData.firstName,
+        last_name: registrationData.lastName,
+        middle_name: registrationData.middleName || null,
+        suffix: registrationData.suffix || null,
         age: registrationData.age,
+        birthdate: formatDateForBackend(registrationData.dateOfBirth),
+        phone_number: registrationData.phoneNumber,
+        gender: registrationData.gender,
+        barangay: registrationData.barangay,
+        zip_code: registrationData.zipCode || registrationData.zone || null,
+        full_address: registrationData.streetAddress,
+        longitude: registrationData.longitude || null,
+        latitude: registrationData.latitude || null,
+        id_type: registrationData.idType,
+        id_number: registrationData.idNumber,
         otp: otpString,
       };
 
-    
       formData.append('data', JSON.stringify(dataObject));
 
-      // Append image files
+      // Append image files with backend field names
       if (registrationData.idFrontImage) {
-        const idFrontBlob = await base64ToBlob(registrationData.idFrontImage, 'id_front.jpg');
-        formData.append('idFrontImage', {
+        formData.append('front_id', {
           uri: registrationData.idFrontImage,
           type: 'image/jpeg',
-          name: 'id_front.jpg',
+          name: 'front_id.jpg',
         } as any);
       }
 
       if (registrationData.idBackImage) {
-        const idBackBlob = await base64ToBlob(registrationData.idBackImage, 'id_back.jpg');
-        formData.append('idBackImage', {
+        formData.append('back_id', {
           uri: registrationData.idBackImage,
           type: 'image/jpeg',
-          name: 'id_back.jpg',
+          name: 'back_id.jpg',
         } as any);
       }
 
       if (registrationData.selfieImage) {
-        const selfieBlob = await base64ToBlob(registrationData.selfieImage, 'selfie.jpg');
-        formData.append('selfieImage', {
+        formData.append('selfie_with_id', {
           uri: registrationData.selfieImage,
           type: 'image/jpeg',
-          name: 'selfie.jpg',
+          name: 'selfie_with_id.jpg',
         } as any);
       }
 
-      const response = await authApiClient.post('/auth/verify-otp', formData, {
+      const response = await authApiClient.post('/verify-otp', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      console.log('OTP Verification Response:', response.data);
-
-      // If successful, clear AsyncStorage
+      // Clear registration data after successful verification
       await AsyncStorage.removeItem('registrationData');
-      console.log('Registration data cleared from AsyncStorage');
 
-     
-      //router.push('/(auth)/VerificationPending');
+      // Navigate to home/tabs
       router.push('/(tabs)');
 
     } catch (err: any) {
-      console.error('OTP Verification Error:', err);
-      
-      if (err?.response?.data?.message) {
-        setError(err.response.data.message);
-      } else {
-        setError('Verification failed. Please try again.');
+      // Handle specific backend error messages
+      if (err?.response?.status === 400) {
+        const errorDetail = err?.response?.data?.detail || '';
+        
+        if (errorDetail.includes('expired') || errorDetail.includes('not found')) {
+          setError('OTP expired or not found. Please request a new one.');
+        } else if (errorDetail.includes('Invalid OTP')) {
+          setError('Invalid OTP. Please try again.');
+        } else if (errorDetail.includes('ID images')) {
+          setError('All ID images (front, back, selfie with ID) are required.');
+        } else if (errorDetail.includes('birthdate') || errorDetail.includes('datetime')) {
+          setError('Invalid date format. Please check your birth date.');
+        } else {
+          setError(errorDetail || 'Verification failed. Please try again.');
+        }
+      }
+      // Network errors
+      else if (err?.code === 'ECONNABORTED' || err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
+        setNetworkError('Network error. Please check your connection and try again.');
+      }
+      // Timeout errors
+      else if (err?.code === 'ETIMEDOUT') {
+        setNetworkError('Request timed out. Please try again.');
+      }
+      // Generic errors
+      else {
+        setError(err?.response?.data?.detail || err?.response?.data?.message || 'Verification failed. Please try again.');
       }
     } finally {
       setIsVerifying(false);
@@ -260,6 +298,18 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
               </Text>
             </View>
 
+            {/* Network Error Alert */}
+            {networkError && (
+              <View className="bg-error-50 border border-error-500 rounded-xl p-4 mb-6 flex-row items-start">
+                <View className="mr-3 flex-shrink-0">
+                  <WifiOff size={20} color="#EF4444" />
+                </View>
+                <Text className="text-sm text-error-600 flex-1 leading-5">
+                  {networkError}
+                </Text>
+              </View>
+            )}
+
             {/* OTP Input Section */}
             <View className="bg-white rounded-2xl p-6 shadow-sm border border-neutral-200 mb-6">
               <Text className="text-neutral-700 text-sm font-medium text-center mb-4">
@@ -291,7 +341,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
               {/* Error Message */}
               {error && (
-                <View className="flex-row items-center bg-error-50 border border-error-200 rounded-lg p-3 mb-4">
+                <View className="flex-row items-center bg-error-50 border border-gray-100 rounded-lg p-3 mb-4">
                   <AlertCircle size={20} color="#DC2626" />
                   <Text className="text-error-700 text-sm ml-2 flex-1">{error}</Text>
                 </View>
@@ -320,7 +370,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
             </View>
 
             {/* Information Notice */}
-            <View className="bg-primary-50 border border-primary-200 rounded-xl p-4 mb-6">
+            <View className="bg-primary-50 rounded-xl p-4 mb-6">
               <View className="flex-row items-start">
                 <View className="bg-primary-600 rounded-full p-1 mr-3 mt-0.5">
                   <CheckCircle size={16} color="#FFFFFF" />

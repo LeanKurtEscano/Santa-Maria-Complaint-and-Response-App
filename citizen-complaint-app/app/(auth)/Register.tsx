@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -34,11 +34,13 @@ import {
   AlertCircle,
   Calendar,
   FileText,
+  WifiOff,
 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { authApiClient } from '@/lib/client/user';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import convertImageToBase64 from '@/utils/general/image';
+
 export default function RegisterScreen({ navigation }: any) {
   const router = useRouter();
   const { t, i18n } = useTranslation();
@@ -52,6 +54,25 @@ export default function RegisterScreen({ navigation }: any) {
   const [submittedEmail, setSubmittedEmail] = useState("");
   const [age, setAge] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [networkError, setNetworkError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 18);
+    return date;
+  });
+
+  // Helper functions for date limits
+  const getMinDate = () => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 85);
+    return date;
+  };
+
+  const getMaxDate = () => {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 18);
+    return date;
+  };
 
   const {
     control,
@@ -61,6 +82,7 @@ export default function RegisterScreen({ navigation }: any) {
     setValue,
     setError,
     clearErrors,
+    reset,
   } = useForm<RegistrationFormData>({
     defaultValues: {
       firstName: '',
@@ -85,6 +107,53 @@ export default function RegisterScreen({ navigation }: any) {
 
   const password = watch('password');
 
+  // Load saved registration data on component mount
+  useEffect(() => {
+    loadSavedRegistrationData();
+  }, []);
+
+  const loadSavedRegistrationData = async () => {
+    try {
+      const savedData = await AsyncStorage.getItem('registrationFormData');
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        
+        // Restore form values
+        reset(parsedData);
+        
+        // Restore age if available
+        if (parsedData.age) {
+          setAge(parsedData.age);
+        }
+        
+        // Restore selected date if dateOfBirth exists
+        if (parsedData.dateOfBirth) {
+          const [month, day, year] = parsedData.dateOfBirth.split('/');
+          const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          setSelectedDate(date);
+        }
+        
+        console.log('Loaded saved registration data');
+      }
+    } catch (error) {
+      console.error('Error loading saved registration data:', error);
+    }
+  };
+
+  const saveFormData = async () => {
+    try {
+      const currentData = watch();
+      const dataToSave = {
+        ...currentData,
+        age: age,
+      };
+      await AsyncStorage.setItem('registrationFormData', JSON.stringify(dataToSave));
+      console.log('Form data saved to AsyncStorage');
+    } catch (error) {
+      console.error('Error saving form data:', error);
+    }
+  };
+
   const changeLanguage = (lang: string) => {
     i18n.changeLanguage(lang);
   };
@@ -105,6 +174,7 @@ export default function RegisterScreen({ navigation }: any) {
     }
 
     if (selectedDate) {
+      setSelectedDate(selectedDate);
       const calculatedAge = calculateAge(selectedDate);
       setAge(calculatedAge);
 
@@ -178,7 +248,7 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   const storeRegistrationData = async (data: RegistrationFormData) => {
-     const [idFrontBase64, idBackBase64, selfieBase64] = await Promise.all([
+    const [idFrontBase64, idBackBase64, selfieBase64] = await Promise.all([
       data.idFrontImage ? convertImageToBase64(data.idFrontImage) : null,
       data.idBackImage ? convertImageToBase64(data.idBackImage) : null,
       data.selfieImage ? convertImageToBase64(data.selfieImage) : null,
@@ -205,7 +275,7 @@ export default function RegisterScreen({ navigation }: any) {
         agreedToTerms: data.agreedToTerms,
         age: age,
       };
-      
+
       await AsyncStorage.setItem('registrationData', JSON.stringify(registrationData));
       console.log('Registration data stored successfully in AsyncStorage');
     } catch (error) {
@@ -214,17 +284,25 @@ export default function RegisterScreen({ navigation }: any) {
     }
   };
 
+  const clearSavedFormData = async () => {
+    try {
+      await AsyncStorage.removeItem('registrationFormData');
+      console.log('Saved form data cleared');
+    } catch (error) {
+      console.error('Error clearing saved form data:', error);
+    }
+  };
+
   const onSubmit = async (data: RegistrationFormData) => {
-    // Manual validation
+    setNetworkError(null);
+
     const validationErrors: { [key: string]: string } = {};
 
-    // Personal Info
     if (!data.firstName) validationErrors.firstName = t('required');
     if (!data.lastName) validationErrors.lastName = t('required');
     if (!data.dateOfBirth) validationErrors.dateOfBirth = t('required');
     if (!data.gender) validationErrors.gender = t('required');
 
-    // Contact
     if (!data.email) {
       validationErrors.email = t('required');
     } else if (!/\S+@\S+\.\S+/.test(data.email)) {
@@ -243,11 +321,9 @@ export default function RegisterScreen({ navigation }: any) {
       validationErrors.confirmPassword = t('passwordMismatch');
     }
 
-    // Address
     if (!data.barangay) validationErrors.barangay = t('required');
     if (!data.streetAddress) validationErrors.streetAddress = t('required');
 
-    // ID Verification
     if (!data.idType) validationErrors.idType = t('required');
     if (!data.idNumber) validationErrors.idNumber = t('required');
     if (!data.idFrontImage) validationErrors.idFrontImage = t('required');
@@ -269,11 +345,14 @@ export default function RegisterScreen({ navigation }: any) {
       return;
     }
 
+    // Save form data before submitting
+    await saveFormData();
+
     setIsLoading(true);
 
     try {
       // Send only email to backend
-      const response = await authApiClient.post('/auth/register', {
+      const response = await authApiClient.post('/register', {
         email: data.email,
       });
 
@@ -293,17 +372,34 @@ export default function RegisterScreen({ navigation }: any) {
 
     } catch (error: any) {
       console.error('Registration error:', error);
-      
-      if (error?.response?.data?.errors) {
-        // Handle validation errors from server
+
+      if (error?.response?.status === 400) {
+        setError('email', {
+          type: 'server',
+          message: error?.response?.data?.detail || 'Email already registered',
+        });
+        // Navigate back to step 2 (Contact Info) where email field is
+        setStep(2);
+      }
+      // Handle network errors
+      else if (error?.code === 'ECONNABORTED' || error?.code === 'ERR_NETWORK' || error?.message === 'Network Error') {
+        setNetworkError('Network error. Please check your connection and try again.');
+      }
+      // Handle timeout errors
+      else if (error?.code === 'ETIMEDOUT') {
+        setNetworkError('Request timed out. Please try again.');
+      }
+      // Handle validation errors from server
+      else if (error?.response?.data?.errors) {
         Object.entries(error.response.data.errors).forEach(([key, message]) => {
           setError(key as keyof RegistrationFormData, {
             type: 'server',
             message: message as string,
           });
         });
-      } else {
-        // Handle general error
+      }
+      // Handle general error
+      else {
         setError('root.general', {
           type: 'server',
           message: error?.response?.data?.message || error?.message || 'Registration failed',
@@ -313,6 +409,7 @@ export default function RegisterScreen({ navigation }: any) {
       setIsLoading(false);
     }
   };
+
 
   const renderStep1 = () => (
     <View>
@@ -329,9 +426,8 @@ export default function RegisterScreen({ navigation }: any) {
           rules={{ required: t('required') }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View
-              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
-                errors.firstName ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-              }`}
+              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.firstName ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
             >
               <User size={20} color="#6B7280" />
               <TextInput
@@ -386,9 +482,8 @@ export default function RegisterScreen({ navigation }: any) {
           rules={{ required: t('required') }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View
-              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
-                errors.lastName ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-              }`}
+              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.lastName ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
             >
               <User size={20} color="#6B7280" />
               <TextInput
@@ -444,16 +539,14 @@ export default function RegisterScreen({ navigation }: any) {
           render={({ field: { value } }) => (
             <TouchableOpacity
               onPress={() => setShowDatePicker(true)}
-              className={`flex-row items-center border-2 rounded-xl px-4 py-3.5 bg-white ${
-                errors.dateOfBirth ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-              }`}
+              className={`flex-row items-center border-2 rounded-xl px-4 py-3.5 bg-white ${errors.dateOfBirth ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
               activeOpacity={0.7}
             >
               <Calendar size={20} color="#6B7280" />
               <Text
-                className={`flex-1 ml-3 text-base ${
-                  value ? 'text-neutral-900' : 'text-neutral-400'
-                }`}
+                className={`flex-1 ml-3 text-base ${value ? 'text-neutral-900' : 'text-neutral-400'
+                  }`}
               >
                 {value || 'MM/DD/YYYY'}
               </Text>
@@ -472,22 +565,20 @@ export default function RegisterScreen({ navigation }: any) {
       {/* Date Picker */}
       {showDatePicker && (
         <DateTimePicker
-          value={
-            watch('dateOfBirth')
-              ? new Date(watch('dateOfBirth'))
-              : new Date(2000, 0, 1)
-          }
+          value={selectedDate}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={handleDateChange}
-          maximumDate={new Date()}
+          maximumDate={getMaxDate()}
+          minimumDate={getMinDate()}
+          textColor="#000000"
         />
       )}
 
       {/* iOS Date Picker Modal */}
       {Platform.OS === 'ios' && showDatePicker && (
         <Modal transparent animationType="slide">
-          <TouchableOpacity 
+          <TouchableOpacity
             className="flex-1 justify-end bg-black/50"
             activeOpacity={1}
             onPress={() => setShowDatePicker(false)}
@@ -506,23 +597,16 @@ export default function RegisterScreen({ navigation }: any) {
                     <X size={24} color="#6B7280" />
                   </TouchableOpacity>
                 </View>
-                
+
                 <View style={{ backgroundColor: 'white' }}>
                   <DateTimePicker
-                    value={
-                      watch('dateOfBirth')
-                        ? new Date(watch('dateOfBirth'))
-                        : new Date(2000, 0, 1)
-                    }
+                    value={selectedDate}
                     mode="date"
                     display="spinner"
                     onChange={handleDateChange}
-                    maximumDate={new Date()}
+                    maximumDate={getMaxDate()}
+                    minimumDate={getMinDate()}
                     textColor="#000000"
-                    style={{ 
-                      backgroundColor: 'white',
-                      height: 200 
-                    }}
                   />
                 </View>
 
@@ -565,16 +649,14 @@ export default function RegisterScreen({ navigation }: any) {
           render={({ field: { value } }) => (
             <TouchableOpacity
               onPress={() => setShowGenderModal(true)}
-              className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${
-                errors.gender ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-              }`}
+              className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${errors.gender ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
               activeOpacity={0.7}
             >
               <User size={20} color="#6B7280" />
               <Text
-                className={`flex-1 ml-3 text-base ${
-                  value ? 'text-neutral-900' : 'text-neutral-400'
-                }`}
+                className={`flex-1 ml-3 text-base ${value ? 'text-neutral-900' : 'text-neutral-400'
+                  }`}
               >
                 {value ? t(value) : t('Select Gender')}
               </Text>
@@ -622,9 +704,8 @@ export default function RegisterScreen({ navigation }: any) {
                     clearErrors('gender');
                     setShowGenderModal(false);
                   }}
-                  className={`py-4 border-b border-neutral-200 ${
-                    watch('gender') === option.value ? 'bg-primary-50' : ''
-                  }`}
+                  className={`py-4 border-b border-neutral-200 ${watch('gender') === option.value ? 'bg-primary-50' : ''
+                    }`}
                   activeOpacity={0.7}
                 >
                   <Text className="text-base text-neutral-900">{option.label}</Text>
@@ -649,6 +730,18 @@ export default function RegisterScreen({ navigation }: any) {
     <View>
       <Text className="text-2xl font-bold text-neutral-900 mb-6">{t('contactInfo')}</Text>
 
+      {/* Network Error Alert */}
+      {networkError && (
+        <View className="bg-error-50 border border-error-500 rounded-xl p-4 mb-6 flex-row items-start">
+          <View className="mr-3 flex-shrink-0">
+            <WifiOff size={20} color="#EF4444" />
+          </View>
+          <Text className="text-sm text-error-600 flex-1 leading-5">
+            {networkError}
+          </Text>
+        </View>
+      )}
+
       {/* Email */}
       <View className="mb-4">
         <Text className="text-sm font-medium text-neutral-700 mb-2">
@@ -666,15 +759,18 @@ export default function RegisterScreen({ navigation }: any) {
           }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View
-              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
-                errors.email ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-              }`}
+              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.email ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
             >
-              <Mail size={20} color="#6B7280" />
+              <Mail size={20} color={errors.email ? '#EF4444' : '#6B7280'} />
               <TextInput
                 className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
                 onBlur={onBlur}
-                onChangeText={onChange}
+                onChangeText={(text) => {
+                  onChange(text);
+                  clearErrors('email');
+                  setNetworkError(null);
+                }}
                 value={value}
                 placeholder="juan.delacruz@email.com"
                 placeholderTextColor="#9CA3AF"
@@ -685,9 +781,11 @@ export default function RegisterScreen({ navigation }: any) {
           )}
         />
         {errors.email && (
-          <View className="flex-row items-center mt-2">
-            <AlertCircle size={14} color="#EF4444" />
-            <Text className="text-error-600 text-xs ml-1">{errors.email.message}</Text>
+          <View className="flex-row items-center mt-2 px-1">
+            <View className="mr-1.5 flex-shrink-0">
+              <AlertCircle size={14} color="#EF4444" />
+            </View>
+            <Text className="text-error-600 text-xs flex-1">{errors.email.message}</Text>
           </View>
         )}
       </View>
@@ -703,9 +801,8 @@ export default function RegisterScreen({ navigation }: any) {
           rules={{ required: t('required') }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View
-              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
-                errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-              }`}
+              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
             >
               <Phone size={20} color="#6B7280" />
               <TextInput
@@ -745,9 +842,8 @@ export default function RegisterScreen({ navigation }: any) {
           }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View
-              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
-                errors.password ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-              }`}
+              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.password ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
             >
               <Lock size={20} color="#6B7280" />
               <TextInput
@@ -784,9 +880,8 @@ export default function RegisterScreen({ navigation }: any) {
           }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View
-              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
-                errors.confirmPassword ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-              }`}
+              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.confirmPassword ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
             >
               <Lock size={20} color="#6B7280" />
               <TextInput
@@ -846,16 +941,14 @@ export default function RegisterScreen({ navigation }: any) {
           render={({ field: { value } }) => (
             <TouchableOpacity
               onPress={() => setShowBarangayModal(true)}
-              className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${
-                errors.barangay ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-              }`}
+              className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${errors.barangay ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
               activeOpacity={0.7}
             >
               <MapPin size={20} color="#6B7280" />
               <Text
-                className={`flex-1 ml-3 text-base ${
-                  value ? 'text-neutral-900' : 'text-neutral-400'
-                }`}
+                className={`flex-1 ml-3 text-base ${value ? 'text-neutral-900' : 'text-neutral-400'
+                  }`}
               >
                 {value || t('selectBarangay')}
               </Text>
@@ -899,9 +992,8 @@ export default function RegisterScreen({ navigation }: any) {
                     clearErrors('barangay');
                     setShowBarangayModal(false);
                   }}
-                  className={`py-4 border-b border-neutral-200 ${
-                    watch('barangay') === brgy ? 'bg-primary-50' : ''
-                  }`}
+                  className={`py-4 border-b border-neutral-200 ${watch('barangay') === brgy ? 'bg-primary-50' : ''
+                    }`}
                   activeOpacity={0.7}
                 >
                   <Text className="text-base text-neutral-900">{brgy}</Text>
@@ -923,9 +1015,8 @@ export default function RegisterScreen({ navigation }: any) {
           rules={{ required: t('required') }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View
-              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
-                errors.streetAddress ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-              }`}
+              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.streetAddress ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
             >
               <MapPin size={20} color="#6B7280" />
               <TextInput
@@ -1008,16 +1099,14 @@ export default function RegisterScreen({ navigation }: any) {
           render={({ field: { value } }) => (
             <TouchableOpacity
               onPress={() => setShowIdTypeModal(true)}
-              className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${
-                errors.idType ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-              }`}
+              className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${errors.idType ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
               activeOpacity={0.7}
             >
               <CreditCard size={20} color="#6B7280" />
               <Text
-                className={`flex-1 ml-3 text-base ${
-                  value ? 'text-neutral-900' : 'text-neutral-400'
-                }`}
+                className={`flex-1 ml-3 text-base ${value ? 'text-neutral-900' : 'text-neutral-400'
+                  }`}
               >
                 {value ? t(value) : t('selectIdType')}
               </Text>
@@ -1061,9 +1150,8 @@ export default function RegisterScreen({ navigation }: any) {
                     clearErrors('idType');
                     setShowIdTypeModal(false);
                   }}
-                  className={`py-4 border-b border-neutral-200 ${
-                    watch('idType') === type ? 'bg-primary-50' : ''
-                  }`}
+                  className={`py-4 border-b border-neutral-200 ${watch('idType') === type ? 'bg-primary-50' : ''
+                    }`}
                   activeOpacity={0.7}
                 >
                   <Text className="text-base text-neutral-900">{t(type)}</Text>
@@ -1085,9 +1173,8 @@ export default function RegisterScreen({ navigation }: any) {
           rules={{ required: t('required') }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View
-              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
-                errors.idNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-              }`}
+              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.idNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
             >
               <FileText size={20} color="#6B7280" />
               <TextInput
@@ -1141,11 +1228,10 @@ export default function RegisterScreen({ navigation }: any) {
               ) : (
                 <TouchableOpacity
                   onPress={() => handleImagePick('idFrontImage')}
-                  className={`border-2 border-dashed rounded-xl p-6 items-center ${
-                    errors.idFrontImage
+                  className={`border-2 border-dashed rounded-xl p-6 items-center ${errors.idFrontImage
                       ? 'border-error-500 bg-error-50'
                       : 'border-neutral-300 bg-neutral-50'
-                  }`}
+                    }`}
                   activeOpacity={0.7}
                 >
                   <Camera size={32} color="#9CA3AF" />
@@ -1238,11 +1324,10 @@ export default function RegisterScreen({ navigation }: any) {
               ) : (
                 <TouchableOpacity
                   onPress={() => handleImagePick('selfieImage')}
-                  className={`border-2 border-dashed rounded-xl p-6 items-center ${
-                    errors.selfieImage
+                  className={`border-2 border-dashed rounded-xl p-6 items-center ${errors.selfieImage
                       ? 'border-error-500 bg-error-50'
                       : 'border-neutral-300 bg-neutral-50'
-                  }`}
+                    }`}
                   activeOpacity={0.7}
                 >
                   <Camera size={32} color="#9CA3AF" />
@@ -1327,13 +1412,12 @@ export default function RegisterScreen({ navigation }: any) {
               activeOpacity={0.7}
             >
               <View
-                className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${
-                  value
+                className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${value
                     ? 'bg-primary-600 border-primary-600'
                     : errors.agreedToTerms
-                    ? 'border-error-500'
-                    : 'border-neutral-300'
-                }`}
+                      ? 'border-error-500'
+                      : 'border-neutral-300'
+                  }`}
               >
                 {value && <Check size={14} color="#FFFFFF" />}
               </View>
@@ -1400,30 +1484,26 @@ export default function RegisterScreen({ navigation }: any) {
           <View className="flex-row justify-end mb-6 gap-2">
             <TouchableOpacity
               onPress={() => changeLanguage('en')}
-              className={`px-3.5 py-2 rounded-lg ${
-                i18n.language === 'en' ? 'bg-primary-600' : 'bg-neutral-100'
-              }`}
+              className={`px-3.5 py-2 rounded-lg ${i18n.language === 'en' ? 'bg-primary-600' : 'bg-neutral-100'
+                }`}
               activeOpacity={0.7}
             >
               <Text
-                className={`font-medium ${
-                  i18n.language === 'en' ? 'text-white' : 'text-neutral-700'
-                }`}
+                className={`font-medium ${i18n.language === 'en' ? 'text-white' : 'text-neutral-700'
+                  }`}
               >
                 EN
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => changeLanguage('tl')}
-              className={`px-3.5 py-2 rounded-lg ${
-                i18n.language === 'tl' ? 'bg-primary-600' : 'bg-neutral-100'
-              }`}
+              className={`px-3.5 py-2 rounded-lg ${i18n.language === 'tl' ? 'bg-primary-600' : 'bg-neutral-100'
+                }`}
               activeOpacity={0.7}
             >
               <Text
-                className={`font-medium ${
-                  i18n.language === 'tl' ? 'text-white' : 'text-neutral-700'
-                }`}
+                className={`font-medium ${i18n.language === 'tl' ? 'text-white' : 'text-neutral-700'
+                  }`}
               >
                 TL
               </Text>
@@ -1438,9 +1518,8 @@ export default function RegisterScreen({ navigation }: any) {
             {[1, 2, 3, 4].map((s) => (
               <View
                 key={s}
-                className={`flex-1 h-1.5 rounded-full ${
-                  s <= step ? 'bg-primary-600' : 'bg-neutral-200'
-                }`}
+                className={`flex-1 h-1.5 rounded-full ${s <= step ? 'bg-primary-600' : 'bg-neutral-200'
+                  }`}
               />
             ))}
           </View>
@@ -1463,3 +1542,4 @@ export default function RegisterScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
+

@@ -9,13 +9,14 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
-  
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSubmitForm } from '@/hooks/general/useSubmitForm';
 import { useRouter } from 'expo-router';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react-native';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, WifiOff } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { authApiClient } from '@/lib/client/user';
+
 interface LoginFormData {
     email: string;
     password: string;
@@ -32,8 +33,9 @@ export default function LoginScreen({ navigation }: any) {
     const [showPassword, setShowPassword] = useState(false);
 
     const loginMutation = useSubmitForm<LoginFormData>({
-        url: '/auth/login',
+        url: '/login',
         method: 'post',
+        client: authApiClient,
         validators: [
             (data) => {
                 const errors: { [key: string]: string } = {};
@@ -47,7 +49,7 @@ export default function LoginScreen({ navigation }: any) {
         ],
         onSuccess: (data) => {
             console.log('Login successful:', data);
-             router.replace('/(tabs)');
+            router.replace('/(tabs)');
         },
     });
 
@@ -60,8 +62,26 @@ export default function LoginScreen({ navigation }: any) {
             onError: (error: any) => {
                 if (error?.type === 'validation') {
                     setErrors(error.errors);
+                } else if (error?.status === 404) {
+                
+                    setErrors({ 
+                        email: 'No user registered with this email address.' 
+                    });
+                } else if (error?.status === 400) {
+                   
+                    setErrors({ 
+                        password: 'Incorrect password. Please try again.' 
+                    });
+                } else if (error?.code === 'OFFLINE' || error?.code === 'NETWORK_ERROR' || error?.code === 'TIMEOUT') {
+                  
+                    setErrors({ 
+                        general: 'Network error. Please check your connection.' 
+                    });
                 } else {
-                    setErrors({ general: error?.general || 'Login failed' });
+                 
+                    setErrors({ 
+                        general:  'Login failed. Please try again.' 
+                    });
                 }
             },
         });
@@ -146,11 +166,15 @@ export default function LoginScreen({ navigation }: any) {
                             </Text>
                         </View>
 
-                        {/* General Error Alert */}
+                        {/* Network Error Alert */}
                         {errors.general && (
                             <View className="bg-error-50 border border-error-500 rounded-xl p-4 mb-6 flex-row items-start">
                                 <View className="mr-3 flex-shrink-0">
-                                    <AlertCircle size={20} color="#EF4444" />
+                                    {errors.general.includes('network') || errors.general.includes('connection') ? (
+                                        <WifiOff size={20} color="#EF4444" />
+                                    ) : (
+                                        <AlertCircle size={20} color="#EF4444" />
+                                    )}
                                 </View>
                                 <Text className="text-sm text-error-600 flex-1 leading-5">
                                     {errors.general}
@@ -181,7 +205,7 @@ export default function LoginScreen({ navigation }: any) {
                                     value={formData.email}
                                     onChangeText={(text) => {
                                         setFormData({ ...formData, email: text });
-                                        setErrors({ ...errors, email: '' });
+                                        setErrors({ ...errors, email: '', general: '' });
                                     }}
                                     keyboardType="email-address"
                                     autoCapitalize="none"
@@ -229,7 +253,7 @@ export default function LoginScreen({ navigation }: any) {
                                     value={formData.password}
                                     onChangeText={(text) => {
                                         setFormData({ ...formData, password: text });
-                                        setErrors({ ...errors, password: '' });
+                                        setErrors({ ...errors, password: '', general: '' });
                                     }}
                                     secureTextEntry={!showPassword}
                                     autoComplete="password"

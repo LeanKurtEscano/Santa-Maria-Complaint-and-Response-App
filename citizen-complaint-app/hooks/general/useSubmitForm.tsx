@@ -41,9 +41,7 @@
 import { useMutation } from "@tanstack/react-query";
 import NetInfo from "@react-native-community/netinfo";
 import type { AxiosInstance } from "axios";
-
-import { handleAxiosError } from "@/utils/general/axiosException";
-
+import { handleApiError } from "@/utils/general/errorHandler";
 export type ValidatorFn<T> = (data: T) => { [key: string]: string } | null;
 
 interface UseSubmitFormOptions<T> {
@@ -54,6 +52,7 @@ interface UseSubmitFormOptions<T> {
   onSuccess?: (data: any) => void;
 }
 
+
 export function useSubmitForm<T = any>({
   url,
   client,
@@ -63,7 +62,7 @@ export function useSubmitForm<T = any>({
 }: UseSubmitFormOptions<T>) {
   return useMutation({
     mutationFn: async (data: T) => {
-      // ---- validation
+      
       const errors: Record<string, string> = {};
 
       for (const validator of validators) {
@@ -75,13 +74,11 @@ export function useSubmitForm<T = any>({
         throw { type: "validation", errors };
       }
 
-      // ---- network check
       const netState = await NetInfo.fetch();
       if (!netState.isConnected) {
-        throw { type: "network", message: "No internet connection." };
+        throw { code: "OFFLINE" };
       }
 
-      // ---- request
       let response;
 
       switch (method) {
@@ -105,9 +102,16 @@ export function useSubmitForm<T = any>({
     },
 
     onError: (error: any) => {
-      const message = handleAxiosError(error);
-      console.log("Mutation Error:", message);
-      return { general: message };
+      // Handle validation errors separately
+      if (error.type === "validation") {
+        console.log("Validation Error:", error.errors);
+        return error.errors;
+      }
+      
+      // Handle all other errors with handleApiError
+      const apiError = handleApiError(error);
+      console.log("Mutation Error:", apiError.message);
+      return { general: apiError.message };
     },
 
     onSuccess: (data) => {

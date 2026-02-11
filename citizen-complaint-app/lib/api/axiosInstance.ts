@@ -1,3 +1,4 @@
+import 'react-native-get-random-values'; // Must be first!
 import axios, { AxiosInstance } from "axios";
 import NetInfo from "@react-native-community/netinfo";
 import { v4 as uuidv4 } from "uuid";
@@ -11,15 +12,17 @@ export const createApi = (
     headers: {
       "Content-Type": "application/json",
     },
-    timeout: 20000, // 20s timeout for slow connections
+    timeout: 20000,
   });
 
   instance.interceptors.request.use(
     async (config) => {
       const net = await NetInfo.fetch();
+
       if (!net.isConnected) {
         return Promise.reject({ code: "OFFLINE" });
       }
+
       if (getToken) {
         try {
           const token = await getToken();
@@ -38,7 +41,6 @@ export const createApi = (
     (error) => Promise.reject(error)
   );
 
-
   instance.interceptors.response.use(
     (res) => res,
     async (error) => {
@@ -50,17 +52,23 @@ export const createApi = (
       const isTimeout = error.code === "ECONNABORTED";
       const isNetwork = !error.response;
 
-      // Retry logic (3 times with exponential backoff)
       if ((isTimeout || isNetwork) && config.__retryCount < 3) {
         config.__retryCount += 1;
-        const delay = Math.pow(2, config.__retryCount) * 1000; // 1s, 2s, 4s
+
+        const delay = Math.pow(2, config.__retryCount) * 1000;
         await new Promise((res) => setTimeout(res, delay));
+
         return instance(config);
       }
 
-     
-      if (isTimeout) return Promise.reject({ code: "TIMEOUT", message: "Slow network" });
-      if (isNetwork) return Promise.reject({ code: "NETWORK_ERROR", message: "No internet" });
+      if (isTimeout)
+        return Promise.reject({ code: "TIMEOUT", message: "Slow network" });
+
+      if (isNetwork)
+        return Promise.reject({
+          code: "NETWORK_ERROR",
+          message: "No internet",
+        });
 
       return Promise.reject(error);
     }
