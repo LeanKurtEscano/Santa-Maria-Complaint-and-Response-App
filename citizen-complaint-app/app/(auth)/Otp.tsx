@@ -121,6 +121,32 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     return dateString;
   };
 
+  const extractErrorMessage = (errorData: any): string => {
+    if (!errorData) return '';
+    
+   
+    if (Array.isArray(errorData)) {
+      return errorData
+        .map((e: any) => {
+          if (typeof e === 'string') return e;
+       
+          const field = e.loc ? e.loc.join('.') : '';
+          const msg = e.msg || e.message || '';
+          return field ? `${field}: ${msg}` : msg;
+        })
+        .filter(Boolean)
+        .join(', ') || 'Validation error occurred';
+    }
+    
+    // Handle object errors
+    if (typeof errorData === 'object' && errorData !== null) {
+      return errorData.msg || errorData.message || JSON.stringify(errorData);
+    }
+    
+    // Handle string errors
+    return String(errorData);
+  };
+
   const handleVerifyOtp = async () => {
     const otpString = otp.join('');
 
@@ -146,7 +172,6 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
       const formData = new FormData();
 
-      // Match backend field names exactly and format birthdate
       const dataObject = {
         email: registrationData.email,
         password: registrationData.password,
@@ -201,16 +226,18 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
         },
       });
 
-      // Clear registration data after successful verification
+
       await AsyncStorage.removeItem('registrationData');
 
-      // Navigate to home/tabs
-      router.push('/(tabs)');
+    
+      router.push('/(auth)');
 
     } catch (err: any) {
-      // Handle specific backend error messages
+      console.error('Verification error:', err?.response?.data); 
+      
+     
       if (err?.response?.status === 400) {
-        const errorDetail = err?.response?.data?.detail || '';
+        const errorDetail = extractErrorMessage(err?.response?.data?.detail);
         
         if (errorDetail.includes('expired') || errorDetail.includes('not found')) {
           setError('OTP expired or not found. Please request a new one.');
@@ -218,23 +245,31 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
           setError('Invalid OTP. Please try again.');
         } else if (errorDetail.includes('ID images')) {
           setError('All ID images (front, back, selfie with ID) are required.');
-        } else if (errorDetail.includes('birthdate') || errorDetail.includes('datetime')) {
+        } else if (errorDetail.includes('birthdate') || errorDetail.includes('datetime') || errorDetail.includes('date')) {
           setError('Invalid date format. Please check your birth date.');
+        } else if (errorDetail) {
+          setError(errorDetail);
         } else {
-          setError(errorDetail || 'Verification failed. Please try again.');
+          setError('Verification failed. Please try again.');
         }
       }
-      // Network errors
+     
+      else if (err?.response?.status === 422) {
+        const errorDetail = extractErrorMessage(err?.response?.data?.detail);
+        setError(errorDetail || 'Validation error. Please check your information.');
+      }
+      
       else if (err?.code === 'ECONNABORTED' || err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
         setNetworkError('Network error. Please check your connection and try again.');
       }
-      // Timeout errors
+      
       else if (err?.code === 'ETIMEDOUT') {
         setNetworkError('Request timed out. Please try again.');
       }
-      // Generic errors
+     
       else {
-        setError(err?.response?.data?.detail || err?.response?.data?.message || 'Verification failed. Please try again.');
+        const errorMsg = extractErrorMessage(err?.response?.data?.detail || err?.response?.data?.message);
+        setError(errorMsg || 'Verification failed. Please try again.');
       }
     } finally {
       setIsVerifying(false);

@@ -30,29 +30,40 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       set({ userData: null, loading: false });
     }
   },
-
+  
   mapUserFromBackend: (data) => {
+  const mappedUser: User = {
+    id: data.id,
+    email: data.email,
+    role: data.role,
+    is_administrator: data.is_administrator,
 
-    const mappedUser: User = {
-      id: data.id,
-      first_name: data.first_name,
-      middle_name: data.middle_name,
-      last_name: data.last_name,
-      age: data.age,
-      birthdate: data.birthdate,
-      email: data.email,
-      phone_number: data.phone_number,
-      status: data.status,  
-      longitude: data.longitude,
-      latitude: data.latitude,
-      role: data.role,
-      is_administrator: data.is_administrator,
-      profile: data.profile,
-      suffix: data.suffix,
-    };
+    profile_image: data.profile_image,
+    last_login: data.last_login,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
 
-    set({ userData: mappedUser, loading: false });
-  },
+    first_name: data.first_name,
+    last_name: data.last_name,
+    age: data.age,
+    gender: data.gender,
+    barangay: data.barangay,
+    full_address: data.full_address,
+    zip_code: data.zip_code,
+
+    latitude: data.latitude,
+    longitude: data.longitude,
+
+    id_type: data.id_type,
+    id_number: data.id_number,
+    front_id: data.front_id,
+    back_id: data.back_id,
+    selfie_with_id: data.selfie_with_id,
+  };
+
+  set({ userData: mappedUser, loading: false });
+},
+
 
   fetchCurrentUser: async () => {
     try {
@@ -65,7 +76,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
         return;
       }
 
-      const response = await userApiClient.get('/user-details');
+      const response = await userApiClient.get('/profile');
       
       if (response.data) {
         get().mapUserFromBackend(response.data);

@@ -35,6 +35,8 @@ import {
   Calendar,
   FileText,
   WifiOff,
+  Eye,
+  EyeOff,
 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { authApiClient } from '@/lib/client/user';
@@ -55,6 +57,8 @@ export default function RegisterScreen({ navigation }: any) {
   const [age, setAge] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [networkError, setNetworkError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => {
     const date = new Date();
     date.setFullYear(date.getFullYear() - 18);
@@ -118,8 +122,12 @@ export default function RegisterScreen({ navigation }: any) {
       if (savedData) {
         const parsedData = JSON.parse(savedData);
         
-        // Restore form values
-        reset(parsedData);
+        // Always exclude image fields from restored data
+        // Images should not persist across app restarts
+        const { idFrontImage, idBackImage, selfieImage, ...dataWithoutImages } = parsedData;
+        
+        // Restore form values (without images)
+        reset(dataWithoutImages);
         
         // Restore age if available
         if (parsedData.age) {
@@ -133,7 +141,7 @@ export default function RegisterScreen({ navigation }: any) {
           setSelectedDate(date);
         }
         
-        console.log('Loaded saved registration data');
+        console.log('Loaded saved registration data (images excluded)');
       }
     } catch (error) {
       console.error('Error loading saved registration data:', error);
@@ -186,6 +194,7 @@ export default function RegisterScreen({ navigation }: any) {
 
       setValue('dateOfBirth', formattedDate);
       clearErrors('dateOfBirth');
+      saveFormData();
     }
   };
 
@@ -212,6 +221,7 @@ export default function RegisterScreen({ navigation }: any) {
     if (!result.canceled) {
       setValue(currentImageField, result.assets[0].uri);
       clearErrors(currentImageField);
+      await saveFormData();
     }
 
     setShowImagePickerModal(false);
@@ -231,14 +241,18 @@ export default function RegisterScreen({ navigation }: any) {
     if (!result.canceled) {
       setValue(currentImageField, result.assets[0].uri);
       clearErrors(currentImageField);
+      await saveFormData();
     }
 
     setShowImagePickerModal(false);
     setCurrentImageField(null);
   };
 
-  const removeImage = (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
+  const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
     setValue(field, undefined);
+    clearErrors(field);
+    // Save form data after removing image
+    await saveFormData();
   };
 
   const getFileName = (uri: string | undefined) => {
@@ -293,122 +307,147 @@ export default function RegisterScreen({ navigation }: any) {
     }
   };
 
-  const onSubmit = async (data: RegistrationFormData) => {
-    setNetworkError(null);
+const onSubmit = async (data: RegistrationFormData) => {
+  setNetworkError(null);
 
-    const validationErrors: { [key: string]: string } = {};
+  const validationErrors: { [key: string]: string } = {};
 
-    if (!data.firstName) validationErrors.firstName = t('required');
-    if (!data.lastName) validationErrors.lastName = t('required');
-    if (!data.dateOfBirth) validationErrors.dateOfBirth = t('required');
-    if (!data.gender) validationErrors.gender = t('required');
+  if (!data.firstName) validationErrors.firstName = t('required');
+  if (!data.lastName) validationErrors.lastName = t('required');
+  if (!data.dateOfBirth) validationErrors.dateOfBirth = t('required');
+  if (!data.gender) validationErrors.gender = t('required');
 
-    if (!data.email) {
-      validationErrors.email = t('required');
-    } else if (!/\S+@\S+\.\S+/.test(data.email)) {
-      validationErrors.email = t('invalidEmail');
-    }
+  if (!data.email) {
+    validationErrors.email = t('required');
+  } else if (!/\S+@\S+\.\S+/.test(data.email)) {
+    validationErrors.email = t('invalidEmail');
+  }
 
-    if (!data.phoneNumber) validationErrors.phoneNumber = t('required');
+  if (!data.phoneNumber) validationErrors.phoneNumber = t('required');
 
-    if (!data.password) {
-      validationErrors.password = t('required');
-    } else if (data.password.length < 8) {
-      validationErrors.password = t('minLength', { count: 8 });
-    }
+  if (!data.password) {
+    validationErrors.password = t('required');
+  } else if (data.password.length < 8) {
+    validationErrors.password = t('minLength', { count: 8 });
+  }
 
-    if (data.password !== data.confirmPassword) {
-      validationErrors.confirmPassword = t('passwordMismatch');
-    }
+  if (data.password !== data.confirmPassword) {
+    validationErrors.confirmPassword = t('passwordMismatch');
+  }
 
-    if (!data.barangay) validationErrors.barangay = t('required');
-    if (!data.streetAddress) validationErrors.streetAddress = t('required');
+  if (!data.barangay) validationErrors.barangay = t('required');
+  if (!data.streetAddress) validationErrors.streetAddress = t('required');
 
-    if (!data.idType) validationErrors.idType = t('required');
-    if (!data.idNumber) validationErrors.idNumber = t('required');
-    if (!data.idFrontImage) validationErrors.idFrontImage = t('required');
-    if (!data.selfieImage) validationErrors.selfieImage = t('required');
+  if (!data.idType) validationErrors.idType = t('required');
+  if (!data.idNumber) validationErrors.idNumber = t('required');
+  if (!data.idFrontImage) validationErrors.idFrontImage = t('required');
+  if (!data.selfieImage) validationErrors.selfieImage = t('required');
 
-    // Terms
-    if (!data.agreedToTerms) {
-      validationErrors.agreedToTerms = t('required');
-    }
+  // Terms
+  if (!data.agreedToTerms) {
+    validationErrors.agreedToTerms = t('required');
+  }
 
-    // Set errors if any
-    if (Object.keys(validationErrors).length > 0) {
-      Object.entries(validationErrors).forEach(([key, message]) => {
-        setError(key as keyof RegistrationFormData, {
-          type: 'manual',
-          message,
-        });
+  // Set errors if any
+  if (Object.keys(validationErrors).length > 0) {
+    Object.entries(validationErrors).forEach(([key, message]) => {
+      setError(key as keyof RegistrationFormData, {
+        type: 'manual',
+        message,
       });
-      return;
-    }
+    });
+    return;
+  }
 
-    // Save form data before submitting
+  setIsLoading(true);
+
+  try {
+    // Save form data before API call
     await saveFormData();
 
-    setIsLoading(true);
+    console.log('Sending registration request...');
+    
+  
+    const response = await authApiClient.post('/register', {
+      email: data.email,
+    });
 
-    try {
-      // Send only email to backend
-      const response = await authApiClient.post('/register', {
-        email: data.email,
-      });
+    console.log('Registration API response:', response.data);
 
-      console.log('Registration API response:', response.data);
-
-      // Store all registration data in AsyncStorage after successful API call
-      await storeRegistrationData(data);
-
-      // Set submitted email for navigation
-      setSubmittedEmail(data.email);
-
-      // Navigate to OTP screen
-      router.replace({
-        pathname: "/(auth)/Otp",
-        params: { email: data.email },
-      });
-
-    } catch (error: any) {
-      console.error('Registration error:', error);
-
-      if (error?.response?.status === 400) {
-        setError('email', {
-          type: 'server',
-          message: error?.response?.data?.detail || 'Email already registered',
-        });
-        // Navigate back to step 2 (Contact Info) where email field is
-        setStep(2);
-      }
-      // Handle network errors
-      else if (error?.code === 'ECONNABORTED' || error?.code === 'ERR_NETWORK' || error?.message === 'Network Error') {
-        setNetworkError('Network error. Please check your connection and try again.');
-      }
-      // Handle timeout errors
-      else if (error?.code === 'ETIMEDOUT') {
-        setNetworkError('Request timed out. Please try again.');
-      }
-      // Handle validation errors from server
-      else if (error?.response?.data?.errors) {
-        Object.entries(error.response.data.errors).forEach(([key, message]) => {
-          setError(key as keyof RegistrationFormData, {
-            type: 'server',
-            message: message as string,
-          });
-        });
-      }
-      // Handle general error
-      else {
-        setError('root.general', {
-          type: 'server',
-          message: error?.response?.data?.message || error?.message || 'Registration failed',
-        });
-      }
-    } finally {
-      setIsLoading(false);
+   
+    if (!response || !response.data) {
+      throw new Error('Invalid response from server');
     }
-  };
+
+    await storeRegistrationData(data);
+    
+    console.log('Registration data stored successfully');
+
+
+    setSubmittedEmail(data.email);
+
+  
+    await clearSavedFormData();
+
+    console.log('Navigating to OTP screen...');
+
+  
+    router.replace({
+      pathname: "/(auth)/Otp",
+      params: { email: data.email },
+    });
+
+  } catch (error: any) {
+    console.error('Registration error:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      response: error?.response?.data,
+    });
+
+ 
+    if (error?.response?.status === 400) {
+      setError('email', {
+        type: 'server',
+        message: error?.response?.data?.detail || 'Email already registered',
+      });
+     
+      setStep(2);
+    }
+    
+    else if (
+      error?.code === 'ECONNABORTED' || 
+      error?.code === 'ERR_NETWORK' || 
+      error?.message === 'Network Error' ||
+      error?.message?.includes('Network request failed')
+    ) {
+      setNetworkError('Network error. Please check your connection and try again.');
+    }
+   
+    else if (error?.code === 'ETIMEDOUT') {
+      setNetworkError('Request timed out. Please try again.');
+    }
+    
+    else if (error?.response?.data?.errors) {
+      Object.entries(error.response.data.errors).forEach(([key, message]) => {
+        setError(key as keyof RegistrationFormData, {
+          type: 'server',
+          message: message as string,
+        });
+      });
+    }
+    // Handle general errors
+    else {
+      setNetworkError(
+        error?.response?.data?.message || 
+        error?.message || 
+        'Registration failed. Please try again.'
+      );
+    }
+  } finally {
+    setIsLoading(false);
+  }
+};
 
 
   const renderStep1 = () => (
@@ -703,6 +742,7 @@ export default function RegisterScreen({ navigation }: any) {
                     setValue('gender', option.value);
                     clearErrors('gender');
                     setShowGenderModal(false);
+                    saveFormData();
                   }}
                   className={`py-4 border-b border-neutral-200 ${watch('gender') === option.value ? 'bg-primary-50' : ''
                     }`}
@@ -853,8 +893,19 @@ export default function RegisterScreen({ navigation }: any) {
                 value={value}
                 placeholder="••••••••"
                 placeholderTextColor="#9CA3AF"
-                secureTextEntry
+                secureTextEntry={!showPassword}
               />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                className="p-1"
+                activeOpacity={0.7}
+              >
+                {showPassword ? (
+                  <EyeOff size={20} color="#6B7280" />
+                ) : (
+                  <Eye size={20} color="#6B7280" />
+                )}
+              </TouchableOpacity>
             </View>
           )}
         />
@@ -891,8 +942,19 @@ export default function RegisterScreen({ navigation }: any) {
                 value={value}
                 placeholder="••••••••"
                 placeholderTextColor="#9CA3AF"
-                secureTextEntry
+                secureTextEntry={!showConfirmPassword}
               />
+              <TouchableOpacity
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="p-1"
+                activeOpacity={0.7}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff size={20} color="#6B7280" />
+                ) : (
+                  <Eye size={20} color="#6B7280" />
+                )}
+              </TouchableOpacity>
             </View>
           )}
         />
@@ -991,6 +1053,7 @@ export default function RegisterScreen({ navigation }: any) {
                     setValue('barangay', brgy);
                     clearErrors('barangay');
                     setShowBarangayModal(false);
+                    saveFormData();
                   }}
                   className={`py-4 border-b border-neutral-200 ${watch('barangay') === brgy ? 'bg-primary-50' : ''
                     }`}
@@ -1149,6 +1212,7 @@ export default function RegisterScreen({ navigation }: any) {
                     setValue('idType', type);
                     clearErrors('idType');
                     setShowIdTypeModal(false);
+                    saveFormData();
                   }}
                   className={`py-4 border-b border-neutral-200 ${watch('idType') === type ? 'bg-primary-50' : ''
                     }`}
@@ -1407,7 +1471,10 @@ export default function RegisterScreen({ navigation }: any) {
           rules={{ required: t('required') }}
           render={({ field: { onChange, value } }) => (
             <TouchableOpacity
-              onPress={() => onChange(!value)}
+              onPress={() => {
+                onChange(!value);
+                saveFormData();
+              }}
               className="flex-row items-start mb-6"
               activeOpacity={0.7}
             >
@@ -1542,4 +1609,3 @@ export default function RegisterScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
-
