@@ -226,10 +226,15 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
         },
       });
 
+      if(response.status === 201) {
+         await AsyncStorage.removeItem('registrationData');
 
-      await AsyncStorage.removeItem('registrationData');
+      }
+
 
     
+
+      
       router.push('/(auth)');
 
     } catch (err: any) {

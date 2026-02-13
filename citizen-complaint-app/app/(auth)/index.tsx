@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, WifiOff } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authApiClient } from '@/lib/client/user';
-
+import { useCurrentUser } from '@/store/useCurrentUserStore';
 interface LoginFormData {
     email: string;
     password: string;
@@ -25,6 +25,7 @@ interface LoginFormData {
 export default function LoginScreen({ navigation }: any) {
     const router = useRouter();
     const { t, i18n } = useTranslation();
+    const {fetchCurrentUser} = useCurrentUser();
     const [formData, setFormData] = useState<LoginFormData>({
         email: '',
         password: '',
@@ -47,8 +48,9 @@ export default function LoginScreen({ navigation }: any) {
                 return Object.keys(errors).length > 0 ? errors : null;
             },
         ],
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
             console.log('Login successful:', data);
+            await fetchCurrentUser();
             router.replace('/(tabs)');
         },
     });
