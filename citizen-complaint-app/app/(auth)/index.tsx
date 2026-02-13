@@ -17,6 +17,7 @@ import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, WifiOff } from 'luci
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authApiClient } from '@/lib/client/user';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
+import * as SecureStore from 'expo-secure-store';
 interface LoginFormData {
     email: string;
     password: string;
@@ -49,6 +50,7 @@ export default function LoginScreen({ navigation }: any) {
             },
         ],
         onSuccess: async (data) => {
+            await SecureStore.setItemAsync('complaint_token', data.access_token);
             console.log('Login successful:', data);
             await fetchCurrentUser();
             router.replace('/(tabs)');

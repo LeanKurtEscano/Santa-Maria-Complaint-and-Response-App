@@ -66,7 +66,7 @@ export default function TabsLayout() {
         }}
       >
         <Tabs.Screen 
-          name="home"
+          name="index"
           options={{
             title: "Home",
             tabBarIcon: ({ color, focused }) => (
@@ -80,12 +80,12 @@ export default function TabsLayout() {
         />
         
         <Tabs.Screen 
-          name="complaints"
+          name="Complaints"
           options={{
             title: "Complaints",
             tabBarIcon: ({ color, focused }) => (
               <Ionicons 
-                name={focused ? "chatbox-ellipses" : "chatbox-ellipses-outline"} 
+                name={focused ? "document-text" : "document-text-outline"} 
                 size={24} 
                 color={color} 
               />
@@ -94,7 +94,7 @@ export default function TabsLayout() {
         />
         
         <Tabs.Screen 
-          name="notifications"
+          name="Notifications"
           options={{
             title: "Notifications",
             tabBarIcon: ({ color, focused }) => (
@@ -108,7 +108,7 @@ export default function TabsLayout() {
         />
         
         <Tabs.Screen 
-          name="profile"
+          name="Profile"
           options={{
             title: "Profile",
             tabBarIcon: ({ color, focused }) => (
