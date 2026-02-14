@@ -15,8 +15,6 @@ function RootLayoutNav() {
   const router = useRouter();
   const [initError, setInitError] = useState<any>(null);
   const [retrying, setRetrying] = useState(false);
-
-
   useEffect(() => {
     initializeApp();
   }, []);

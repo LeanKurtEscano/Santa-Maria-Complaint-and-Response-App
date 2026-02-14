@@ -463,8 +463,8 @@ export default function ProfileScreen() {
       {/* Map-Based Location Picker (Manual Pin) */}
       <LocationPicker
         visible={showMapPicker}
-        initialLatitude={userData.latitude}
-        initialLongitude={userData.longitude}
+         initialLatitude={userData.latitude ? parseFloat(userData.latitude) : undefined}
+  initialLongitude={userData.longitude ? parseFloat(userData.longitude) : undefined}
         onConfirm={handleLocationFromMap}
         onCancel={() => setShowMapPicker(false)}
       />

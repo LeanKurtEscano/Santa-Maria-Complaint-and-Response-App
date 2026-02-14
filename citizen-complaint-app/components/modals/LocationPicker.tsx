@@ -44,17 +44,18 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
   const [gettingLocation, setGettingLocation] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState({
-    latitude: initialLatitude || 14.5995, // Default to Manila
-    longitude: initialLongitude || 120.9842,
-  });
+ const [selectedLocation, setSelectedLocation] = useState({
+  latitude: initialLatitude ? parseFloat(initialLatitude.toString()) : 14.5995,
+  longitude: initialLongitude ? parseFloat(initialLongitude.toString()) : 120.9842,
+});
+
 
   useEffect(() => {
     if (visible) {
       if (initialLatitude && initialLongitude) {
         setSelectedLocation({
-          latitude: initialLatitude,
-          longitude: initialLongitude,
+          latitude: parseFloat(initialLatitude.toString()),
+        longitude: parseFloat(initialLongitude.toString()),
         });
       } else {
         // Try to get current location when modal opens
@@ -304,10 +305,10 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
           <View style={styles.coordinatesCard}>
             <Text style={styles.coordinatesLabel}>Selected Location:</Text>
             <Text style={styles.coordinatesText}>
-              Lat: {selectedLocation.latitude.toFixed(6)}
+              Lat: {(selectedLocation.latitude ?? 0).toFixed(6)}
             </Text>
             <Text style={styles.coordinatesText}>
-              Lng: {selectedLocation.longitude.toFixed(6)}
+              Lng: {(selectedLocation.longitude ?? 0).toFixed(6)}
             </Text>
           </View>
         </View>

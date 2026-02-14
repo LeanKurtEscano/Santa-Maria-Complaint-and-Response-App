@@ -34,6 +34,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
   },
   
   mapUserFromBackend: (data) => {
+    console.log(data)
     const mappedUser: User = {
       id: data.id,
       email: data.email,
