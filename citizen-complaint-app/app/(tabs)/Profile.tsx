@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,14 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useMutation } from '@tanstack/react-query';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
 import { useLocationPermission } from '@/hooks/general/useLocationPermission';
 import { LocationPermissionModal } from '@/components/modals/LocationPermissionModal';
 import { LocationPicker } from '@/components/modals/LocationPicker';
+import { userApiClient } from '@/lib/client/user';
+import ErrorScreen from '@/screen/general/ErrorScreen';
+import { handleApiError } from '@/utils/general/errorHandler';
 import {
   User,
   MapPin,
@@ -31,59 +35,76 @@ export default function ProfileScreen() {
   const [showMapPicker, setShowMapPicker] = useState(false);
 
 
+  const updateLocationMutation = useMutation({
+    mutationFn: async ({ latitude, longitude }: { latitude: number; longitude: number }) => {
+      const response = await userApiClient.put('/update-current-location', {
+        latitude,
+        longitude,
+      });
+      return response.data;
+    },
+    onSuccess: async () => {
+     
+      await fetchCurrentUser();
+      
+    
+      setShowLocationModal(false);
+      setShowMapPicker(false);
+      
+  
+      Alert.alert(
+        'Success',
+        'Your location has been saved successfully!',
+        [{ text: 'OK' }]
+      );
+    },
+    onError: (error) => {
+      const appError = handleApiError(error);
+      
+      console.error('Error saving location:', appError);
+      
+      Alert.alert(
+        'Error',
+        appError.message,
+        [{ text: 'OK' }]
+      );
+    },
+  });
 
   // Handle location permission from modal (auto-detect)
   const handleAllowLocation = async () => {
     const result = await requestLocationPermission();
 
     if (result.granted && result.latitude && result.longitude) {
-      // Option 1: Save directly
-      await saveLocationToBackend(result.latitude, result.longitude);
+     
+      updateLocationMutation.mutate({
+        latitude: result.latitude.toString(),
+        longitude: result.longitude.toString(),
+      });
+    } else if (!result.granted) {
+     
+      setShowLocationModal(false);
       
-      // Option 2: Show map for fine-tuning
-      // setShowLocationModal(false);
-      // setShowMapPicker(true);
+      Alert.alert(
+        'Permission Denied',
+        'Location permission was denied. You can still set your location manually using the map.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Use Map', 
+            onPress: () => setShowMapPicker(true)
+          }
+        ]
+      );
     }
   };
 
   // Handle location from map picker (manual pin)
   const handleLocationFromMap = async (latitude: number, longitude: number) => {
-    await saveLocationToBackend(latitude, longitude);
-    setShowMapPicker(false);
+    updateLocationMutation.mutate({ latitude: latitude.toString(), longitude: longitude.toString() });
   };
 
-  // Save location to backend
-  const saveLocationToBackend = async (latitude: number, longitude: number) => {
-    try {
-      // TODO: Call API to update user location
-      // await userApiClient.patch('/profile/location', {
-      //   latitude: latitude,
-      //   longitude: longitude,
-      // });
 
-      console.log('Location saved:', { latitude, longitude });
-
-      // Refresh user data after updating location
-      await fetchCurrentUser();
-      
-      setShowLocationModal(false);
-      
-      Alert.alert(
-        'Success',
-        'Your location has been saved successfully!',
-        [{ text: 'OK' }]
-      );
-    } catch (error) {
-      console.error('Error saving location:', error);
-      Alert.alert(
-        'Error',
-        'Failed to save location. Please try again.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
-
-  // Show loading state
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-white">
@@ -95,27 +116,18 @@ export default function ProfileScreen() {
     );
   }
 
-  // Show error state if no user data
+
   if (!userData) {
+    const error = new Error('Failed to load profile');
+    const appError = handleApiError(error);
+    
     return (
-      <SafeAreaView className="flex-1 bg-white">
-        <View className="flex-1 justify-center items-center px-6">
-          <AlertCircle size={48} color="#EF4444" />
-          <Text className="text-xl font-bold text-neutral-900 mt-4">
-            Failed to Load Profile
-          </Text>
-          <Text className="text-neutral-600 text-center mt-2">
-            Unable to retrieve your profile information.
-          </Text>
-          <TouchableOpacity
-            onPress={fetchCurrentUser}
-            className="bg-primary-600 rounded-xl px-6 py-3 mt-6"
-            activeOpacity={0.8}
-          >
-            <Text className="text-white font-semibold">Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <ErrorScreen
+        type={appError.type}
+        title="Failed to Load Profile"
+        message="Unable to retrieve your profile information."
+        onRetry={fetchCurrentUser}
+      />
     );
   }
 
@@ -173,17 +185,34 @@ export default function ProfileScreen() {
                 <View className="mt-3 gap-2">
                   <TouchableOpacity
                     onPress={() => setShowLocationModal(true)}
-                    className="bg-amber-600 rounded-lg py-2.5 items-center flex-row justify-center"
+                    disabled={updateLocationMutation.isPending}
+                    className={`rounded-lg py-2.5 items-center flex-row justify-center ${
+                      updateLocationMutation.isPending 
+                        ? 'bg-amber-400' 
+                        : 'bg-amber-600'
+                    }`}
                     activeOpacity={0.8}
                   >
-                    <MapPin size={16} color="#fff" />
-                    <Text className="text-white font-semibold text-sm ml-2">
-                      Auto-Detect Location
-                    </Text>
+                    {updateLocationMutation.isPending ? (
+                      <>
+                        <ActivityIndicator size="small" color="#fff" />
+                        <Text className="text-white font-semibold text-sm ml-2">
+                          Saving...
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <MapPin size={16} color="#fff" />
+                        <Text className="text-white font-semibold text-sm ml-2">
+                          Auto-Detect Location
+                        </Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                   
                   <TouchableOpacity
                     onPress={() => setShowMapPicker(true)}
+                    disabled={updateLocationMutation.isPending}
                     className="bg-white border border-amber-600 rounded-lg py-2.5 items-center flex-row justify-center"
                     activeOpacity={0.8}
                   >
@@ -208,27 +237,30 @@ export default function ProfileScreen() {
                   You can now file complaints in your area.
                 </Text>
                 
-                {/* Show coordinates */}
-                <View className="bg-white rounded-lg p-3 mb-2">
-                  <Text className="text-xs text-neutral-500 mb-1">Coordinates:</Text>
-                  <Text className="text-xs text-neutral-700 font-mono">
-                    Lat: {userData.latitude.toFixed(6)}
-                  </Text>
-                  <Text className="text-xs text-neutral-700 font-mono">
-                    Lng: {userData.longitude.toFixed(6)}
-                  </Text>
-                </View>
+             
 
                 {/* Update Location Button */}
                 <TouchableOpacity
                   onPress={() => setShowMapPicker(true)}
+                  disabled={updateLocationMutation.isPending}
                   className="bg-green-100 border border-green-300 rounded-lg py-2 items-center flex-row justify-center"
                   activeOpacity={0.8}
                 >
-                  <Map size={14} color="#059669" />
-                  <Text className="text-green-700 font-medium text-xs ml-2">
-                    Update Location
-                  </Text>
+                  {updateLocationMutation.isPending ? (
+                    <>
+                      <ActivityIndicator size="small" color="#059669" />
+                      <Text className="text-green-700 font-medium text-xs ml-2">
+                        Updating...
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Map size={14} color="#059669" />
+                      <Text className="text-green-700 font-medium text-xs ml-2">
+                        Update Location
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
             )}
@@ -392,7 +424,7 @@ export default function ProfileScreen() {
       {/* Location Permission Modal (Auto-Detect) */}
       <LocationPermissionModal
         visible={showLocationModal}
-        loading={locationLoading}
+        loading={locationLoading || updateLocationMutation.isPending}
         onAllow={handleAllowLocation}
         onCancel={() => setShowLocationModal(false)}
       />

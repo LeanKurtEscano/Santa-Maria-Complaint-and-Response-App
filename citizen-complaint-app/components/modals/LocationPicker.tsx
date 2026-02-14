@@ -101,8 +101,8 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
       
       if (data.type === 'locationSelected') {
         setSelectedLocation({
-          latitude: data.latitude,
-          longitude: data.longitude,
+          latitude: parseFloat(data.latitude),
+          longitude: parseFloat(data.longitude),
         });
       } else if (data.type === 'mapLoaded') {
         setLoading(false);
@@ -170,7 +170,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
           const customIcon = L.divIcon({
             className: 'custom-marker',
             html: \`
-              <svg width="40" height="50" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
+              <svg width="40" height="45" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
                 <!-- Drop shadow -->
                 <ellipse cx="20" cy="48" rx="8" ry="3" fill="rgba(0,0,0,0.2)"/>
                 <!-- Pin body -->
