@@ -26,6 +26,7 @@ import {
   CheckCircle,
   AlertCircle,
   Map,
+  LogOut,
 } from 'lucide-react-native';
 
 export default function ProfileScreen() {
@@ -33,7 +34,6 @@ export default function ProfileScreen() {
   const { locationLoading, requestLocationPermission } = useLocationPermission();
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
-
 
   const updateLocationMutation = useMutation({
     mutationFn: async ({ latitude, longitude }: { latitude: number; longitude: number }) => {
@@ -44,14 +44,11 @@ export default function ProfileScreen() {
       return response.data;
     },
     onSuccess: async () => {
-     
       await fetchCurrentUser();
       
-    
       setShowLocationModal(false);
       setShowMapPicker(false);
       
-  
       Alert.alert(
         'Success',
         'Your location has been saved successfully!',
@@ -76,13 +73,11 @@ export default function ProfileScreen() {
     const result = await requestLocationPermission();
 
     if (result.granted && result.latitude && result.longitude) {
-     
       updateLocationMutation.mutate({
         latitude: result.latitude.toString(),
         longitude: result.longitude.toString(),
       });
     } else if (!result.granted) {
-     
       setShowLocationModal(false);
       
       Alert.alert(
@@ -104,6 +99,31 @@ export default function ProfileScreen() {
     updateLocationMutation.mutate({ latitude: latitude.toString(), longitude: longitude.toString() });
   };
 
+  // Handle logout
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: () => {
+            // TODO: Implement your logout logic here
+            // Example:
+            // await logoutUser();
+            // navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+            console.log('Logout pressed - implement your logout logic');
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   if (loading) {
     return (
@@ -115,7 +135,6 @@ export default function ProfileScreen() {
       </SafeAreaView>
     );
   }
-
 
   if (!userData) {
     const error = new Error('Failed to load profile');
@@ -236,8 +255,6 @@ export default function ProfileScreen() {
                 <Text className="text-green-700 text-xs mb-3">
                   You can now file complaints in your area.
                 </Text>
-                
-             
 
                 {/* Update Location Button */}
                 <TouchableOpacity
@@ -418,6 +435,20 @@ export default function ProfileScreen() {
               </View>
             )}
           </View>
+        </View>
+
+        {/* Logout Button */}
+        <View className="px-6 mt-6 mb-6">
+          <TouchableOpacity
+            onPress={handleLogout}
+            className="bg-red-50 border border-red-200 rounded-xl py-4 flex-row items-center justify-center"
+            activeOpacity={0.8}
+          >
+            <LogOut size={20} color="#DC2626" />
+            <Text className="text-red-600 font-semibold text-base ml-2">
+              Logout
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
 
