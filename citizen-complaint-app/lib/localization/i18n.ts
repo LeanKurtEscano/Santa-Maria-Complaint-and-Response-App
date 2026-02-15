@@ -87,36 +87,113 @@ const resources = {
       complaintSystem: 'Complaint System',
       age: 'Age',
 
-
-      "verifyYourEmail": "Verify Your Email",
-      "otpSentMessage": "We've sent a 6-digit verification code to",
-      "enterVerificationCode": "Enter Verification Code",
+      // OTP Verification
+      verifyYourEmail: "Verify Your Email",
+      otpSentMessage: "We've sent a 6-digit verification code to",
+      enterVerificationCode: "Enter Verification Code",
       "didn'tReceiveCode": "Didn't receive the code?",
-      "resendOTP": "Resend OTP",
-      "resendIn": "Resend in",
-      "verifyOTP": "Verify Code",
-      "importantNotice": "Important Notice",
-      "otpVerificationNotice": "After verifying your email, your account will be reviewed by our team. You will receive a confirmation email once approved.",
+      resendOTP: "Resend OTP",
+      resendIn: "Resend in",
+      verifyOTP: "Verify Code",
+      importantNotice: "Important Notice",
+      otpVerificationNotice: "After verifying your email, your account will be reviewed by our team. You will receive a confirmation email once approved.",
 
       // Verification Pending Screen
-      "registrationSubmitted": "Registration Submitted!",
-      "accountUnderReview": "Your account is now under review by our verification team.",
-      "verificationEmailNotice": "You will receive an email notification once your account has been approved.",
-      "officialNotice": "Official Notice",
-      "applicationReceived": "Application Received",
-      "applicationReceivedDesc": "Your registration has been successfully submitted.",
-      "documentVerification": "Document Verification",
-      "documentVerificationDesc": "Our team is currently reviewing your submitted documents and information.",
-      "emailNotification": "Email Notification",
-      "emailNotificationDesc": "We will send you an email at:",
-      "verificationTimeline": "Verification Timeline",
-      "verificationTimelineDesc": "Account verification typically takes 1-3 business days. You will be notified via email once the process is complete.",
-      "whatsNext": "What's Next?",
-      "whatsNext1": "Check your email regularly for updates on your verification status",
-      "whatsNext2": "Ensure the email address you provided is correct and accessible",
-      "whatsNext3": "Once approved, you can log in using your registered credentials",
-      "backToLogin": "Back to Login",
-      "verificationHelpText": "Need help? Contact our support team at support@barangay.gov.ph"
+      registrationSubmitted: "Registration Submitted!",
+      accountUnderReview: "Your account is now under review by our verification team.",
+      verificationEmailNotice: "You will receive an email notification once your account has been approved.",
+      officialNotice: "Official Notice",
+      applicationReceived: "Application Received",
+      applicationReceivedDesc: "Your registration has been successfully submitted.",
+      documentVerification: "Document Verification",
+      documentVerificationDesc: "Our team is currently reviewing your submitted documents and information.",
+      emailNotification: "Email Notification",
+      emailNotificationDesc: "We will send you an email at:",
+      verificationTimeline: "Verification Timeline",
+      verificationTimelineDesc: "Account verification typically takes 1-3 business days. You will be notified via email once the process is complete.",
+      whatsNext: "What's Next?",
+      whatsNext1: "Check your email regularly for updates on your verification status",
+      whatsNext2: "Ensure the email address you provided is correct and accessible",
+      whatsNext3: "Once approved, you can log in using your registered credentials",
+      backToLogin: "Back to Login",
+      verificationHelpText: "Need help? Contact our support team at support@barangay.gov.ph",
+
+      // Common
+      common: {
+        ok: "OK",
+        cancel: "Cancel",
+        error: "Error",
+        loading: "Loading...",
+        save: "Save",
+        update: "Update"
+      },
+
+      // Profile
+      profile: {
+        title: "My Profile",
+        loadingProfile: "Loading profile...",
+        failedToLoad: "Failed to Load Profile",
+        unableToRetrieve: "Unable to retrieve your profile information.",
+        location: {
+          required: "Location Required",
+          requiredMessage: "Enable location access to file complaints in your area.",
+          autoDetect: "Auto-Detect Location",
+          pinOnMap: "Pin on Map",
+          enabled: "Location Enabled",
+          enabledMessage: "You can file complaints now. If you are in the complaint area, tap the white button on the map to use your current location.",
+          updateLocation: "Update Location",
+          saving: "Saving...",
+          updating: "Updating...",
+          useMap: "Use Map",
+          success: {
+            title: "Success",
+            message: "Your location has been saved successfully!"
+          },
+          permissionDenied: {
+            title: "Permission Denied",
+            message: "Location permission was denied. You can still set your location manually using the map."
+          }
+        },
+        personalInfo: {
+          title: "Personal Information",
+          email: "EMAIL",
+          fullName: "FULL NAME",
+          age: "AGE",
+          gender: "GENDER",
+          barangay: "BARANGAY",
+          fullAddress: "FULL ADDRESS",
+          yearsOld: "years old"
+        },
+        accountInfo: {
+          title: "Account Information",
+          role: "ACCOUNT ROLE",
+          memberSince: "MEMBER SINCE"
+        },
+        logout: {
+          title: "Logout",
+          confirmMessage: "Are you sure you want to logout?"
+        }
+      },
+
+      // Settings
+      settings: {
+        title: "Settings",
+        preferences: "Preferences",
+        localization: {
+          title: "Localization",
+          language: "Language",
+          selectLanguage: "Select Language",
+          english: "English",
+          tagalog: "Tagalog"
+        },
+        notifications: {
+          title: "Notifications",
+          pushNotifications: "Push Notifications",
+          emailNotifications: "Email Notifications",
+          complaintUpdates: "Complaint Updates",
+          newsAlerts: "News & Alerts"
+        }
+      }
     },
   },
   tl: {
@@ -202,35 +279,112 @@ const resources = {
       complaintSystem: 'Sistema ng Reklamo',
 
       // OTP Verification Screen
-      "verifyYourEmail": "I-verify ang Iyong Email",
-      "otpSentMessage": "Nagpadala kami ng 6-digit na verification code sa",
-      "enterVerificationCode": "Ilagay ang Verification Code",
+      verifyYourEmail: "I-verify ang Iyong Email",
+      otpSentMessage: "Nagpadala kami ng 6-digit na verification code sa",
+      enterVerificationCode: "Ilagay ang Verification Code",
       "didn'tReceiveCode": "Hindi natanggap ang code?",
-      "resendOTP": "Ipadala Muli ang OTP",
-      "resendIn": "Muling ipadala sa",
-      "verifyOTP": "I-verify ang Code",
-      "importantNotice": "Mahalagang Paalala",
-      "otpVerificationNotice": "Pagkatapos i-verify ang iyong email, ang iyong account ay susuriin ng aming team. Makakatanggap ka ng email confirmation kapag naaprubahan na.",
+      resendOTP: "Ipadala Muli ang OTP",
+      resendIn: "Muling ipadala sa",
+      verifyOTP: "I-verify ang Code",
+      importantNotice: "Mahalagang Paalala",
+      otpVerificationNotice: "Pagkatapos i-verify ang iyong email, ang iyong account ay susuriin ng aming team. Makakatanggap ka ng email confirmation kapag naaprubahan na.",
 
       // Verification Pending Screen
-      "registrationSubmitted": "Naisumite ang Rehistrasyon!",
-      "accountUnderReview": "Ang iyong account ay kasalukuyang sinusuri ng aming verification team.",
-      "verificationEmailNotice": "Makakatanggap ka ng email notification kapag naaprubahan na ang iyong account.",
-      "officialNotice": "Opisyal na Paalala",
-      "applicationReceived": "Natanggap ang Aplikasyon",
-      "applicationReceivedDesc": "Matagumpay na naisumite ang iyong rehistrasyon.",
-      "documentVerification": "Pag-verify ng Dokumento",
-      "documentVerificationDesc": "Kasalukuyang sinusuri ng aming team ang iyong mga isinumiteng dokumento at impormasyon.",
-      "emailNotification": "Email Notification",
-      "emailNotificationDesc": "Magpapadala kami ng email sa:",
-      "verificationTimeline": "Timeline ng Verification",
-      "verificationTimelineDesc": "Ang pag-verify ng account ay karaniwang tumatagal ng 1-3 araw ng negosyo. Bibigyan ka ng abiso sa email kapag tapos na ang proseso.",
-      "whatsNext": "Ano ang Susunod?",
-      "whatsNext1": "Regular na suriin ang iyong email para sa updates sa iyong verification status",
-      "whatsNext2": "Siguraduhing tama at accessible ang email address na iyong ibinigay",
-      "whatsNext3": "Kapag naaprubahan na, maaari ka nang mag-log in gamit ang iyong mga credentials",
-      "backToLogin": "Bumalik sa Login",
-      "verificationHelpText": "Kailangan ng tulong? Kontakin ang aming support team sa support@barangay.gov.ph"
+      registrationSubmitted: "Naisumite ang Rehistrasyon!",
+      accountUnderReview: "Ang iyong account ay kasalukuyang sinusuri ng aming verification team.",
+      verificationEmailNotice: "Makakatanggap ka ng email notification kapag naaprubahan na ang iyong account.",
+      officialNotice: "Opisyal na Paalala",
+      applicationReceived: "Natanggap ang Aplikasyon",
+      applicationReceivedDesc: "Matagumpay na naisumite ang iyong rehistrasyon.",
+      documentVerification: "Pag-verify ng Dokumento",
+      documentVerificationDesc: "Kasalukuyang sinusuri ng aming team ang iyong mga isinumiteng dokumento at impormasyon.",
+      emailNotification: "Email Notification",
+      emailNotificationDesc: "Magpapadala kami ng email sa:",
+      verificationTimeline: "Timeline ng Verification",
+      verificationTimelineDesc: "Ang pag-verify ng account ay karaniwang tumatagal ng 1-3 araw ng negosyo. Bibigyan ka ng abiso sa email kapag tapos na ang proseso.",
+      whatsNext: "Ano ang Susunod?",
+      whatsNext1: "Regular na suriin ang iyong email para sa updates sa iyong verification status",
+      whatsNext2: "Siguraduhing tama at accessible ang email address na iyong ibinigay",
+      whatsNext3: "Kapag naaprubahan na, maaari ka nang mag-log in gamit ang iyong mga credentials",
+      backToLogin: "Bumalik sa Login",
+      verificationHelpText: "Kailangan ng tulong? Kontakin ang aming support team sa support@barangay.gov.ph",
+
+      // Common
+      common: {
+        ok: "Sige",
+        cancel: "Kanselahin",
+        error: "May Mali",
+        loading: "Naglo-load...",
+        save: "I-save",
+        update: "I-update"
+      },
+
+      // Profile
+      profile: {
+        title: "Aking Profile",
+        loadingProfile: "Naglo-load ng profile...",
+        failedToLoad: "Hindi Na-load ang Profile",
+        unableToRetrieve: "Hindi makuha ang iyong impormasyon sa profile.",
+        location: {
+          required: "Kailangan ang Lokasyon",
+          requiredMessage: "Paganahin ang access sa lokasyon upang magsumite ng reklamo sa iyong lugar.",
+          autoDetect: "Auto-Detect ng Lokasyon",
+          pinOnMap: "I-pin sa Mapa",
+          enabled: "Naka-enable ang Lokasyon",
+          enabledMessage: "Maaari ka nang magsumite ng reklamo. Kung nasa complaint area ka, i-tap ang puting button sa mapa upang gamitin ang iyong kasalukuyang lokasyon.",
+          updateLocation: "I-update ang Lokasyon",
+          saving: "Nag-se-save...",
+          updating: "Nag-a-update...",
+          useMap: "Gamitin ang Mapa",
+          success: {
+            title: "Tagumpay",
+            message: "Matagumpay na na-save ang iyong lokasyon!"
+          },
+          permissionDenied: {
+            title: "Tinanggihan ang Pahintulot",
+            message: "Tinanggihan ang pahintulot sa lokasyon. Maaari mo pa ring itakda ang iyong lokasyon gamit ang mapa."
+          }
+        },
+        personalInfo: {
+          title: "Personal na Impormasyon",
+          email: "EMAIL",
+          fullName: "BUONG PANGALAN",
+          age: "EDAD",
+          gender: "KASARIAN",
+          barangay: "BARANGAY",
+          fullAddress: "BUONG ADDRESS",
+          yearsOld: "taong gulang"
+        },
+        accountInfo: {
+          title: "Impormasyon ng Account",
+          role: "TUNGKULIN SA ACCOUNT",
+          memberSince: "MIYEMBRO MULA"
+        },
+        logout: {
+          title: "Mag-logout",
+          confirmMessage: "Sigurado ka bang gusto mong mag-logout?"
+        }
+      },
+
+      // Settings
+      settings: {
+        title: "Mga Setting",
+        preferences: "Mga Kagustuhan",
+        localization: {
+          title: "Lokalisasyon",
+          language: "Wika",
+          selectLanguage: "Pumili ng Wika",
+          english: "Ingles",
+          tagalog: "Tagalog"
+        },
+        notifications: {
+          title: "Mga Notification",
+          pushNotifications: "Push Notifications",
+          emailNotifications: "Email Notifications",
+          complaintUpdates: "Updates sa Reklamo",
+          newsAlerts: "Balita at Alerto"
+        }
+      }
     },
   },
 };

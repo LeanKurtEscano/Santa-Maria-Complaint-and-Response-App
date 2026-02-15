@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,17 +6,14 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useMutation } from '@tanstack/react-query';
-import { useCurrentUser } from '@/store/useCurrentUserStore';
-import { useLocationPermission } from '@/hooks/general/useLocationPermission';
+import { useTranslation } from 'react-i18next';
 import { LocationPermissionModal } from '@/components/modals/LocationPermissionModal';
 import { LocationPicker } from '@/components/modals/LocationPicker';
-import { userApiClient } from '@/lib/client/user';
 import ErrorScreen from '@/screen/general/ErrorScreen';
 import { handleApiError } from '@/utils/general/errorHandler';
+import { useProfileLogic } from '@/hooks/general/useProfile';
 import {
   User,
   MapPin,
@@ -27,110 +24,36 @@ import {
   AlertCircle,
   Map,
   LogOut,
+  Settings,
 } from 'lucide-react-native';
-
+import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 export default function ProfileScreen() {
-  const { userData, loading, fetchCurrentUser } = useCurrentUser();
-  const { locationLoading, requestLocationPermission } = useLocationPermission();
-  const [showLocationModal, setShowLocationModal] = useState(false);
-  const [showMapPicker, setShowMapPicker] = useState(false);
-
-  const updateLocationMutation = useMutation({
-    mutationFn: async ({ latitude, longitude }: { latitude: number; longitude: number }) => {
-      const response = await userApiClient.put('/update-current-location', {
-        latitude,
-        longitude,
-      });
-      return response.data;
-    },
-    onSuccess: async () => {
-      await fetchCurrentUser();
-      
-      setShowLocationModal(false);
-      setShowMapPicker(false);
-      
-      Alert.alert(
-        'Success',
-        'Your location has been saved successfully!',
-        [{ text: 'OK' }]
-      );
-    },
-    onError: (error) => {
-      const appError = handleApiError(error);
-      
-      console.error('Error saving location:', appError);
-      
-      Alert.alert(
-        'Error',
-        appError.message,
-        [{ text: 'OK' }]
-      );
-    },
-  });
-
-  // Handle location permission from modal (auto-detect)
-  const handleAllowLocation = async () => {
-    const result = await requestLocationPermission();
-
-    if (result.granted && result.latitude && result.longitude) {
-      updateLocationMutation.mutate({
-        latitude: result.latitude.toString(),
-        longitude: result.longitude.toString(),
-      });
-    } else if (!result.granted) {
-      setShowLocationModal(false);
-      
-      Alert.alert(
-        'Permission Denied',
-        'Location permission was denied. You can still set your location manually using the map.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Use Map', 
-            onPress: () => setShowMapPicker(true)
-          }
-        ]
-      );
-    }
-  };
-
-  // Handle location from map picker (manual pin)
-  const handleLocationFromMap = async (latitude: number, longitude: number) => {
-    updateLocationMutation.mutate({ latitude: latitude.toString(), longitude: longitude.toString() });
-  };
-
-  // Handle logout
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: () => {
-            // TODO: Implement your logout logic here
-            // Example:
-            // await logoutUser();
-            // navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-            console.log('Logout pressed - implement your logout logic');
-          },
-        },
-      ],
-      { cancelable: true }
-    );
-  };
+  const { t } = useTranslation();
+  const navigation = useNavigation();
+  const router = useRouter();
+  const {
+    userData,
+    loading,
+    hasLocation,
+    showLocationModal,
+    showMapPicker,
+    locationLoading,
+    updateLocationMutation,
+    setShowLocationModal,
+    setShowMapPicker,
+    handleAllowLocation,
+    handleLocationFromMap,
+    handleLogout,
+    fetchCurrentUser,
+  } = useProfileLogic();
 
   if (loading) {
     return (
       <SafeAreaView className="flex-1 bg-white">
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color="#2563EB" />
-          <Text className="text-neutral-600 mt-4">Loading profile...</Text>
+          <Text className="text-neutral-600 mt-4">{t('profile.loadingProfile')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -139,29 +62,36 @@ export default function ProfileScreen() {
   if (!userData) {
     const error = new Error('Failed to load profile');
     const appError = handleApiError(error);
-    
+
     return (
       <ErrorScreen
         type={appError.type}
-        title="Failed to Load Profile"
-        message="Unable to retrieve your profile information."
+        title={t('profile.failedToLoad')}
+        message={t('profile.unableToRetrieve')}
         onRetry={fetchCurrentUser}
       />
     );
   }
 
-  const hasLocation = userData.latitude && userData.longitude;
-
   return (
-    <SafeAreaView className="flex-1 bg-neutral-50">
+    <SafeAreaView className="flex-1 bg-neutral-50" edges={["top"]}>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Header with Settings Button */}
         <View className="bg-primary-600 px-6 pt-6 pb-12">
-          <Text className="text-white text-2xl font-bold">My Profile</Text>
+          <View className="flex-row items-center justify-between">
+            <Text className="text-white text-2xl font-bold">{t('profile.title')}</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/profile/settings')}
+              className="bg-white/20 rounded-full p-2"
+              activeOpacity={0.7}
+            >
+              <Settings size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Profile Card */}
@@ -185,29 +115,29 @@ export default function ProfileScreen() {
               <Text className="text-neutral-600 text-sm mt-1">{userData.email}</Text>
             </View>
 
-            {/* Location Status */}
+            {/* Location Status - Not Enabled */}
             {!hasLocation && (
               <View className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                 <View className="flex-row items-start">
                   <AlertCircle size={20} color="#F59E0B" />
                   <View className="flex-1 ml-3">
                     <Text className="text-amber-900 font-semibold text-sm">
-                      Location Required
+                      {t('profile.location.required')}
                     </Text>
                     <Text className="text-amber-700 text-xs mt-1">
-                      Enable location access to file complaints in your area.
+                      {t('profile.location.requiredMessage')}
                     </Text>
                   </View>
                 </View>
-                
+
                 {/* Action Buttons */}
                 <View className="mt-3 gap-2">
                   <TouchableOpacity
                     onPress={() => setShowLocationModal(true)}
                     disabled={updateLocationMutation.isPending}
                     className={`rounded-lg py-2.5 items-center flex-row justify-center ${
-                      updateLocationMutation.isPending 
-                        ? 'bg-amber-400' 
+                      updateLocationMutation.isPending
+                        ? 'bg-amber-400'
                         : 'bg-amber-600'
                     }`}
                     activeOpacity={0.8}
@@ -216,19 +146,19 @@ export default function ProfileScreen() {
                       <>
                         <ActivityIndicator size="small" color="#fff" />
                         <Text className="text-white font-semibold text-sm ml-2">
-                          Saving...
+                          {t('profile.location.saving')}
                         </Text>
                       </>
                     ) : (
                       <>
                         <MapPin size={16} color="#fff" />
                         <Text className="text-white font-semibold text-sm ml-2">
-                          Auto-Detect Location
+                          {t('profile.location.autoDetect')}
                         </Text>
                       </>
                     )}
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity
                     onPress={() => setShowMapPicker(true)}
                     disabled={updateLocationMutation.isPending}
@@ -237,23 +167,24 @@ export default function ProfileScreen() {
                   >
                     <Map size={16} color="#D97706" />
                     <Text className="text-amber-600 font-semibold text-sm ml-2">
-                      Pin on Map
+                      {t('profile.location.pinOnMap')}
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
 
+            {/* Location Status - Enabled */}
             {hasLocation && (
               <View className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
                 <View className="flex-row items-center mb-2">
                   <CheckCircle size={20} color="#10B981" />
                   <Text className="text-green-900 font-semibold text-sm ml-2">
-                    Location Enabled
+                    {t('profile.location.enabled')}
                   </Text>
                 </View>
                 <Text className="text-green-700 text-xs mb-3">
-                  You can now file complaints in your area.
+                  {t('profile.location.enabledMessage')}
                 </Text>
 
                 {/* Update Location Button */}
@@ -267,14 +198,14 @@ export default function ProfileScreen() {
                     <>
                       <ActivityIndicator size="small" color="#059669" />
                       <Text className="text-green-700 font-medium text-xs ml-2">
-                        Updating...
+                        {t('profile.location.updating')}
                       </Text>
                     </>
                   ) : (
                     <>
                       <Map size={14} color="#059669" />
                       <Text className="text-green-700 font-medium text-xs ml-2">
-                        Update Location
+                        {t('profile.location.updateLocation')}
                       </Text>
                     </>
                   )}
@@ -287,7 +218,7 @@ export default function ProfileScreen() {
         {/* Personal Information */}
         <View className="px-6 mt-6">
           <Text className="text-lg font-bold text-neutral-900 mb-4">
-            Personal Information
+            {t('profile.personalInfo.title')}
           </Text>
 
           <View className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6">
@@ -296,7 +227,7 @@ export default function ProfileScreen() {
               <View className="flex-row items-center mb-2">
                 <Mail size={16} color="#6B7280" />
                 <Text className="text-xs font-medium text-neutral-500 ml-2">
-                  EMAIL
+                  {t('profile.personalInfo.email')}
                 </Text>
               </View>
               <Text className="text-base text-neutral-900">{userData.email}</Text>
@@ -310,7 +241,7 @@ export default function ProfileScreen() {
               <View className="flex-row items-center mb-2">
                 <User size={16} color="#6B7280" />
                 <Text className="text-xs font-medium text-neutral-500 ml-2">
-                  FULL NAME
+                  {t('profile.personalInfo.fullName')}
                 </Text>
               </View>
               <Text className="text-base text-neutral-900">
@@ -328,11 +259,11 @@ export default function ProfileScreen() {
                   <View className="flex-row items-center mb-2">
                     <Calendar size={16} color="#6B7280" />
                     <Text className="text-xs font-medium text-neutral-500 ml-2">
-                      AGE
+                      {t('profile.personalInfo.age')}
                     </Text>
                   </View>
                   <Text className="text-base text-neutral-900">
-                    {userData.age} years old
+                    {userData.age} {t('profile.personalInfo.yearsOld')}
                   </Text>
                 </View>
 
@@ -348,7 +279,7 @@ export default function ProfileScreen() {
                   <View className="flex-row items-center mb-2">
                     <User size={16} color="#6B7280" />
                     <Text className="text-xs font-medium text-neutral-500 ml-2">
-                      GENDER
+                      {t('profile.personalInfo.gender')}
                     </Text>
                   </View>
                   <Text className="text-base text-neutral-900 capitalize">
@@ -368,7 +299,7 @@ export default function ProfileScreen() {
                   <View className="flex-row items-center mb-2">
                     <MapPin size={16} color="#6B7280" />
                     <Text className="text-xs font-medium text-neutral-500 ml-2">
-                      BARANGAY
+                      {t('profile.personalInfo.barangay')}
                     </Text>
                   </View>
                   <Text className="text-base text-neutral-900">
@@ -387,7 +318,7 @@ export default function ProfileScreen() {
                 <View className="flex-row items-center mb-2">
                   <Home size={16} color="#6B7280" />
                   <Text className="text-xs font-medium text-neutral-500 ml-2">
-                    FULL ADDRESS
+                    {t('profile.personalInfo.fullAddress')}
                   </Text>
                 </View>
                 <Text className="text-base text-neutral-900">
@@ -402,14 +333,14 @@ export default function ProfileScreen() {
         {/* Account Information */}
         <View className="px-6 mt-6">
           <Text className="text-lg font-bold text-neutral-900 mb-4">
-            Account Information
+            {t('profile.accountInfo.title')}
           </Text>
 
           <View className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6">
             {/* Role */}
             <View className="mb-4">
               <Text className="text-xs font-medium text-neutral-500 mb-2">
-                ACCOUNT ROLE
+                {t('profile.accountInfo.role')}
               </Text>
               <Text className="text-base text-neutral-900 capitalize">
                 {userData.role}
@@ -423,7 +354,7 @@ export default function ProfileScreen() {
             {userData.created_at && (
               <View>
                 <Text className="text-xs font-medium text-neutral-500 mb-2">
-                  MEMBER SINCE
+                  {t('profile.accountInfo.memberSince')}
                 </Text>
                 <Text className="text-base text-neutral-900">
                   {new Date(userData.created_at).toLocaleDateString('en-US', {
@@ -446,7 +377,7 @@ export default function ProfileScreen() {
           >
             <LogOut size={20} color="#DC2626" />
             <Text className="text-red-600 font-semibold text-base ml-2">
-              Logout
+              {t('profile.logout.title')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -463,8 +394,8 @@ export default function ProfileScreen() {
       {/* Map-Based Location Picker (Manual Pin) */}
       <LocationPicker
         visible={showMapPicker}
-         initialLatitude={userData.latitude ? parseFloat(userData.latitude) : undefined}
-  initialLongitude={userData.longitude ? parseFloat(userData.longitude) : undefined}
+        initialLatitude={userData.latitude ? parseFloat(userData.latitude) : undefined}
+        initialLongitude={userData.longitude ? parseFloat(userData.longitude) : undefined}
         onConfirm={handleLocationFromMap}
         onCancel={() => setShowMapPicker(false)}
       />
