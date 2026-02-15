@@ -7,9 +7,11 @@ import { userApiClient } from '@/lib/client/user';
 import { handleApiError } from '@/utils/general/errorHandler';
 import * as secureStorage from 'expo-secure-store';
 import { useTranslation } from 'react-i18next';
-
+import useToast from './useToast';
 export const useProfileLogic = () => {
   const { t } = useTranslation();
+  const { toastType,toastMessage, showToast, setToastVisible,toastVisible } = useToast();
+
   const { userData, loading, fetchCurrentUser, clearUser } = useCurrentUser();
   const { locationLoading, requestLocationPermission } = useLocationPermission();
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -37,14 +39,12 @@ export const useProfileLogic = () => {
     },
     onError: (error) => {
       const appError = handleApiError(error);
-
-      console.error('Error saving location:', appError);
-
-      Alert.alert(
-        t('common.error'),
-        appError.message,
-        [{ text: t('common.ok') }]
-      );
+      showToast(appError.message, 'error');
+      setShowMapPicker(false);
+      setShowLocationModal(false);
+     
+      
+      
     },
   });
 
@@ -121,5 +121,10 @@ export const useProfileLogic = () => {
     handleLocationFromMap,
     handleLogout,
     fetchCurrentUser,
+    toastMessage,
+    toastType,
+    showToast,
+    setToastVisible,
+    toastVisible
   };
 };

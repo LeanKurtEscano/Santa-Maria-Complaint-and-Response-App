@@ -47,7 +47,7 @@ export const handleApiError = (err: any): AppError => {
     408: "Request timed out. Please try again.",
     422: "Validation error. Please check your input.",
     429: "Too many requests. Please wait a moment and try again.",
-    500: "Server error. Please try again later.",
+    500: "Something Went Wrong. Please try again later.",
     502: "Bad gateway. Please try again later.",
     503: "Service temporarily unavailable.",
     504: "Gateway timeout. Please try again.",

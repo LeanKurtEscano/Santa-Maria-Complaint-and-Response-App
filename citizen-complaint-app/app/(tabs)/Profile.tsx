@@ -28,6 +28,7 @@ import {
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
+import GeneralToast from '@/components/Toast/GeneralToast';
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
@@ -46,6 +47,10 @@ export default function ProfileScreen() {
     handleLocationFromMap,
     handleLogout,
     fetchCurrentUser,
+    toastType,
+    toastMessage,
+    setToastVisible,
+    toastVisible
   } = useProfileLogic();
 
   if (loading) {
@@ -399,6 +404,11 @@ export default function ProfileScreen() {
         onConfirm={handleLocationFromMap}
         onCancel={() => setShowMapPicker(false)}
       />
+      <GeneralToast   
+      visible={toastVisible}
+        onHide={() => setToastVisible(false)}
+        message={toastMessage}
+        type={toastType} />
     </SafeAreaView>
   );
 }
