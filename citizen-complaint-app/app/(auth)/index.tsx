@@ -51,6 +51,7 @@ export default function LoginScreen({ navigation }: any) {
         ],
         onSuccess: async (data) => {
             await SecureStore.setItemAsync('complaint_token', data.access_token);
+            await SecureStore.setItemAsync('complaint_refresh_token', data.refresh_token);
             console.log('Login successful:', data);
             await fetchCurrentUser();
             router.replace('/(tabs)');

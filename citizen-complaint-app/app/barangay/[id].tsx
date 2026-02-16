@@ -15,22 +15,12 @@
  * ]
  */
 
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Image, Modal, Pressable } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Modal, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { X, Upload, FileText, Video, Image as ImageIcon, ArrowLeft, Camera } from 'lucide-react-native';
-import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
-
-interface Attachment {
-  id: string;
-  uri: string;
-  type: 'image' | 'video' | 'file';
-  name: string;
-  mimeType?: string;
-  size?: number;
-}
+import { X, Upload, FileText, Video, Image as ImageIcon, ArrowLeft } from 'lucide-react-native';
+import { useAttachments,Attachment } from '@/hooks/general/useAttachment';
 
 export default function ComplaintFormScreen() {
   const router = useRouter();
@@ -40,152 +30,21 @@ export default function ComplaintFormScreen() {
 
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
 
-  const handlePickImage = async () => {
-    if (attachments.length >= 3) {
-      Alert.alert('Limit Reached', 'You can only attach up to 3 files');
-      return;
-    }
-
-    // Request permissions first
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to access your photos.');
-      return;
-    }
-
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-        allowsMultipleSelection: false,
-      });
-
-      // Close modal after picker returns
-      setShowAttachmentModal(false);
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const asset = result.assets[0];
-        const newAttachment: Attachment = {
-          id: Date.now().toString(),
-          uri: asset.uri,
-          type: 'image',
-          name: asset.fileName || `image_${Date.now()}.jpg`,
-          mimeType: asset.mimeType,
-          size: asset.fileSize,
-        };
-        setAttachments([...attachments, newAttachment]);
-      }
-    } catch (error) {
-      setShowAttachmentModal(false);
-      Alert.alert('Error', 'Failed to pick image');
-      console.error('Image picker error:', error);
-    }
-  };
-
-  const handlePickVideo = async () => {
-    if (attachments.length >= 3) {
-      Alert.alert('Limit Reached', 'You can only attach up to 3 files');
-      return;
-    }
-
-    // Request permissions first
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to access your videos.');
-      return;
-    }
-
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-        allowsEditing: false,
-        quality: 0.8,
-        allowsMultipleSelection: false,
-      });
-
-      // Close modal after picker returns
-      setShowAttachmentModal(false);
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const asset = result.assets[0];
-        const newAttachment: Attachment = {
-          id: Date.now().toString(),
-          uri: asset.uri,
-          type: 'video',
-          name: asset.fileName || `video_${Date.now()}.mp4`,
-          mimeType: asset.mimeType,
-          size: asset.fileSize,
-        };
-        setAttachments([...attachments, newAttachment]);
-      }
-    } catch (error) {
-      setShowAttachmentModal(false);
-      Alert.alert('Error', 'Failed to pick video');
-      console.error('Video picker error:', error);
-    }
-  };
-
-  const handlePickDocument = async () => {
-    if (attachments.length >= 3) {
-      Alert.alert('Limit Reached', 'You can only attach up to 3 files');
-      return;
-    }
-
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-
-      // Close modal after picker returns
-      setShowAttachmentModal(false);
-
-      console.log('Document picker result:', result);
-
-      if (result.canceled) {
-        console.log('Document picker was cancelled');
-        return;
-      }
-
-      if (result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        const newAttachment: Attachment = {
-          id: Date.now().toString(),
-          uri: asset.uri,
-          type: 'file',
-          name: asset.name,
-          mimeType: asset.mimeType || undefined,
-          size: asset.size || undefined,
-        };
-        setAttachments([...attachments, newAttachment]);
-      }
-    } catch (error) {
-      setShowAttachmentModal(false);
-      console.error('Document picker error:', error);
-      Alert.alert('Error', 'Failed to pick document. Please try again.');
-    }
-  };
-
-  const handleShowAttachmentOptions = () => {
-    setShowAttachmentModal(true);
-  };
-
-  const handleRemoveAttachment = (id: string) => {
-    setAttachments(attachments.filter(att => att.id !== id));
-  };
-
-  const formatFileSize = (bytes?: number): string => {
-    if (!bytes) return '';
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  };
+  
+  const {
+    attachments,
+    isPickingFile,
+    showAttachmentModal,
+    setShowAttachmentModal,
+    handlePickImage,
+    handlePickVideo,
+    handlePickDocument,
+    handleRemoveAttachment,
+    formatFileSize,
+    resetAttachments,
+  } = useAttachments();
 
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -200,7 +59,7 @@ export default function ComplaintFormScreen() {
 
     setIsSubmitting(true);
 
-    // TODO: Implement API call to submit complaint
+  
     console.log('Submitting complaint:', {
       barangayId,
       title,
@@ -208,7 +67,7 @@ export default function ComplaintFormScreen() {
       attachments
     });
 
-    // Simulate API call
+
     setTimeout(() => {
       setIsSubmitting(false);
       Alert.alert(
@@ -217,7 +76,10 @@ export default function ComplaintFormScreen() {
         [
           {
             text: 'OK',
-            onPress: () => router.back()
+            onPress: () => {
+              resetAttachments();
+              router.back();
+            }
           }
         ]
       );
@@ -342,7 +204,7 @@ export default function ComplaintFormScreen() {
           {/* Add Attachment Button */}
           {attachments.length < 3 && (
             <TouchableOpacity
-              onPress={handleShowAttachmentOptions}
+              onPress={() => setShowAttachmentModal(true)}
               className="bg-white border-2 border-dashed border-blue-300 rounded-xl py-6 items-center justify-center"
             >
               <View className="bg-blue-50 p-3 rounded-full mb-2">
@@ -431,7 +293,10 @@ export default function ComplaintFormScreen() {
               {/* Photo Option */}
               <TouchableOpacity
                 onPress={handlePickImage}
-                className="flex-row items-center p-4 bg-blue-50 rounded-xl mb-3 active:bg-blue-100"
+                disabled={isPickingFile}
+                className={`flex-row items-center p-4 bg-blue-50 rounded-xl mb-3 ${
+                  isPickingFile ? 'opacity-50' : 'active:bg-blue-100'
+                }`}
               >
                 <View className="bg-blue-600 p-3 rounded-full mr-4">
                   <ImageIcon size={24} color="white" />
@@ -454,7 +319,10 @@ export default function ComplaintFormScreen() {
               {/* Video Option */}
               <TouchableOpacity
                 onPress={handlePickVideo}
-                className="flex-row items-center p-4 bg-purple-50 rounded-xl mb-3 active:bg-purple-100"
+                disabled={isPickingFile}
+                className={`flex-row items-center p-4 bg-purple-50 rounded-xl mb-3 ${
+                  isPickingFile ? 'opacity-50' : 'active:bg-purple-100'
+                }`}
               >
                 <View className="bg-purple-600 p-3 rounded-full mr-4">
                   <Video size={24} color="white" />
@@ -477,7 +345,10 @@ export default function ComplaintFormScreen() {
               {/* Document Option */}
               <TouchableOpacity
                 onPress={handlePickDocument}
-                className="flex-row items-center p-4 bg-green-50 rounded-xl mb-3 active:bg-green-100"
+                disabled={isPickingFile}
+                className={`flex-row items-center p-4 bg-green-50 rounded-xl mb-3 ${
+                  isPickingFile ? 'opacity-50' : 'active:bg-green-100'
+                }`}
               >
                 <View className="bg-green-600 p-3 rounded-full mr-4">
                   <FileText size={24} color="white" />
