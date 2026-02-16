@@ -10,7 +10,7 @@ interface UserState {
   setUserData: (user: User | null) => void;
   setLoading: (loading: boolean) => void;
   clearUser: () => Promise<void>;
-  logout: () => Promise<void>; // New method for logout
+  logout: () => Promise<void>;
   mapUserFromBackend: (data: any) => void;
   fetchCurrentUser: () => Promise<void>;
 }
@@ -20,7 +20,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
   loading: true,
   isAuthenticated: false,
 
-  setUserData: (user) => set({ userData: user }),
+  setUserData: (user) => set({ userData: user, isAuthenticated: !!user }),
 
   setLoading: (loading) => set({ loading }),
 
@@ -35,7 +35,6 @@ export const useCurrentUser = create<UserState>((set, get) => ({
     }
   },
 
- 
   logout: async () => {
     try {
       await SecureStore.deleteItemAsync('complaint_token');
@@ -48,7 +47,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
   },
   
   mapUserFromBackend: (data) => {
-    console.log(data)
+    console.log("Mapping user data:", data);
     const mappedUser: User = {
       id: data.id,
       email: data.email,
@@ -68,6 +67,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       full_address: data.full_address,
       zip_code: data.zip_code,
 
+      // Ensure these are strings or null
       latitude: data.latitude,
       longitude: data.longitude,
 
@@ -77,6 +77,9 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       back_id: data.back_id,
       selfie_with_id: data.selfie_with_id,
     };
+
+    console.log("Mapped user latitude:", mappedUser.latitude);
+    console.log("Mapped user longitude:", mappedUser.longitude);
 
     set({ userData: mappedUser, loading: false, isAuthenticated: true });
   },
@@ -94,6 +97,8 @@ export const useCurrentUser = create<UserState>((set, get) => ({
 
       const response = await userApiClient.get('/profile');
       
+      console.log("API Response:", response.data);
+      
       if (response.data) {
         get().mapUserFromBackend(response.data);
       } else {
@@ -104,11 +109,11 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       
       // Only clear token if it's an auth error (401/403)
       if (error?.response?.status === 401 || error?.response?.status === 403) {
-        await get().logout(); // Use the logout method
+        await get().clearUser();
       } else {
         set({ loading: false });
-        throw error; 
       }
+      throw error; 
     }
   },
 }));

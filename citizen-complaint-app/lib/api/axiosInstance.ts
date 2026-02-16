@@ -25,7 +25,7 @@ export const createApi = (
   baseURL: string,
   refreshUrl: string | null,
   getToken?: () => Promise<string | null>,
-  onLogout?: () => void
+
 ): AxiosInstance => {
   const instance = axios.create({
     baseURL,
@@ -125,9 +125,7 @@ export const createApi = (
           await SecureStore.deleteItemAsync('complaint_token');
           await SecureStore.deleteItemAsync('complaint_refresh_token');
           
-          if (onLogout) {
-            onLogout();
-          }
+  
 
           return Promise.reject(refreshError);
         } finally {

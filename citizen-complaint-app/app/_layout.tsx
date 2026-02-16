@@ -8,7 +8,7 @@ import "../lib/localization/i18n";
 import queryClient from "@/lib/api/queryClient";
 import ErrorScreen from "@/screen/general/ErrorScreen";
 import { handleApiError } from "@/utils/general/errorHandler";
-
+import * as SecureStore from 'expo-secure-store';
 function RootLayoutNav() {
   const { userData, loading, fetchCurrentUser, isAuthenticated } = useCurrentUser();
   const segments = useSegments();
@@ -20,6 +20,8 @@ function RootLayoutNav() {
   }, []);
 
   const initializeApp = async () => {
+    await SecureStore.deleteItemAsync('access_token');
+await SecureStore.deleteItemAsync('refresh_token');
     try {
       setInitError(null);
       setRetrying(false);

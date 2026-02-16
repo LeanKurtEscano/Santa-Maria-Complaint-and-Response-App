@@ -17,36 +17,39 @@ export const useProfileLogic = () => {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
 
-  const updateLocationMutation = useMutation({
-    mutationFn: async ({ latitude, longitude }: { latitude: number; longitude: number }) => {
-      const response = await userApiClient.put('/update-current-location', {
-        latitude,
-        longitude,
-      });
-      return response.data;
-    },
-    onSuccess: async () => {
-      await fetchCurrentUser();
+const updateLocationMutation = useMutation({
+  mutationFn: async ({ latitude, longitude }: { latitude: number; longitude: number }) => {
+    console.log("Sending location update:", { latitude, longitude });
+    const response = await userApiClient.put('/update-current-location', {
+      latitude,
+      longitude,
+    });
+    console.log("Location update response:", response.data);
+    return response.data;
+  },
+  onSuccess: async () => {
+    console.log("Location update successful, fetching user data...");
+    
+    // Force refresh user data
+    await fetchCurrentUser();
+    
+    console.log("User data after fetch:", userData);
 
-      setShowLocationModal(false);
-      setShowMapPicker(false);
+    // Close modals
+    setShowLocationModal(false);
+    setShowMapPicker(false);
 
-      Alert.alert(
-        t('profile.location.success.title'),
-        t('profile.location.success.message'),
-        [{ text: t('common.ok') }]
-      );
-    },
-    onError: (error) => {
-      const appError = handleApiError(error);
-      showToast(appError.message, 'error');
-      setShowMapPicker(false);
-      setShowLocationModal(false);
-     
-      
-      
-    },
-  });
+    // Show success toast
+    showToast(t('profile.location.success.message'), 'success');
+  },
+  onError: (error) => {
+    console.error("Location update error:", error);
+    const appError = handleApiError(error);
+    showToast(appError.message, 'error');
+    setShowMapPicker(false);
+    setShowLocationModal(false);
+  },
+});
 
   const handleAllowLocation = async () => {
     const result = await requestLocationPermission();
