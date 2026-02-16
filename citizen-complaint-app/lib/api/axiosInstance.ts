@@ -1,10 +1,9 @@
-import 'react-native-get-random-values'; // Must be first!
+import 'react-native-get-random-values';
 import axios, { AxiosInstance } from "axios";
 import NetInfo from "@react-native-community/netinfo";
 import { v4 as uuidv4 } from "uuid";
-import { userApiClient } from '../client/user';
+import * as SecureStore from 'expo-secure-store';
 
-// Track if we're currently refreshing to avoid multiple simultaneous refresh calls
 let isRefreshing = false;
 let failedQueue: Array<{
   resolve: (value?: any) => void;
@@ -24,8 +23,9 @@ const processQueue = (error: any = null, token: string | null = null) => {
 
 export const createApi = (
   baseURL: string,
+  refreshUrl: string | null,
   getToken?: () => Promise<string | null>,
-  onLogout?: () => void // Callback to redirect to login
+  onLogout?: () => void
 ): AxiosInstance => {
   const instance = axios.create({
     baseURL,
@@ -67,10 +67,8 @@ export const createApi = (
       const config = error.config;
       if (!config) return Promise.reject(error);
 
-      // Handle 401 Unauthorized - Token expired
       if (error.response?.status === 401 && !config._retry) {
         if (isRefreshing) {
-          // If already refreshing, queue this request
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
           })
@@ -87,29 +85,48 @@ export const createApi = (
         isRefreshing = true;
 
         try {
-          console.log()
-          const response = await userApiClient.post('/refresh-token');
+     
+          const refreshToken = await SecureStore.getItemAsync('complaint_refresh_token');
+          
+          if (!refreshToken) {
+            throw new Error('No refresh token available');
+          }
+
+        
+          const response = await axios.post(
+            `${refreshUrl}/refresh-token`,  // Full URL
+            {},  // Empty body
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${refreshToken}`  
+              },
+              timeout: 20000
+            }
+          );
+          
           const newAccessToken = response.data.access_token;
 
-          // Update the token in your storage/state here
-          // await AsyncStorage.setItem('access_token', newAccessToken);
+      
+          await SecureStore.setItemAsync('complaint_token', newAccessToken);
 
-          // Process queued requests with new token
+          if (response.data.refresh_token) {
+            await SecureStore.setItemAsync('complaint_refresh_token', response.data.refresh_token);
+          }
+
           processQueue(null, newAccessToken);
 
-          // Retry the original request with new token
+        
           config.headers.Authorization = `Bearer ${newAccessToken}`;
           return instance(config);
         } catch (refreshError: any) {
-          // Refresh token is also expired or invalid
           processQueue(refreshError, null);
 
-          // Clear tokens and redirect to login
-          // await AsyncStorage.removeItem('access_token');
-          // await AsyncStorage.removeItem('refresh_token');
+          await SecureStore.deleteItemAsync('complaint_token');
+          await SecureStore.deleteItemAsync('complaint_refresh_token');
           
           if (onLogout) {
-            onLogout(); // Trigger logout/redirect to login
+            onLogout();
           }
 
           return Promise.reject(refreshError);
@@ -118,7 +135,6 @@ export const createApi = (
         }
       }
 
-      // Retry logic for timeouts and network errors
       config.__retryCount = config.__retryCount || 0;
 
       const isTimeout = error.code === "ECONNABORTED";

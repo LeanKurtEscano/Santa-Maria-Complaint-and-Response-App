@@ -10,6 +10,7 @@ interface UserState {
   setUserData: (user: User | null) => void;
   setLoading: (loading: boolean) => void;
   clearUser: () => Promise<void>;
+  logout: () => Promise<void>; // New method for logout
   mapUserFromBackend: (data: any) => void;
   fetchCurrentUser: () => Promise<void>;
 }
@@ -26,10 +27,23 @@ export const useCurrentUser = create<UserState>((set, get) => ({
   clearUser: async () => {
     try {
       await SecureStore.deleteItemAsync('complaint_token');
+      await SecureStore.deleteItemAsync('complaint_refresh_token'); 
       set({ userData: null, loading: false, isAuthenticated: false });
     } catch (error) {
       console.error("Error clearing user:", error);
-      set({ userData: null, loading: false });
+      set({ userData: null, loading: false, isAuthenticated: false });
+    }
+  },
+
+ 
+  logout: async () => {
+    try {
+      await SecureStore.deleteItemAsync('complaint_token');
+      await SecureStore.deleteItemAsync('complaint_refresh_token');
+      set({ userData: null, loading: false, isAuthenticated: false });
+    } catch (error) {
+      console.error("Error during logout:", error);
+      set({ userData: null, loading: false, isAuthenticated: false });
     }
   },
   
@@ -89,12 +103,9 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       console.error("Failed to fetch current user:", error);
       
       // Only clear token if it's an auth error (401/403)
-      // Keep token for network/server errors so user can retry
       if (error?.response?.status === 401 || error?.response?.status === 403) {
-        await SecureStore.deleteItemAsync('complaint_token');
-        set({ userData: null, loading: false, isAuthenticated: false });
+        await get().logout(); // Use the logout method
       } else {
-   
         set({ loading: false });
         throw error; 
       }
