@@ -1,7 +1,19 @@
 import { create } from "zustand";
 import * as SecureStore from 'expo-secure-store';
+import { jwtDecode } from "jwt-decode";
 import { User } from "@/types/general/user";
 import { userApiClient } from "@/lib/client/user";
+
+const isTokenExpired = (token: string): boolean => {
+  try {
+    const { exp } = jwtDecode<{ exp?: number }>(token);
+    if (!exp) return true;
+  
+    return Date.now() >= exp * 1000;
+  } catch {
+    return true; 
+  }
+};
 
 interface UserState {
   userData: User | null;
@@ -12,7 +24,8 @@ interface UserState {
   clearUser: () => Promise<void>;
   logout: () => Promise<void>;
   mapUserFromBackend: (data: any) => void;
-  fetchCurrentUser: () => Promise<void>;
+  fetchCurrentUser: (background?: boolean) => Promise<void>;
+  checkAuthStatus: () => Promise<void>;
 }
 
 export const useCurrentUser = create<UserState>((set, get) => ({
@@ -27,7 +40,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
   clearUser: async () => {
     try {
       await SecureStore.deleteItemAsync('complaint_token');
-      await SecureStore.deleteItemAsync('complaint_refresh_token'); 
+      await SecureStore.deleteItemAsync('complaint_refresh_token');
       set({ userData: null, loading: false, isAuthenticated: false });
     } catch (error) {
       console.error("Error clearing user:", error);
@@ -45,7 +58,37 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       set({ userData: null, loading: false, isAuthenticated: false });
     }
   },
-  
+
+  // Called on app launch in _layout.tsx to determine if user is still authenticated
+  checkAuthStatus: async () => {
+    try {
+      set({ loading: true });
+
+      const refreshToken = await SecureStore.getItemAsync('complaint_refresh_token');
+
+      // No refresh token at all → not authenticated
+      if (!refreshToken) {
+        set({ userData: null, loading: false, isAuthenticated: false });
+        return;
+      }
+
+      // Refresh token exists but is expired → not authenticated
+      if (isTokenExpired(refreshToken)) {
+        console.log("Refresh token expired, clearing session...");
+        await get().clearUser();
+        return;
+      }
+
+      // Refresh token is still valid → fetch the user profile to hydrate state
+      console.log("Refresh token valid, fetching user profile...");
+      await get().fetchCurrentUser();
+
+    } catch (error) {
+      console.error("Error checking auth status:", error);
+      set({ userData: null, loading: false, isAuthenticated: false });
+    }
+  },
+
   mapUserFromBackend: (data) => {
     console.log("Mapping user data:", data);
     const mappedUser: User = {
@@ -67,7 +110,6 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       full_address: data.full_address,
       zip_code: data.zip_code,
 
-      // Ensure these are strings or null
       latitude: data.latitude,
       longitude: data.longitude,
 
@@ -78,42 +120,34 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       selfie_with_id: data.selfie_with_id,
     };
 
-    console.log("Mapped user latitude:", mappedUser.latitude);
-    console.log("Mapped user longitude:", mappedUser.longitude);
-
     set({ userData: mappedUser, loading: false, isAuthenticated: true });
   },
 
-  fetchCurrentUser: async () => {
-    try {
-      set({ loading: true });
-
-      const token = await SecureStore.getItemAsync('complaint_token');
-
-      if (!token) {
-        set({ userData: null, loading: false, isAuthenticated: false });
-        return; 
-      }
-
-      const response = await userApiClient.get('/profile');
-      
-      console.log("API Response:", response.data);
-      
-      if (response.data) {
-        get().mapUserFromBackend(response.data);
-      } else {
-        set({ userData: null, loading: false, isAuthenticated: false });
-      }
-    } catch (error) {
-      console.error("Failed to fetch current user:", error);
-      
-      // Only clear token if it's an auth error (401/403)
-      if (error?.response?.status === 401 || error?.response?.status === 403) {
-        await get().clearUser();
-      } else {
-        set({ loading: false });
-      }
-      throw error; 
+  fetchCurrentUser: async (background = false) => {
+  try {
+    if (!background) {
+      set({ loading: true }); // Only show loading on initial/explicit loads
     }
-  },
+
+    const token = await SecureStore.getItemAsync('complaint_token');
+
+    if (!token) {
+      set({ userData: null, loading: false, isAuthenticated: false });
+      return;
+    }
+
+    const response = await userApiClient.get('/profile');
+
+    if (response.data) {
+      get().mapUserFromBackend(response.data);
+    } else {
+      set({ userData: null, loading: false, isAuthenticated: false });
+    }
+  } catch (error) {
+    console.error("Failed to fetch current user:", error);
+    set({ loading: false });
+    throw error;
+  }
+},
+
 }));

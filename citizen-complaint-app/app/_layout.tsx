@@ -3,29 +3,28 @@ import "../global.css";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useCurrentUser } from "@/store/useCurrentUserStore";
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import "../lib/localization/i18n";
 import queryClient from "@/lib/api/queryClient";
 import ErrorScreen from "@/screen/general/ErrorScreen";
 import { handleApiError } from "@/utils/general/errorHandler";
-import * as SecureStore from 'expo-secure-store';
+
 function RootLayoutNav() {
-  const { userData, loading, fetchCurrentUser, isAuthenticated } = useCurrentUser();
+  const { userData, loading, checkAuthStatus } = useCurrentUser();
   const segments = useSegments();
   const router = useRouter();
   const [initError, setInitError] = useState<any>(null);
   const [retrying, setRetrying] = useState(false);
+
   useEffect(() => {
     initializeApp();
   }, []);
 
   const initializeApp = async () => {
-    await SecureStore.deleteItemAsync('access_token');
-await SecureStore.deleteItemAsync('refresh_token');
     try {
       setInitError(null);
       setRetrying(false);
-      await fetchCurrentUser();
+      await checkAuthStatus();
     } catch (error) {
       console.error("Failed to initialize app:", error);
       setInitError(error);
@@ -42,13 +41,13 @@ await SecureStore.deleteItemAsync('refresh_token');
     if (loading || retrying) return;
 
     const inAuthGroup = segments[0] === "(auth)";
-    
-    console.log("🔍 Auth Check:", { 
-      isAuthenticated: isAuthenticated,
+
+    console.log("🔍 Auth Check:", {
+      isAuthenticated: !!userData,
       currentSegment: segments[0],
-      inAuthGroup 
+      inAuthGroup,
     });
-    
+
     if (!userData && !inAuthGroup) {
       console.log("➡️ Not authenticated, redirecting to auth");
       router.replace("/(auth)");
@@ -62,7 +61,7 @@ await SecureStore.deleteItemAsync('refresh_token');
 
   if (initError && !loading) {
     const appError = handleApiError(initError);
-    
+
     return (
       <ErrorScreen
         type={appError.type}

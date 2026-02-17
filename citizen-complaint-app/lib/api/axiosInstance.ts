@@ -25,7 +25,6 @@ export const createApi = (
   baseURL: string,
   refreshUrl: string | null,
   getToken?: () => Promise<string | null>,
-
 ): AxiosInstance => {
   const instance = axios.create({
     baseURL,
@@ -35,6 +34,7 @@ export const createApi = (
     timeout: 20000,
   });
 
+  // ─── Request Interceptor ─────────────────────────────────────────────────────
   instance.interceptors.request.use(
     async (config) => {
       const net = await NetInfo.fetch();
@@ -61,100 +61,132 @@ export const createApi = (
     (error) => Promise.reject(error)
   );
 
+  // ─── Response Interceptor ────────────────────────────────────────────────────
   instance.interceptors.response.use(
     (res) => res,
     async (error) => {
-      const config = error.config;
-      if (!config) return Promise.reject(error);
+      const originalConfig = error.config;
 
-      if (error.response?.status === 401 && !config._retry) {
+      if (!originalConfig) return Promise.reject(error);
+
+      // ── Handle 401 (access token expired) ──────────────────────────────────
+      // Only attempt refresh if:
+      //   1. The response is 401
+      //   2. We haven't already retried this request
+      //   3. A refreshUrl is configured
+      if (
+        error.response?.status === 401 &&
+        !originalConfig._retry &&
+        refreshUrl
+      ) {
+        // If a refresh is already in flight, queue this request
+        // and resolve it once the refresh completes
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
           })
-            .then((token) => {
-              config.headers.Authorization = `Bearer ${token}`;
-              return instance(config);
+            .then((newToken) => {
+              originalConfig.headers.Authorization = `Bearer ${newToken}`;
+              return instance(originalConfig);
             })
-            .catch((err) => {
-              return Promise.reject(err);
-            });
+            .catch((err) => Promise.reject(err));
         }
 
-        config._retry = true;
+        // Mark this request as already retried so we don't loop infinitely
+        originalConfig._retry = true;
         isRefreshing = true;
 
         try {
-     
           const refreshToken = await SecureStore.getItemAsync('complaint_refresh_token');
-          
+
           if (!refreshToken) {
-            throw new Error('No refresh token available');
+            // No refresh token stored — user needs to log in again
+            // but we do NOT delete anything here, state is already empty
+            throw new Error('NO_REFRESH_TOKEN');
           }
 
-        
-          const response = await axios.post(
-            `${refreshUrl}/refresh-token`,  // Full URL
-            {},  // Empty body
+          // Attempt to get a new access token using the refresh token
+          const refreshResponse = await axios.post(
+            `${refreshUrl}/refresh-token`,
+            {},
             {
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${refreshToken}`  
+                'Authorization': `Bearer ${refreshToken}`,
               },
-              timeout: 20000
+              timeout: 20000,
             }
           );
-          
-          const newAccessToken = response.data.access_token;
 
-      
+          const newAccessToken = refreshResponse.data.access_token;
+          const newRefreshToken = refreshResponse.data.refresh_token;
+
+          // Persist the new tokens
           await SecureStore.setItemAsync('complaint_token', newAccessToken);
 
-          if (response.data.refresh_token) {
-            await SecureStore.setItemAsync('complaint_refresh_token', response.data.refresh_token);
+          // Only update refresh token if the backend rotated it
+          if (newRefreshToken) {
+            await SecureStore.setItemAsync('complaint_refresh_token', newRefreshToken);
           }
 
+          // Unblock all queued requests with the new access token
           processQueue(null, newAccessToken);
 
-        
-          config.headers.Authorization = `Bearer ${newAccessToken}`;
-          return instance(config);
+          // Retry the original failed request with the new access token
+          originalConfig.headers.Authorization = `Bearer ${newAccessToken}`;
+          return instance(originalConfig);
+
         } catch (refreshError: any) {
+          // Refresh itself failed (e.g. refresh token is expired/revoked)
+          // Only NOW do we clear tokens and force logout
+          const isRefreshTokenInvalid =
+            refreshError.message === 'NO_REFRESH_TOKEN' ||
+            refreshError.response?.status === 401 ||
+            refreshError.response?.status === 403;
+
+          if (isRefreshTokenInvalid) {
+            console.warn("Refresh token invalid or expired — clearing session");
+            await SecureStore.deleteItemAsync('complaint_token');
+            await SecureStore.deleteItemAsync('complaint_refresh_token');
+
+            // Notify the store so the UI redirects to login
+            // Lazy import avoids circular dependency
+            const { useCurrentUser } = await import('@/store/useCurrentUserStore');
+            useCurrentUser.getState().clearUser();
+          }
+
           processQueue(refreshError, null);
-
-          await SecureStore.deleteItemAsync('complaint_token');
-          await SecureStore.deleteItemAsync('complaint_refresh_token');
-          
-  
-
           return Promise.reject(refreshError);
+
         } finally {
           isRefreshing = false;
         }
       }
 
-      config.__retryCount = config.__retryCount || 0;
+      // ── Retry on timeout / network errors (up to 3 times) ──────────────────
+      originalConfig.__retryCount = originalConfig.__retryCount || 0;
 
       const isTimeout = error.code === "ECONNABORTED";
-      const isNetwork = !error.response;
+      const isOffline = error.code === "OFFLINE";
+      const isNetwork = !error.response && !isOffline;
 
-      if ((isTimeout || isNetwork) && config.__retryCount < 3) {
-        config.__retryCount += 1;
+      if ((isTimeout || isNetwork) && originalConfig.__retryCount < 3) {
+        originalConfig.__retryCount += 1;
 
-        const delay = Math.pow(2, config.__retryCount) * 1000;
+        const delay = Math.pow(2, originalConfig.__retryCount) * 1000;
         await new Promise((res) => setTimeout(res, delay));
 
-        return instance(config);
+        return instance(originalConfig);
       }
 
+      if (isOffline)
+        return Promise.reject({ code: "OFFLINE", message: "No internet connection" });
+
       if (isTimeout)
-        return Promise.reject({ code: "TIMEOUT", message: "Slow network" });
+        return Promise.reject({ code: "TIMEOUT", message: "Request timed out" });
 
       if (isNetwork)
-        return Promise.reject({
-          code: "NETWORK_ERROR",
-          message: "No internet",
-        });
+        return Promise.reject({ code: "NETWORK_ERROR", message: "Network error" });
 
       return Promise.reject(error);
     }

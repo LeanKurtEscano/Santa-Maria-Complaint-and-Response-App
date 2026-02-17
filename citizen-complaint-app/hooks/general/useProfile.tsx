@@ -11,7 +11,7 @@ import useToast from './useToast';
 export const useProfileLogic = () => {
   const { t } = useTranslation();
   const { toastType,toastMessage, showToast, setToastVisible,toastVisible } = useToast();
-
+  
   const { userData, loading, fetchCurrentUser, clearUser } = useCurrentUser();
   const { locationLoading, requestLocationPermission } = useLocationPermission();
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -29,21 +29,15 @@ const updateLocationMutation = useMutation({
   },
   onSuccess: async () => {
     console.log("Location update successful, fetching user data...");
-    
-    // Force refresh user data
-    await fetchCurrentUser();
-    
-    console.log("User data after fetch:", userData);
 
-    // Close modals
     setShowLocationModal(false);
     setShowMapPicker(false);
 
-    // Show success toast
     showToast(t('profile.location.success.message'), 'success');
+    await fetchCurrentUser(true);
   },
   onError: (error) => {
-    console.error("Location update error:", error);
+  
     const appError = handleApiError(error);
     showToast(appError.message, 'error');
     setShowMapPicker(false);
