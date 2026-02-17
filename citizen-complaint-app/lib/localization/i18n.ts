@@ -193,7 +193,66 @@ const resources = {
           complaintUpdates: "Complaint Updates",
           newsAlerts: "News & Alerts"
         }
-      }
+      },
+
+
+      "complaint": {
+    "screen_title": "New Complaint",
+
+    "title_label": "Complaint Title",
+    "title_placeholder": "Select a complaint category...",
+    "custom_title_placeholder": "Type your own complaint title",
+    "custom_title_hint": "Be specific so the barangay can act quickly.",
+
+    "details_label": "Complaint Details",
+    "details_placeholder": "Describe your complaint in detail...",
+
+    "attachments_label": "Attachments (Optional)",
+    "attachments_hint": "You can attach up to 3 files (photos, videos, or documents)",
+    "attachments_count": "{{count}}/3 files attached",
+    "add_attachment": "Add Attachment",
+    "attachment_remaining": "Select multiple files — up to {{count}} remaining",
+    "attachment_photo": "Photo",
+    "attachment_photo_hint": "Select multiple from gallery",
+    "attachment_video": "Video",
+    "attachment_video_hint": "Select multiple from gallery",
+    "attachment_document": "Document",
+    "attachment_document_hint": "PDF, Word, Excel, etc.",
+
+    "note_title": "Please Note",
+    "note_body": "• Your complaint will be reviewed by the barangay office\n• You will receive updates on your complaint status\n• Please provide accurate and detailed information",
+
+    "submit": "Submit Complaint",
+    "submitting": "Submitting...",
+
+    "success_title": "Success",
+    "success_message": "Your complaint has been submitted successfully",
+
+    "picker_title": "Select Complaint Type",
+    "picker_subtitle": "Choose the category that best describes your complaint",
+
+    "error": {
+      "title_required": "Complaint title is required",
+      "title_too_short": "Please enter at least 3 characters",
+      "details_required": "Complaint details are required"
+    },
+
+    "preset": {
+      "noise_disturbance": "Noise Disturbance",
+      "illegal_dumping": "Illegal Dumping / Littering",
+      "road_damage": "Road Damage / Pothole",
+      "street_light_outage": "Street Light Outage",
+      "flooding_drainage": "Flooding / Clogged Drainage",
+      "illegal_construction": "Illegal Construction",
+      "stray_animals": "Stray Animals",
+      "public_intoxication": "Public Intoxication / Disorder",
+      "illegal_vending": "Illegal Vending / Obstruction",
+      "water_supply_issue": "Water Supply Issue",
+      "garbage_collection": "Garbage Collection Problem",
+      "vandalism": "Vandalism / Property Damage",
+      "other": "Other (specify below)"
+    }
+  }
     },
   },
   tl: {
@@ -384,7 +443,65 @@ const resources = {
           complaintUpdates: "Updates sa Reklamo",
           newsAlerts: "Balita at Alerto"
         }
-      }
+      },
+
+      "complaint": {
+    "screen_title": "Bagong Reklamo",
+
+    "title_label": "Pamagat ng Reklamo",
+    "title_placeholder": "Pumili ng kategorya ng reklamo...",
+    "custom_title_placeholder": "I-type ang iyong sariling pamagat",
+    "custom_title_hint": "Maging tiyak para mabilis maaksyunan ng barangay.",
+
+    "details_label": "Detalye ng Reklamo",
+    "details_placeholder": "Ilarawan nang detalyado ang iyong reklamo...",
+
+    "attachments_label": "Mga Kalakip (Opsyonal)",
+    "attachments_hint": "Maaari kang maglakip ng hanggang 3 file (litrato, video, o dokumento)",
+    "attachments_count": "{{count}}/3 na file ang nakalakip",
+    "add_attachment": "Magdagdag ng Kalakip",
+    "attachment_remaining": "Pumili ng maraming file — hanggang {{count}} pa ang maaaring idagdag",
+    "attachment_photo": "Litrato",
+    "attachment_photo_hint": "Pumili ng marami mula sa gallery",
+    "attachment_video": "Video",
+    "attachment_video_hint": "Pumili ng marami mula sa gallery",
+    "attachment_document": "Dokumento",
+    "attachment_document_hint": "PDF, Word, Excel, atbp.",
+
+    "note_title": "Pakitandaan",
+    "note_body": "• Ang iyong reklamo ay susuriin ng tanggapan ng barangay\n• Makakatanggap ka ng mga update sa katayuan ng iyong reklamo\n• Mangyaring magbigay ng tumpak at detalyadong impormasyon",
+
+    "submit": "Isumite ang Reklamo",
+    "submitting": "Isinusumite...",
+
+    "success_title": "Matagumpay",
+    "success_message": "Matagumpay na naisumite ang iyong reklamo",
+
+    "picker_title": "Piliin ang Uri ng Reklamo",
+    "picker_subtitle": "Piliin ang kategoryang pinaka-angkop sa iyong reklamo",
+
+    "error": {
+      "title_required": "Kinakailangan ang pamagat ng reklamo",
+      "title_too_short": "Mangyaring maglagay ng hindi bababa sa 3 karakter",
+      "details_required": "Kinakailangan ang detalye ng reklamo"
+    },
+
+    "preset": {
+      "noise_disturbance": "Abala sa Ingay",
+      "illegal_dumping": "Ilegal na Pagtatapon ng Basura",
+      "road_damage": "Pinsala sa Kalsada / Butas",
+      "street_light_outage": "Patay na Ilaw sa Kalsada",
+      "flooding_drainage": "Pagbaha / Baradong Imburnal",
+      "illegal_construction": "Ilegal na Konstruksyon",
+      "stray_animals": "Mga Ligaw na Hayop",
+      "public_intoxication": "Pagkakalasing / Kaguluhan sa Pampublikong Lugar",
+      "illegal_vending": "Ilegal na Pagnenegosyo / Harang sa Daan",
+      "water_supply_issue": "Suliranin sa Suplay ng Tubig",
+      "garbage_collection": "Problema sa Koleksyon ng Basura",
+      "vandalism": "Vandalism / Pinsala sa Ari-arian",
+      "other": "Iba pa (tukuyin sa ibaba)"
+    }
+  }
     },
   },
 };

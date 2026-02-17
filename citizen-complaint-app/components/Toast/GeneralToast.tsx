@@ -5,7 +5,7 @@ interface GeneralToastProps {
   visible: boolean;
   onHide: () => void;
   message: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'info';
 }
 
 const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, type }) => {
@@ -17,12 +17,10 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
 
   useEffect(() => {
     if (visible) {
-      // Reset animations
       iconScaleAnim.setValue(0);
       iconRotateAnim.setValue(0);
       shakeAnim.setValue(0);
 
-      // Animate in
       Animated.parallel([
         Animated.spring(scaleAnim, {
           toValue: 1,
@@ -37,7 +35,6 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
         }),
       ]).start(() => {
         if (type === 'success') {
-          // Success checkmark animation
           Animated.sequence([
             Animated.spring(iconScaleAnim, {
               toValue: 1.2,
@@ -58,29 +55,12 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
             duration: 400,
             useNativeDriver: true,
           }).start();
-        } else {
-          // Error shake animation
+        } else if (type === 'error') {
           Animated.sequence([
-            Animated.timing(shakeAnim, {
-              toValue: 10,
-              duration: 50,
-              useNativeDriver: true,
-            }),
-            Animated.timing(shakeAnim, {
-              toValue: -10,
-              duration: 50,
-              useNativeDriver: true,
-            }),
-            Animated.timing(shakeAnim, {
-              toValue: 10,
-              duration: 50,
-              useNativeDriver: true,
-            }),
-            Animated.timing(shakeAnim, {
-              toValue: 0,
-              duration: 50,
-              useNativeDriver: true,
-            }),
+            Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+            Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+            Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+            Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
           ]).start();
 
           Animated.spring(iconScaleAnim, {
@@ -89,11 +69,18 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
             friction: 4,
             useNativeDriver: true,
           }).start();
+        } else {
+          // info — simple pop in, no shake or rotate
+          Animated.spring(iconScaleAnim, {
+            toValue: 1,
+            tension: 80,
+            friction: 5,
+            useNativeDriver: true,
+          }).start();
         }
       });
 
-      // Auto hide after duration (longer for errors)
-      const duration = type === 'error' ? 3000 : 2000;
+      const duration = type === 'error' ? 3000 : type === 'info' ? 3500 : 2000;
       const timer = setTimeout(() => {
         handleHide();
       }, duration);
@@ -121,9 +108,26 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
 
   if (!visible) return null;
 
-  const isSuccess = type === 'success';
-  const bgColor = isSuccess ? 'bg-pink-500' : 'bg-red-500';
-  const textColor = isSuccess ? 'text-pink-500' : 'text-red-500';
+  const config = {
+    success: {
+      bg: 'bg-pink-500',
+      text: 'text-pink-500',
+      label: 'Success!',
+      icon: '✓',
+    },
+    error: {
+      bg: 'bg-red-500',
+      text: 'text-red-500',
+      label: 'Oops!',
+      icon: '✕',
+    },
+    info: {
+      bg: 'bg-blue-500',
+      text: 'text-blue-500',
+      label: 'Heads up!',
+      icon: 'ℹ',
+    },
+  }[type];
 
   return (
     <Modal
@@ -137,14 +141,14 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
           style={{
             transform: [
               { scale: scaleAnim },
-              { translateX: type === 'error' ? shakeAnim : 0 }
+              { translateX: type === 'error' ? shakeAnim : 0 },
             ],
             opacity: opacityAnim,
           }}
           className="bg-white rounded-2xl px-8 py-6 mx-8 shadow-lg max-w-sm"
         >
-          <View className={`${bgColor} rounded-full w-16 h-16 justify-center items-center mx-auto mb-4`}>
-            {isSuccess ? (
+          <View className={`${config.bg} rounded-full w-16 h-16 justify-center items-center mx-auto mb-4`}>
+            {type === 'success' ? (
               <Animated.Text
                 style={{
                   transform: [
@@ -159,7 +163,7 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
                 }}
                 className="text-white text-3xl font-bold"
               >
-                ✓
+                {config.icon}
               </Animated.Text>
             ) : (
               <Animated.Text
@@ -168,12 +172,13 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
                 }}
                 className="text-white text-4xl font-bold"
               >
-                ✕
+                {config.icon}
               </Animated.Text>
             )}
           </View>
-          <Text className={`${textColor} text-lg font-bold text-center`}>
-            {isSuccess ? 'Success!' : 'Oops!'}
+
+          <Text className={`${config.text} text-lg font-bold text-center`}>
+            {config.label}
           </Text>
           <Text className="text-gray-600 text-sm text-center mt-2">
             {message}
