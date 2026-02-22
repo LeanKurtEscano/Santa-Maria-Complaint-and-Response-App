@@ -25,6 +25,7 @@ interface UseAttachmentsReturn {
   formatFileSize: (bytes?: number) => string;
   resetAttachments: () => void;
   setToastVisible: (visible: boolean) => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   toastVisible: boolean;
   toastMessage: string;
   toastType: 'success' | 'error' | 'info';
@@ -274,6 +275,7 @@ export const useAttachments = (): UseAttachmentsReturn => {
     handleRemoveAttachment,
     formatFileSize,
     resetAttachments,
+    showToast,
     toastVisible,
     toastMessage,
     toastType,

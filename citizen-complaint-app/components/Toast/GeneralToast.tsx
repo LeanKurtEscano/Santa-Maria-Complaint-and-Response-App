@@ -136,7 +136,7 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
       animationType="none"
       onRequestClose={handleHide}
     >
-      <View className="flex-1 justify-center items-center bg-black/40">
+      <View className="flex-1 z-50 justify-center items-center bg-black/40">
         <Animated.View
           style={{
             transform: [

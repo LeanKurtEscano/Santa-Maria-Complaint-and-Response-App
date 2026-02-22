@@ -46,8 +46,8 @@ export default function ComplaintsScreen() {
 
   const handleViewMyComplaints = () => {
     // Navigate to user's complaints list
-    // router.push('/(tabs)/my-complaints');
-    console.log('View my complaints');
+     router.push('/complaints/UserComplaints');
+   
   };
 
   if (error) {
