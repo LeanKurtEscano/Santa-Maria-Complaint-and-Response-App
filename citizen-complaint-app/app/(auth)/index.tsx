@@ -21,6 +21,7 @@ import * as SecureStore from 'expo-secure-store';
 interface LoginFormData {
     email: string;
     password: string;
+    role:string;
 }
 
 export default function LoginScreen({ navigation }: any) {
@@ -30,6 +31,7 @@ export default function LoginScreen({ navigation }: any) {
     const [formData, setFormData] = useState<LoginFormData>({
         email: '',
         password: '',
+        role:'user'
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [showPassword, setShowPassword] = useState(false);
