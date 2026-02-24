@@ -24,6 +24,9 @@ import {
   ChevronDown,
   Check,
   PenLine,
+  Info,
+  ClipboardList,
+  ShieldAlert,
 } from 'lucide-react-native';
 import { useAttachments, Attachment } from '@/hooks/general/useAttachment';
 import { useTranslation } from 'react-i18next';
@@ -104,16 +107,16 @@ export default function ComplaintFormScreen() {
   const validateFields = (): boolean => {
     let valid = true;
     if (!resolvedTitle) {
-      setTitleError(t('complaint.error.title_required'));
+      setTitleError(t('complaint_form.error.title_required'));
       valid = false;
     } else if (isOtherSelected && customTitle.trim().length < 3) {
-      setTitleError(t('complaint.error.title_too_short'));
+      setTitleError(t('complaint_form.error.title_too_short'));
       valid = false;
     } else {
       setTitleError('');
     }
     if (!message.trim()) {
-      setMessageError(t('complaint.error.details_required'));
+      setMessageError(t('complaint_form.error.details_required'));
       valid = false;
     } else {
       setMessageError('');
@@ -129,7 +132,7 @@ export default function ComplaintFormScreen() {
         description: message,
         barangay_id: barangayId,
         location_details: null,
-        category_id: resolvedCategoryId, // ← now properly sent to backend
+        category_id: resolvedCategoryId,
         sector_id: null,
         priority_level_id: null,
       };
@@ -151,7 +154,7 @@ export default function ComplaintFormScreen() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      Alert.alert(t('complaint.success_title'), t('complaint.success_message'), [
+      Alert.alert(t('complaint_form.success_title'), t('complaint_form.success_message'), [
         {
           text: t('common.ok'),
           onPress: () => {
@@ -165,7 +168,7 @@ export default function ComplaintFormScreen() {
         },
       ]);
     } catch (error: any) {
-      showToast("Something Went Wrong. Please try again.", 'error');
+      showToast('Something Went Wrong. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -229,17 +232,110 @@ export default function ComplaintFormScreen() {
           <ArrowLeft size={24} color="#1F2937" />
         </TouchableOpacity>
         <View className="flex-1">
-          <Text className="text-xl font-bold text-gray-900">{t('complaint.screen_title')}</Text>
+          <Text className="text-xl font-bold text-gray-900">{t('complaint_form.screen_title')}</Text>
           <Text className="text-sm text-blue-600">{barangayName}</Text>
         </View>
       </View>
 
       <ScrollView className="flex-1" contentContainerClassName="p-4" showsVerticalScrollIndicator={false}>
 
+        {/* ── Filing Instructions ── */}
+        <View className="bg-white border border-gray-200 rounded-xl mb-5 overflow-hidden">
+
+          {/* Header bar */}
+          <View className="bg-blue-700 px-4 py-3 flex-row items-center gap-2">
+            <ClipboardList size={16} color="white" />
+            <Text className="text-white font-bold text-sm tracking-wide uppercase">
+              {t('complaint_form.instructions_title')}
+            </Text>
+          </View>
+
+          {/* Instructions body */}
+          <View className="px-4 py-4 gap-3">
+
+            {/* Instruction 1 */}
+            <View className="flex-row items-start gap-3">
+              <View className="bg-blue-700 rounded-full w-5 h-5 items-center justify-center mt-0.5 shrink-0">
+                <Text className="text-white text-xs font-bold">1</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs font-bold text-gray-800 uppercase tracking-wide mb-0.5">
+                  {t('complaint_form.instruction_1_title')}
+                </Text>
+                <Text className="text-xs text-gray-600 leading-4">
+                  {t('complaint_form.instruction_1_body')}
+                </Text>
+              </View>
+            </View>
+
+            <View className="h-px bg-gray-100" />
+
+            {/* Instruction 2 */}
+            <View className="flex-row items-start gap-3">
+              <View className="bg-blue-700 rounded-full w-5 h-5 items-center justify-center mt-0.5 shrink-0">
+                <Text className="text-white text-xs font-bold">2</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs font-bold text-gray-800 uppercase tracking-wide mb-0.5">
+                  {t('complaint_form.instruction_2_title')}
+                </Text>
+                <Text className="text-xs text-gray-600 leading-4">
+                  {t('complaint_form.instruction_2_body')}
+                </Text>
+              </View>
+            </View>
+
+            <View className="h-px bg-gray-100" />
+
+            {/* Instruction 3 */}
+            <View className="flex-row items-start gap-3">
+              <View className="bg-blue-700 rounded-full w-5 h-5 items-center justify-center mt-0.5 shrink-0">
+                <Text className="text-white text-xs font-bold">3</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="text-xs font-bold text-gray-800 uppercase tracking-wide mb-0.5">
+                  {t('complaint_form.instruction_3_title')}
+                </Text>
+                <Text className="text-xs text-gray-600 leading-4">
+                  {t('complaint_form.instruction_3_body')}
+                </Text>
+              </View>
+            </View>
+
+          </View>
+
+          {/* ── Warning Block (Instruction 4) ── */}
+          <View className="mx-4 mb-4 border border-red-300 rounded-xl overflow-hidden">
+            {/* Warning header */}
+            <View className="bg-red-600 px-3 py-2 flex-row items-center gap-2">
+              <ShieldAlert size={14} color="white" />
+              <Text className="text-white font-bold text-xs tracking-widest uppercase flex-1">
+                {t('complaint_form.instruction_4_title')}
+              </Text>
+            </View>
+            {/* Warning body */}
+            <View className="bg-red-50 px-3 py-3 flex-row items-start gap-2">
+              <AlertCircle size={14} color="#DC2626" style={{ marginTop: 1, flexShrink: 0 }} />
+              <Text className="text-xs text-red-800 leading-[18px] flex-1">
+                {t('complaint_form.instruction_4_body')}
+              </Text>
+            </View>
+          </View>
+
+          {/* Footer disclaimer */}
+          <View className="bg-gray-50 border-t border-gray-200 px-4 py-3 flex-row items-center gap-2">
+            <Info size={13} color="#6B7280" />
+            <Text className="text-xs text-gray-500 flex-1 leading-4">
+              {t('complaint_form.instructions_disclaimer')}
+            </Text>
+          </View>
+
+        </View>
+
         {/* ── Complaint Title ── */}
         <View className="mb-4">
           <Text className="text-sm font-semibold text-gray-700 mb-2">
-            {t('complaint.title_label')} <Text className="text-red-500">*</Text>
+            {t('complaint_form.title_label')} <Text className="text-red-500">*</Text>
           </Text>
 
           {/* Dropdown trigger */}
@@ -250,7 +346,7 @@ export default function ComplaintFormScreen() {
             }`}
           >
             <Text numberOfLines={1} className={`flex-1 text-sm ${selectedPreset ? 'text-gray-900' : 'text-gray-400'}`}>
-              {selectedPreset ? t(selectedPreset.key) : t('complaint.title_placeholder')}
+              {selectedPreset ? t(selectedPreset.key) : t('complaint_form.title_placeholder')}
             </Text>
             <ChevronDown size={18} color="#6B7280" />
           </TouchableOpacity>
@@ -266,7 +362,7 @@ export default function ComplaintFormScreen() {
                     setCustomTitle(text);
                     if (text.trim().length >= 3) setTitleError('');
                   }}
-                  placeholder={t('complaint.custom_title_placeholder')}
+                  placeholder={t('complaint_form.custom_title_placeholder')}
                   placeholderTextColor="#9CA3AF"
                   maxLength={100}
                   autoFocus
@@ -274,7 +370,7 @@ export default function ComplaintFormScreen() {
                 />
                 <Text className="text-xs text-gray-400 ml-2">{customTitle.length}/100</Text>
               </View>
-              <Text className="text-xs text-blue-500 mt-1 ml-1">{t('complaint.custom_title_hint')}</Text>
+              <Text className="text-xs text-blue-500 mt-1 ml-1">{t('complaint_form.custom_title_hint')}</Text>
             </View>
           )}
 
@@ -290,7 +386,7 @@ export default function ComplaintFormScreen() {
         {/* ── Complaint Details ── */}
         <View className="mb-4">
           <Text className="text-sm font-semibold text-gray-700 mb-2">
-            {t('complaint.details_label')} <Text className="text-red-500">*</Text>
+            {t('complaint_form.details_label')} <Text className="text-red-500">*</Text>
           </Text>
           <TextInput
             value={message}
@@ -298,7 +394,7 @@ export default function ComplaintFormScreen() {
               setMessage(text);
               if (text.trim()) setMessageError('');
             }}
-            placeholder={t('complaint.details_placeholder')}
+            placeholder={t('complaint_form.details_placeholder')}
             placeholderTextColor="#9CA3AF"
             multiline
             textAlignVertical="top"
@@ -322,8 +418,8 @@ export default function ComplaintFormScreen() {
 
         {/* ── Attachments ── */}
         <View className="mb-6">
-          <Text className="text-sm font-semibold text-gray-700 mb-2">{t('complaint.attachments_label')}</Text>
-          <Text className="text-xs text-gray-500 mb-3">{t('complaint.attachments_hint')}</Text>
+          <Text className="text-sm font-semibold text-gray-700 mb-2">{t('complaint_form.attachments_label')}</Text>
+          <Text className="text-xs text-gray-500 mb-3">{t('complaint_form.attachments_hint')}</Text>
 
           {attachments.map((attachment) => renderAttachment(attachment))}
 
@@ -335,9 +431,9 @@ export default function ComplaintFormScreen() {
               <View className="bg-blue-50 p-3 rounded-full mb-2">
                 <Upload size={24} color="#3B82F6" />
               </View>
-              <Text className="text-blue-600 font-semibold text-sm">{t('complaint.add_attachment')}</Text>
+              <Text className="text-blue-600 font-semibold text-sm">{t('complaint_form.add_attachment')}</Text>
               <Text className="text-gray-500 text-xs mt-1">
-                {t('complaint.attachments_count', { count: attachments.length })}
+                {t('complaint_form.attachments_count', { count: attachments.length })}
               </Text>
             </TouchableOpacity>
           )}
@@ -345,8 +441,8 @@ export default function ComplaintFormScreen() {
 
         {/* ── Info Box ── */}
         <View className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-          <Text className="text-sm text-blue-900 font-semibold mb-1">{t('complaint.note_title')}</Text>
-          <Text className="text-xs text-blue-800 leading-5">{t('complaint.note_body')}</Text>
+          <Text className="text-sm text-blue-900 font-semibold mb-1">{t('complaint_form.note_title')}</Text>
+          <Text className="text-xs text-blue-800 leading-5">{t('complaint_form.note_body')}</Text>
         </View>
 
       </ScrollView>
@@ -361,7 +457,7 @@ export default function ComplaintFormScreen() {
           className="py-4 rounded-xl items-center justify-center bg-blue-600 active:bg-blue-700"
         >
           <Text className="text-white font-semibold text-base">
-            {t('complaint.submit')}
+            {t('complaint_form.submit')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -373,12 +469,12 @@ export default function ComplaintFormScreen() {
 
             <View className="px-6 pt-6 pb-4 border-b border-gray-100">
               <View className="flex-row items-center justify-between">
-                <Text className="text-xl font-bold text-gray-900">{t('complaint.picker_title')}</Text>
+                <Text className="text-xl font-bold text-gray-900">{t('complaint_form.picker_title')}</Text>
                 <TouchableOpacity onPress={() => setShowTitlePicker(false)} className="p-2 -mr-2">
                   <X size={24} color="#6B7280" />
                 </TouchableOpacity>
               </View>
-              <Text className="text-sm text-gray-500 mt-1">{t('complaint.picker_subtitle')}</Text>
+              <Text className="text-sm text-gray-500 mt-1">{t('complaint_form.picker_subtitle')}</Text>
             </View>
 
             <FlatList
@@ -436,13 +532,13 @@ export default function ComplaintFormScreen() {
 
             <View className="px-6 pt-6 pb-4 border-b border-gray-100">
               <View className="flex-row items-center justify-between">
-                <Text className="text-xl font-bold text-gray-900">{t('complaint.add_attachment')}</Text>
+                <Text className="text-xl font-bold text-gray-900">{t('complaint_form.add_attachment')}</Text>
                 <TouchableOpacity onPress={() => setShowAttachmentModal(false)} className="p-2 -mr-2">
                   <X size={24} color="#6B7280" />
                 </TouchableOpacity>
               </View>
               <Text className="text-sm text-gray-600 mt-1">
-                {t('complaint.attachment_remaining', { count: 3 - attachments.length })}
+                {t('complaint_form.attachment_remaining', { count: 3 - attachments.length })}
               </Text>
             </View>
 
@@ -457,8 +553,8 @@ export default function ComplaintFormScreen() {
                   <ImageIcon size={24} color="white" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-base font-semibold text-gray-900 mb-0.5">{t('complaint.attachment_photo')}</Text>
-                  <Text className="text-sm text-gray-600">{t('complaint.attachment_photo_hint')}</Text>
+                  <Text className="text-base font-semibold text-gray-900 mb-0.5">{t('complaint_form.attachment_photo')}</Text>
+                  <Text className="text-sm text-gray-600">{t('complaint_form.attachment_photo_hint')}</Text>
                 </View>
                 <View className="bg-blue-600 px-3 py-1 rounded-full">
                   <Text className="text-white text-xs font-semibold">JPG, PNG</Text>
@@ -475,8 +571,8 @@ export default function ComplaintFormScreen() {
                   <Video size={24} color="white" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-base font-semibold text-gray-900 mb-0.5">{t('complaint.attachment_video')}</Text>
-                  <Text className="text-sm text-gray-600">{t('complaint.attachment_video_hint')}</Text>
+                  <Text className="text-base font-semibold text-gray-900 mb-0.5">{t('complaint_form.attachment_video')}</Text>
+                  <Text className="text-sm text-gray-600">{t('complaint_form.attachment_video_hint')}</Text>
                 </View>
                 <View className="bg-purple-600 px-3 py-1 rounded-full">
                   <Text className="text-white text-xs font-semibold">MP4, MOV</Text>
@@ -493,8 +589,8 @@ export default function ComplaintFormScreen() {
                   <FileText size={24} color="white" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-base font-semibold text-gray-900 mb-0.5">{t('complaint.attachment_document')}</Text>
-                  <Text className="text-sm text-gray-600">{t('complaint.attachment_document_hint')}</Text>
+                  <Text className="text-base font-semibold text-gray-900 mb-0.5">{t('complaint_form.attachment_document')}</Text>
+                  <Text className="text-sm text-gray-600">{t('complaint_form.attachment_document_hint')}</Text>
                 </View>
                 <View className="bg-green-600 px-3 py-1 rounded-full">
                   <Text className="text-white text-xs font-semibold">ANY</Text>

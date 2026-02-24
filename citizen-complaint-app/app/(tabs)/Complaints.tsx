@@ -14,18 +14,13 @@ export default function ComplaintsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
-  
-  const {
-    data,
-    isPending,
-    error,
-    refetch,
-  } = useQuery({
+
+  const { data, isPending, error, refetch } = useQuery({
     queryKey: ['barangays'],
     queryFn: async () => {
       const response = await barangayApiClient.get('/all');
       return response.data as Barangay[];
-    }
+    },
   });
 
   const handleRefresh = async () => {
@@ -40,24 +35,20 @@ export default function ComplaintsScreen() {
       params: {
         id: barangay.id.toString(),
         barangayName: barangay.barangay_name,
-      }
+      },
     });
   };
 
   const handleViewMyComplaints = () => {
-    // Navigate to user's complaints list
-     router.push('/complaints/UserComplaints');
-   
+    router.push('/complaints/UserComplaints');
   };
 
   if (error) {
-    const errorObj = new Error('Failed to load barangays');
-    const appError = handleApiError(errorObj);
-
+    const appError = handleApiError(new Error(t('complaintsScreen.errors.loadFailed')));
     return (
       <ErrorScreen
         type={appError.type}
-        title="Unable to Retrieve Barangays"
+        title={t('complaintsScreen.errors.screenTitle')}
         onRetry={refetch}
       />
     );
@@ -95,14 +86,14 @@ export default function ComplaintsScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
       {/* Header */}
       <View className="bg-white px-4 py-6 border-b border-gray-100">
         <Text className="text-2xl font-bold text-gray-900 mb-2">
-          File a Complaint
+          {t('complaintsScreen.header.title')}
         </Text>
         <Text className="text-sm text-gray-600">
-          Select a barangay to submit your complaint
+          {t('complaintsScreen.header.subtitle')}
         </Text>
       </View>
 
@@ -121,7 +112,7 @@ export default function ComplaintsScreen() {
         >
           <FileText size={20} color="white" style={{ marginRight: 8 }} />
           <Text className="text-white font-semibold text-base">
-            View My Complaints
+            {t('complaintsScreen.buttons.viewMyComplaints')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -130,13 +121,15 @@ export default function ComplaintsScreen() {
       {isPending ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#3B82F6" />
-          <Text className="text-gray-500 mt-4">Loading barangays...</Text>
+          <Text className="text-gray-500 mt-4">
+            {t('complaintsScreen.list.loading')}
+          </Text>
         </View>
       ) : (
         <View className="flex-1">
           <View className="px-4 pt-4 pb-2">
             <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Available Barangays
+              {t('complaintsScreen.list.sectionLabel')}
             </Text>
           </View>
           <FlatList
@@ -151,14 +144,14 @@ export default function ComplaintsScreen() {
                 onRefresh={handleRefresh}
                 colors={['#3B82F6']}
                 tintColor="#3B82F6"
-                title="Pull to refresh"
+                title={t('complaintsScreen.list.pullToRefresh')}
                 titleColor="#6B7280"
               />
             }
             ListEmptyComponent={
               <View className="items-center justify-center py-12">
                 <Text className="text-gray-500 text-center">
-                  No barangays available
+                  {t('complaintsScreen.list.empty')}
                 </Text>
               </View>
             }

@@ -18,10 +18,13 @@ import {
   Building2,
   Calendar,
   CheckCircle2,
+  Mail,
   MapPin,
+  Phone,
   RefreshCw,
   Tag,
 } from "lucide-react-native";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   ScrollView,
@@ -31,10 +34,12 @@ import {
 } from "react-native";
 
 
-
 const STATUS_STEPS = ["submitted", "forwarded", "resolved"] as const;
 
+// ─── Status Timeline ──────────────────────────────────────────────────────────
+
 function StatusTimeline({ status }: { status: string | null }) {
+  const { t } = useTranslation();
   const current = status?.toLowerCase() ?? "";
   const isRejected = current === "rejected";
 
@@ -46,9 +51,11 @@ function StatusTimeline({ status }: { status: string | null }) {
             <AlertCircle size={16} color="#ef4444" />
           </View>
           <View>
-            <Text className="text-sm font-bold text-red-700">Complaint Rejected</Text>
+            <Text className="text-sm font-bold text-red-700">
+              {t("complaintDetail.timeline.rejected.title")}
+            </Text>
             <Text className="text-xs text-red-400 mt-0.5">
-              This complaint has been reviewed and rejected.
+              {t("complaintDetail.timeline.rejected.description")}
             </Text>
           </View>
         </View>
@@ -59,7 +66,7 @@ function StatusTimeline({ status }: { status: string | null }) {
   return (
     <View className="bg-white border border-gray-100 rounded-2xl p-4">
       <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
-        Progress
+        {t("complaintDetail.timeline.sectionTitle")}
       </Text>
       <View className="flex-row items-center justify-between">
         {STATUS_STEPS.map((step, i) => {
@@ -114,6 +121,8 @@ function StatusTimeline({ status }: { status: string | null }) {
   );
 }
 
+// ─── Info Row ─────────────────────────────────────────────────────────────────
+
 function InfoRow({
   icon,
   label,
@@ -138,20 +147,45 @@ function InfoRow({
   );
 }
 
-// ─── Loading State ────────────────────────────────────────────────────────────
+// ─── Contact Row ──────────────────────────────────────────────────────────────
 
-function LoadingState() {
+function ContactRow({
+  icon,
+  value,
+}: {
+  icon: React.ReactNode;
+  value: string;
+}) {
   return (
-    <View className="flex-1 items-center justify-center bg-gray-50">
-      <ActivityIndicator size="large" color="#2563eb" />
-      <Text className="text-sm text-gray-400 mt-3">Loading complaint details...</Text>
+    <View className="flex-row items-center gap-2 mb-1">
+      <View className="w-7 h-7 rounded-lg bg-blue-100 items-center justify-center">
+        {icon}
+      </View>
+      <Text className="text-sm font-semibold text-blue-800">{value}</Text>
     </View>
   );
 }
 
+// ─── Loading State ────────────────────────────────────────────────────────────
+
+function LoadingState() {
+  const { t } = useTranslation();
+
+  return (
+    <View className="flex-1 items-center justify-center bg-gray-50">
+      <ActivityIndicator size="large" color="#2563eb" />
+      <Text className="text-sm text-gray-400 mt-3">
+        {t("complaintDetail.loading")}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ComplaintDetail() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const { data, error, isLoading, refetch } = useQuery<Complaint>({
@@ -164,11 +198,11 @@ export default function ComplaintDetail() {
   });
 
   if (error) {
-    const appError = handleApiError(new Error("Failed to fetch complaint details"));
+    const appError = handleApiError(new Error(t("complaintDetail.error.message")));
     return (
       <ErrorScreen
         type={appError.type}
-        title="Unable to Retrieve Complaint Details"
+        title={t("complaintDetail.error.title")}
         onRetry={refetch}
       />
     );
@@ -179,7 +213,6 @@ export default function ComplaintDetail() {
 
   const catKey = data.category?.category_name ?? "";
   const catLabel = getCategoryLabel(catKey, data.title);
-  const statusCfg = getStatusConfig(data.status);
 
   return (
     <View className="flex-1 bg-gray-50">
@@ -192,7 +225,9 @@ export default function ComplaintDetail() {
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <ArrowLeft size={22} color="#2563eb" />
-            <Text className="text-base font-bold text-blue-600">Back</Text>
+            <Text className="text-base font-bold text-blue-600">
+              {t("complaintDetail.header.back")}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -230,12 +265,16 @@ export default function ComplaintDetail() {
 
           {/* Description */}
           {data.description && (
-            <Text className="text-sm text-gray-500 leading-5 mb-3">{data.description}</Text>
+            <Text className="text-sm text-gray-500 leading-5 mb-3">
+              {data.description}
+            </Text>
           )}
 
           {/* Complaint ID */}
           <Text className="text-xs text-gray-300 font-medium">
-            Complaint #{String(data.id).padStart(5, "0")}
+            {t("complaintDetail.hero.complaintId", {
+              id: String(data.id).padStart(5, "0"),
+            })}
           </Text>
         </View>
 
@@ -247,27 +286,33 @@ export default function ComplaintDetail() {
         {/* Details Card */}
         <View className="bg-white border border-gray-100 rounded-2xl px-4 mb-3 shadow-sm">
           <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest pt-4 pb-2">
-            Details
+            {t("complaintDetail.details.sectionTitle")}
           </Text>
 
           <InfoRow
             icon={<Calendar size={15} color="#6b7280" />}
-            label="Date Filed"
-            value={`${formatDate(data.created_at)} at ${formatTime(data.created_at)}`}
+            label={t("complaintDetail.details.dateFiled")}
+            value={t("complaintDetail.details.dateFiled_value", {
+              date: formatDate(data.created_at),
+              time: formatTime(data.created_at),
+            })}
           />
 
           {data.barangay && (
             <InfoRow
               icon={<MapPin size={15} color="#6b7280" />}
-              label="Barangay"
-              value={`${data.barangay.barangay_name} — ${data.barangay.barangay_address}`}
+              label={t("complaintDetail.details.barangay")}
+              value={t("complaintDetail.details.barangay_value", {
+                name: data.barangay.barangay_name,
+                address: data.barangay.barangay_address,
+              })}
             />
           )}
 
           {data.location_details && (
             <InfoRow
               icon={<MapPin size={15} color="#6b7280" />}
-              label="Location Details"
+              label={t("complaintDetail.details.locationDetails")}
               value={data.location_details}
             />
           )}
@@ -275,7 +320,7 @@ export default function ComplaintDetail() {
           {data.department && (
             <InfoRow
               icon={<Building2 size={15} color="#6b7280" />}
-              label="Assigned Department"
+              label={t("complaintDetail.details.assignedDepartment")}
               value={data.department.department_name}
             />
           )}
@@ -283,7 +328,7 @@ export default function ComplaintDetail() {
           {data.priority_level && (
             <InfoRow
               icon={<Tag size={15} color="#6b7280" />}
-              label="Priority Level"
+              label={t("complaintDetail.details.priorityLevel")}
               value={data.priority_level.label}
             />
           )}
@@ -291,7 +336,7 @@ export default function ComplaintDetail() {
           {data.sector && (
             <InfoRow
               icon={<Tag size={15} color="#6b7280" />}
-              label="Sector"
+              label={t("complaintDetail.details.sector")}
               value={data.sector.name}
             />
           )}
@@ -304,17 +349,21 @@ export default function ComplaintDetail() {
           (data.barangay.barangay_contact_number || data.barangay.barangay_email) && (
             <View className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-3">
               <Text className="text-xs font-bold text-blue-400 uppercase tracking-widest mb-3">
-                Barangay Contact
+                {t("complaintDetail.barangayContact.sectionTitle")}
               </Text>
+
               {data.barangay.barangay_contact_number && (
-                <Text className="text-sm font-semibold text-blue-800 mb-1">
-                  📞 {data.barangay.barangay_contact_number}
-                </Text>
+                <ContactRow
+                  icon={<Phone size={14} color="#2563eb" />}
+                  value={data.barangay.barangay_contact_number}
+                />
               )}
+
               {data.barangay.barangay_email && (
-                <Text className="text-sm font-semibold text-blue-800">
-                  ✉️ {data.barangay.barangay_email}
-                </Text>
+                <ContactRow
+                  icon={<Mail size={14} color="#2563eb" />}
+                  value={data.barangay.barangay_email}
+                />
               )}
             </View>
           )}

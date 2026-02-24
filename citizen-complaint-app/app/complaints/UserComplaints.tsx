@@ -28,6 +28,7 @@ import {
   XCircle,
 } from "lucide-react-native";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   FlatList,
@@ -41,6 +42,7 @@ import {
 
 
 function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: () => void }) {
+  const { t } = useTranslation();
   const catKey = complaint.category?.category_name ?? "";
   const catLabel = getCategoryLabel(catKey, complaint.title);
 
@@ -107,7 +109,7 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
 
           {/* ID */}
           <Text className="text-xs text-gray-300 mt-1.5">
-            #{String(complaint.id).padStart(5, "0")}
+            {t("complaints.card.id", { id: String(complaint.id).padStart(5, "0") })}
           </Text>
         </View>
 
@@ -120,18 +122,22 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
 function EmptyState({ filtered }: { filtered: boolean }) {
+  const { t } = useTranslation();
+
   return (
     <View className="flex-1 items-center justify-center py-20">
       <View className="w-16 h-16 rounded-2xl bg-blue-50 items-center justify-center mb-4">
         <AlertCircle size={28} color="#3b82f6" />
       </View>
       <Text className="text-base font-bold text-gray-800 mb-1">
-        {filtered ? "No results found" : "No complaints yet"}
+        {filtered
+          ? t("complaints.empty.noResults.title")
+          : t("complaints.empty.noComplaints.title")}
       </Text>
       <Text className="text-sm text-gray-400 text-center px-8">
         {filtered
-          ? "Try adjusting your filters or search terms."
-          : "You haven't submitted any complaints yet."}
+          ? t("complaints.empty.noResults.description")
+          : t("complaints.empty.noComplaints.description")}
       </Text>
     </View>
   );
@@ -140,10 +146,12 @@ function EmptyState({ filtered }: { filtered: boolean }) {
 // ─── Loading State ────────────────────────────────────────────────────────────
 
 function LoadingState() {
+  const { t } = useTranslation();
+
   return (
     <View className="flex-1 items-center justify-center">
       <ActivityIndicator size="large" color="#2563eb" />
-      <Text className="text-sm text-gray-400 mt-3">Loading your complaints...</Text>
+      <Text className="text-sm text-gray-400 mt-3">{t("complaints.loading")}</Text>
     </View>
   );
 }
@@ -163,6 +171,8 @@ function FilterModal({
   onToggleStatus: (s: string) => void;
   onClear: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Modal visible={visible} transparent animationType="slide">
       <Pressable className="flex-1 bg-black/30" onPress={onClose} />
@@ -170,9 +180,13 @@ function FilterModal({
         <View className="w-10 h-1 bg-gray-200 rounded-full self-center mb-5" />
 
         <View className="flex-row items-center justify-between mb-5">
-          <Text className="text-lg font-bold text-gray-900">Filter by Status</Text>
+          <Text className="text-lg font-bold text-gray-900">
+            {t("complaints.filter.title")}
+          </Text>
           <TouchableOpacity onPress={onClear}>
-            <Text className="text-sm font-semibold text-blue-600">Clear all</Text>
+            <Text className="text-sm font-semibold text-blue-600">
+              {t("complaints.filter.clearAll")}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -202,7 +216,9 @@ function FilterModal({
           onPress={onClose}
           className="bg-blue-600 py-3.5 rounded-xl items-center"
         >
-          <Text className="text-white font-bold text-base">Apply Filters</Text>
+          <Text className="text-white font-bold text-base">
+            {t("complaints.filter.apply")}
+          </Text>
         </TouchableOpacity>
       </View>
     </Modal>
@@ -213,6 +229,7 @@ function FilterModal({
 
 export default function UserComplaints() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -257,11 +274,11 @@ export default function UserComplaints() {
   const isFiltered = search.length > 0 || activeFilterCount > 0;
 
   if (error) {
-    const appError = handleApiError(new Error("Failed to load complaints"));
+    const appError = handleApiError(new Error(t("complaints.error.message")));
     return (
       <ErrorScreen
         type={appError.type}
-        title="Unable to Retrieve Complaints"
+        title={t("complaints.error.title")}
         onRetry={refetch}
       />
     );
@@ -279,7 +296,9 @@ export default function UserComplaints() {
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <ArrowLeft size={24} color="#2563eb" />
-            <Text className="text-base font-bold text-blue-600">Back</Text>
+            <Text className="text-base font-bold text-blue-600">
+              {t("complaints.header.back")}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -293,9 +312,11 @@ export default function UserComplaints() {
         {/* Title */}
         <View className="mb-4">
           <Text className="text-xs font-semibold text-blue-500 uppercase tracking-widest mb-0.5">
-            Santa Maria, Laguna
+            {t("complaints.header.location")}
           </Text>
-          <Text className="text-2xl font-bold text-gray-900">My Complaints</Text>
+          <Text className="text-2xl font-bold text-gray-900">
+            {t("complaints.header.title")}
+          </Text>
         </View>
 
         {/* Search */}
@@ -303,7 +324,7 @@ export default function UserComplaints() {
           <Search size={16} color="#9ca3af" />
           <TextInput
             className="flex-1 ml-2 text-sm text-gray-800"
-            placeholder="Search complaints..."
+            placeholder={t("complaints.search.placeholder")}
             placeholderTextColor="#9ca3af"
             value={search}
             onChangeText={setSearch}
@@ -329,13 +350,20 @@ export default function UserComplaints() {
                 activeFilterCount > 0 ? "text-blue-700" : "text-gray-600"
               }`}
             >
-              Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+              {activeFilterCount > 0
+                ? t("complaints.filter.labelWithCount", { count: activeFilterCount })
+                : t("complaints.filter.label")}
             </Text>
           </TouchableOpacity>
 
           {data && (
             <Text className="text-xs text-gray-400">
-              {filtered.length} of {data.length} complaint{data.length !== 1 ? "s" : ""}
+              {t(
+                data.length !== 1
+                  ? "complaints.count_plural"
+                  : "complaints.count",
+                { filtered: filtered.length, total: data.length }
+              )}
             </Text>
           )}
         </View>
