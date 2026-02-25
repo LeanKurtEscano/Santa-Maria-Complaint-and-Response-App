@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Send, FileText, Paperclip, Shield, Scale } from 'lucide-react-native';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
 import { Attachment } from '@/hooks/general/useAttachment';
-
+import GeneralToast from '../Toast/GeneralToast';
 interface ComplaintLetterPreviewProps {
   barangayName: string;
   title: string;
@@ -17,6 +17,10 @@ interface ComplaintLetterPreviewProps {
   attachments?: Attachment[];
   onConfirmSubmit: () => void;
   onBack: () => void;
+  toastVisible?: boolean;
+  setToastVisible?: (visible: boolean) => void;
+  toastMessage?: string;
+  toastType?: 'success' | 'error' | 'info';
   isSubmitting?: boolean;
 }
 
@@ -45,6 +49,7 @@ export default function ComplaintLetterPreview({
   onConfirmSubmit,
   onBack,
   isSubmitting = false,
+ 
 }: ComplaintLetterPreviewProps) {
   const { userData } = useCurrentUser();
 
@@ -406,6 +411,8 @@ export default function ComplaintLetterPreview({
         </View>
 
       </ScrollView>
+
+     
     </SafeAreaView>
   );
 }

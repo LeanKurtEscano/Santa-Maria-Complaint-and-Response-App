@@ -154,23 +154,23 @@ export default function ComplaintFormScreen() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      Alert.alert(t('complaint_form.success_title'), t('complaint_form.success_message'), [
-        {
-          text: t('common.ok'),
-          onPress: () => {
-            resetAttachments();
+      if (response.status === 201) {  
+        showToast('Complaint submitted successfully!', 'success');
+          resetAttachments();
             setSelectedPreset(null);
             setCustomTitle('');
             setMessage('');
             setShowPreview(false);
-            router.back();
-          },
-        },
-      ]);
+          router.back();
+
+
+      }
     } catch (error: any) {
       showToast('Something Went Wrong. Please try again.', 'error');
+     
     } finally {
       setIsSubmitting(false);
+      setShowPreview(false);
     }
   };
 
@@ -219,6 +219,10 @@ export default function ComplaintFormScreen() {
         onConfirmSubmit={handleSubmit}
         onBack={() => setShowPreview(false)}
         isSubmitting={isSubmitting}
+        toastVisible={toastVisible}
+        setToastVisible={setToastVisible}
+        toastMessage={toastMessage}
+        toastType={toastType}
       />
     );
   }
@@ -607,14 +611,12 @@ export default function ComplaintFormScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-
-      <GeneralToast
+        <GeneralToast
         visible={toastVisible}
         onHide={() => setToastVisible(false)}
         message={toastMessage}
         type={toastType}
       />
-
     </SafeAreaView>
   );
 }

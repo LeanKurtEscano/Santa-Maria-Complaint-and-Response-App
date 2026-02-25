@@ -355,6 +355,41 @@ const resources = {
     }
   }, 
 
+  "complaintDetail": {
+  "header": {
+    "back": "Back"
+  },
+  "loading": "Fetching complaint details...",
+  "error": {
+    "title": "Unable to Retrieve Complaint Details",
+    "message": "Failed to fetch complaint details"
+  },
+  "hero": {
+    "complaintId": "Complaint #{{id}}"
+  },
+  "timeline": {
+    "sectionTitle": "Progress",
+    "rejected": {
+      "title": "Complaint Rejected",
+      "description": "This complaint has been reviewed and rejected."
+    }
+  },
+  "details": {
+    "sectionTitle": "Details",
+    "dateFiled": "Date Filed",
+    "dateFiled_value": "{{date}} at {{time}}",
+    "barangay": "Barangay",
+    "barangay_value": "{{name}} — {{address}}",
+    "locationDetails": "Location Details",
+    "assignedDepartment": "Assigned Department",
+    "priorityLevel": "Priority Level",
+    "sector": "Sector"
+  },
+  "barangayContact": {
+    "sectionTitle": "Contact the Barangay"
+  }
+}
+
   
     },
   },
