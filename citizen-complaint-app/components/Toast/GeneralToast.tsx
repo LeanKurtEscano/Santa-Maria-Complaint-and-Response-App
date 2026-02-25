@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Modal, Animated } from 'react-native';
+import { View, Text, Modal, Animated, Pressable } from 'react-native';
+import { CheckCircle2, XCircle, Info } from 'lucide-react-native';
 
 interface GeneralToastProps {
   visible: boolean;
@@ -11,6 +12,7 @@ interface GeneralToastProps {
 const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, type }) => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
+  const translateYAnim = useRef(new Animated.Value(-20)).current;
   const iconScaleAnim = useRef(new Animated.Value(0)).current;
   const iconRotateAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -20,31 +22,38 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
       iconScaleAnim.setValue(0);
       iconRotateAnim.setValue(0);
       shakeAnim.setValue(0);
+      translateYAnim.setValue(-20);
 
       Animated.parallel([
         Animated.spring(scaleAnim, {
           toValue: 1,
-          tension: 50,
-          friction: 7,
+          tension: 60,
+          friction: 8,
           useNativeDriver: true,
         }),
         Animated.timing(opacityAnim, {
           toValue: 1,
-          duration: 200,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateYAnim, {
+          toValue: 0,
+          tension: 60,
+          friction: 8,
           useNativeDriver: true,
         }),
       ]).start(() => {
         if (type === 'success') {
           Animated.sequence([
             Animated.spring(iconScaleAnim, {
-              toValue: 1.2,
-              tension: 100,
+              toValue: 1.3,
+              tension: 120,
               friction: 3,
               useNativeDriver: true,
             }),
             Animated.spring(iconScaleAnim, {
               toValue: 1,
-              tension: 100,
+              tension: 120,
               friction: 5,
               useNativeDriver: true,
             }),
@@ -59,7 +68,8 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
           Animated.sequence([
             Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
             Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-            Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+            Animated.timing(shakeAnim, { toValue: 8, duration: 50, useNativeDriver: true }),
+            Animated.timing(shakeAnim, { toValue: -8, duration: 50, useNativeDriver: true }),
             Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
           ]).start();
 
@@ -70,7 +80,7 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
             useNativeDriver: true,
           }).start();
         } else {
-          // info — simple pop in, no shake or rotate
+          // info
           Animated.spring(iconScaleAnim, {
             toValue: 1,
             tension: 80,
@@ -80,7 +90,7 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
         }
       });
 
-      const duration = type === 'error' ? 3000 : type === 'info' ? 3500 : 2000;
+      const duration = type === 'error' ? 3000 : type === 'info' ? 3500 : 2500;
       const timer = setTimeout(() => {
         handleHide();
       }, duration);
@@ -92,13 +102,18 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
   const handleHide = () => {
     Animated.parallel([
       Animated.timing(scaleAnim, {
-        toValue: 0,
-        duration: 200,
+        toValue: 0.9,
+        duration: 150,
         useNativeDriver: true,
       }),
       Animated.timing(opacityAnim, {
         toValue: 0,
-        duration: 200,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateYAnim, {
+        toValue: -10,
+        duration: 180,
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -110,24 +125,32 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
 
   const config = {
     success: {
-      bg: 'bg-pink-500',
-      text: 'text-pink-500',
+      iconBg: '#22c55e',
+      iconBgLight: '#dcfce7',
+      labelColor: '#15803d',
       label: 'Success!',
-      icon: '✓',
+      borderColor: '#86efac',
+      LucideIcon: CheckCircle2,
     },
     error: {
-      bg: 'bg-red-500',
-      text: 'text-red-500',
+      iconBg: '#ef4444',
+      iconBgLight: '#fee2e2',
+      labelColor: '#b91c1c',
       label: 'Oops!',
-      icon: '✕',
+      borderColor: '#fca5a5',
+      LucideIcon: XCircle,
     },
     info: {
-      bg: 'bg-blue-500',
-      text: 'text-blue-500',
+      iconBg: '#3b82f6',
+      iconBgLight: '#dbeafe',
+      labelColor: '#1d4ed8',
       label: 'Heads up!',
-      icon: 'ℹ',
+      borderColor: '#93c5fd',
+      LucideIcon: Info,
     },
   }[type];
+
+  const { LucideIcon } = config;
 
   return (
     <Modal
@@ -136,20 +159,54 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
       animationType="none"
       onRequestClose={handleHide}
     >
-      <View className="flex-1 z-50 justify-center items-center bg-black/40">
+      <Pressable
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'rgba(0,0,0,0.45)',
+        }}
+        onPress={handleHide}
+      >
         <Animated.View
           style={{
             transform: [
               { scale: scaleAnim },
               { translateX: type === 'error' ? shakeAnim : 0 },
+              { translateY: translateYAnim },
             ],
             opacity: opacityAnim,
+            backgroundColor: '#ffffff',
+            borderRadius: 20,
+            paddingHorizontal: 32,
+            paddingVertical: 28,
+            marginHorizontal: 32,
+            maxWidth: 320,
+            width: '100%',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.18,
+            shadowRadius: 24,
+            elevation: 12,
+            borderWidth: 1,
+            borderColor: config.borderColor,
           }}
-          className="bg-white rounded-2xl px-8 py-6 mx-8 shadow-lg max-w-sm"
         >
-          <View className={`${config.bg} rounded-full w-16 h-16 justify-center items-center mx-auto mb-4`}>
+          {/* Icon circle */}
+          <View
+            style={{
+              width: 68,
+              height: 68,
+              borderRadius: 34,
+              backgroundColor: config.iconBgLight,
+              justifyContent: 'center',
+              alignItems: 'center',
+              alignSelf: 'center',
+              marginBottom: 16,
+            }}
+          >
             {type === 'success' ? (
-              <Animated.Text
+              <Animated.View
                 style={{
                   transform: [
                     { scale: iconScaleAnim },
@@ -161,30 +218,56 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
                     },
                   ],
                 }}
-                className="text-white text-3xl font-bold"
               >
-                {config.icon}
-              </Animated.Text>
+                <LucideIcon size={36} color={config.iconBg} strokeWidth={2} />
+              </Animated.View>
             ) : (
-              <Animated.Text
-                style={{
-                  transform: [{ scale: iconScaleAnim }],
-                }}
-                className="text-white text-4xl font-bold"
-              >
-                {config.icon}
-              </Animated.Text>
+              <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>
+                <LucideIcon size={36} color={config.iconBg} strokeWidth={2} />
+              </Animated.View>
             )}
           </View>
 
-          <Text className={`${config.text} text-lg font-bold text-center`}>
+          {/* Label */}
+          <Text
+            style={{
+              color: config.labelColor,
+              fontSize: 17,
+              fontWeight: '700',
+              textAlign: 'center',
+              letterSpacing: 0.2,
+            }}
+          >
             {config.label}
           </Text>
-          <Text className="text-gray-600 text-sm text-center mt-2">
+
+          {/* Message */}
+          <Text
+            style={{
+              color: '#6b7280',
+              fontSize: 14,
+              textAlign: 'center',
+              marginTop: 6,
+              lineHeight: 20,
+            }}
+          >
             {message}
           </Text>
+
+          {/* Dismiss hint */}
+          <Text
+            style={{
+              color: '#d1d5db',
+              fontSize: 11,
+              textAlign: 'center',
+              marginTop: 14,
+              letterSpacing: 0.3,
+            }}
+          >
+            Tap anywhere to dismiss
+          </Text>
         </Animated.View>
-      </View>
+      </Pressable>
     </Modal>
   );
 };
