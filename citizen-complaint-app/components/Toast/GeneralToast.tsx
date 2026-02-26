@@ -141,8 +141,8 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
       LucideIcon: XCircle,
     },
     info: {
-      iconBg: '#3b82f6',
-      iconBgLight: '#dbeafe',
+      iconBg: '#ffffff',
+      iconBgLight: '#3b82f6',
       labelColor: '#1d4ed8',
       label: 'Heads up!',
       borderColor: '#93c5fd',

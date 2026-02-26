@@ -399,9 +399,12 @@ export default function RegisterScreen({ navigation }: any) {
         <ErrorMessage message={errors.firstName?.message} />
       </View>
 
-      {/* Middle Name (optional, no strict validation) */}
+      {/* Middle Name (optional) */}
       <View className="mb-4">
-        <Text className="text-sm font-medium text-neutral-700 mb-2">{t('middleName')}</Text>
+        <Text className="text-sm font-medium text-neutral-700 mb-2">
+          {t('middleName')}{' '}
+          <Text className="text-neutral-400 font-normal text-xs">(Optional)</Text>
+        </Text>
         <Controller
           control={control}
           name="middleName"
