@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Mail, AlertCircle, CheckCircle, WifiOff } from 'lucide-react-native';
+import { ArrowLeft, Mail, AlertCircle, CheckCircle, WifiOff, Clock, ShieldAlert } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApiClient } from '@/lib/client/user';
 
@@ -220,22 +220,18 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
       router.push('/(auth)');
 
     } catch (err: any) {
-      console.error('Verification error:', err?.response?.data);
-
       const status = err?.response?.status;
 
       if (status === 400) {
         const detail = extractErrorMessage(err?.response?.data?.detail);
 
         if (detail.includes('expired') || detail.includes('not found')) {
-          // OTP expired — shake inputs, show inline, clear boxes so user requests new one
           setErrorMessage('Your OTP has expired. Please request a new code.');
           setErrorType('expired_otp');
           setOtp(['', '', '', '', '', '']);
           setTimeout(() => inputRefs.current[0]?.focus(), 100);
 
         } else if (detail.includes('Invalid OTP')) {
-          // Wrong code — shake inputs, keep boxes filled so user can correct
           setErrorMessage('Incorrect code. Please try again.');
           setErrorType('invalid_otp');
 
@@ -258,7 +254,6 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
         setErrorType('validation');
 
       } else if (status >= 500) {
-        // Server-side error from your service's except Exception block
         setErrorMessage('Something went wrong on our end. Please try again later.');
         setErrorType('server');
 
@@ -299,8 +294,8 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     return `${maskedUsername}@${domain}`;
   };
 
-  // Drives input border colour — red on invalid/expired, normal otherwise
-  const getInputStyle = (digit: string) => {
+  // ─── Input border colour per error state ─────────────────────────────────
+  const getInputClassName = (digit: string) => {
     const hasOtpError = errorType === 'invalid_otp' || errorType === 'expired_otp';
     if (hasOtpError) {
       return 'border-error-500 bg-error-50 text-error-700';
@@ -311,23 +306,45 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     return 'border-neutral-300 bg-white text-neutral-900';
   };
 
-  // Drives the error box accent colour by error type
-  const getErrorBoxStyle = () => {
-    if (errorType === 'server') {
-      return 'bg-amber-50 border-amber-400';
-    }
-    return 'bg-error-50 border-error-300';
+  // ─── Error banner config per type ─────────────────────────────────────────
+  const errorConfig = {
+    invalid_otp: {
+      containerClass: 'bg-error-50 border-error-400',
+      textClass: 'text-error-800',
+      iconColor: '#DC2626',
+      Icon: AlertCircle,
+    },
+    expired_otp: {
+      containerClass: 'bg-amber-50 border-amber-400',
+      textClass: 'text-amber-800',
+      iconColor: '#D97706',
+      Icon: Clock,
+    },
+    server: {
+      containerClass: 'bg-amber-50 border-amber-400',
+      textClass: 'text-amber-800',
+      iconColor: '#D97706',
+      Icon: ShieldAlert,
+    },
+    validation: {
+      containerClass: 'bg-orange-50 border-orange-400',
+      textClass: 'text-orange-800',
+      iconColor: '#EA580C',
+      Icon: AlertCircle,
+    },
+    generic: {
+      containerClass: 'bg-error-50 border-error-400',
+      textClass: 'text-error-800',
+      iconColor: '#DC2626',
+      Icon: AlertCircle,
+    },
   };
 
-  const getErrorTextStyle = () => {
-    if (errorType === 'server') return 'text-amber-800';
-    return 'text-error-700';
-  };
+  const activeError = errorType ? errorConfig[errorType] : null;
 
-  const getErrorIconColor = () => {
-    if (errorType === 'server') return '#B45309'; // amber-700
-    return '#DC2626'; // red-600
-  };
+  // Server/validation errors render above the card; OTP/generic errors render inside the card
+  const isAboveCardError = errorType === 'server' || errorType === 'validation';
+  const isInsideCardError = errorType === 'invalid_otp' || errorType === 'expired_otp' || errorType === 'generic';
 
   return (
     <SafeAreaView className="flex-1 bg-neutral-50" edges={['top']}>
@@ -371,25 +388,25 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
               </Text>
             </View>
 
-            {/* Network Error — top-level banner */}
+            {/* ── Network Error banner ─────────────────────────────────── */}
             {networkError ? (
-              <View className="bg-error-50 border border-error-500 rounded-xl p-4 mb-6 flex-row items-start">
-                <WifiOff size={20} color="#EF4444" className="mr-3 flex-shrink-0" />
-                <Text className="text-sm text-error-600 flex-1 leading-5">{networkError}</Text>
+              <View className="bg-error-50 border border-error-400 rounded-xl p-4 mb-4 flex-row items-start">
+                <WifiOff size={18} color="#DC2626" />
+                <Text className="text-sm text-error-800 flex-1 ml-2.5 leading-5">{networkError}</Text>
               </View>
             ) : null}
 
-            {/* Server / validation errors that aren't tied to the OTP boxes — show above the card */}
-            {errorMessage && (errorType === 'server' || errorType === 'validation') ? (
-              <View className={`border rounded-xl p-4 mb-4 flex-row items-start ${getErrorBoxStyle()}`}>
-                <AlertCircle size={20} color={getErrorIconColor()} />
-                <Text className={`text-sm ml-2 flex-1 leading-5 ${getErrorTextStyle()}`}>
+            {/* ── Above-card errors (server / validation) ──────────────── */}
+            {errorMessage && isAboveCardError && activeError ? (
+              <View className={`border rounded-xl p-4 mb-4 flex-row items-start ${activeError.containerClass}`}>
+                <activeError.Icon size={18} color={activeError.iconColor} />
+                <Text className={`text-sm ml-2.5 flex-1 leading-5 ${activeError.textClass}`}>
                   {errorMessage}
                 </Text>
               </View>
             ) : null}
 
-            {/* OTP Card */}
+            {/* ── OTP Card ─────────────────────────────────────────────── */}
             <View className="bg-white rounded-2xl p-6 shadow-sm border border-neutral-200 mb-6">
               <Text className="text-neutral-700 text-sm font-medium text-center mb-4">
                 {t('enterVerificationCode')}
@@ -406,17 +423,17 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
                     onKeyPress={(e) => handleKeyPress(e, index)}
                     keyboardType="number-pad"
                     maxLength={1}
-                    className={`w-12 h-14 border-2 rounded-xl text-center text-xl font-bold ${getInputStyle(digit)}`}
+                    className={`w-12 h-14 border-2 rounded-xl text-center text-xl font-bold ${getInputClassName(digit)}`}
                     style={{ textAlignVertical: 'center' }}
                   />
                 ))}
               </View>
 
-              {/* Inline OTP error (invalid / expired) — directly below the boxes */}
-              {errorMessage && (errorType === 'invalid_otp' || errorType === 'expired_otp' || errorType === 'generic') ? (
-                <View className={`flex-row items-center rounded-lg p-3 mb-4 border ${getErrorBoxStyle()}`}>
-                  <AlertCircle size={18} color={getErrorIconColor()} />
-                  <Text className={`text-sm ml-2 flex-1 leading-5 ${getErrorTextStyle()}`}>
+              {/* ── Inside-card errors (invalid_otp / expired_otp / generic) ── */}
+              {errorMessage && isInsideCardError && activeError ? (
+                <View className={`flex-row items-start rounded-xl p-3.5 mb-4 border ${activeError.containerClass}`}>
+                  <activeError.Icon size={16} color={activeError.iconColor} style={{ marginTop: 1 }} />
+                  <Text className={`text-sm ml-2 flex-1 leading-5 ${activeError.textClass}`}>
                     {errorMessage}
                   </Text>
                 </View>

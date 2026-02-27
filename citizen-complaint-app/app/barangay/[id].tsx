@@ -160,9 +160,6 @@ export default function ComplaintFormScreen() {
             setSelectedPreset(null);
             setCustomTitle('');
             setMessage('');
-            setShowPreview(false);
-          router.back();
-
 
       }
     } catch (error: any) {
