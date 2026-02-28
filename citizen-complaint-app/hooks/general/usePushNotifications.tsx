@@ -31,8 +31,8 @@ Notifications.setNotificationHandler({
 });
 
 
-async function saveTokenToBackend(userId: string, token: string): Promise<void> {
-  const response = await userApiClient.post('/users/push-token', {
+export async function saveTokenToBackend(userId: Number, token: string): Promise<void> {
+  const response = await userApiClient.post('/push-token', {
     userId:userId,
     token:token,
   });
