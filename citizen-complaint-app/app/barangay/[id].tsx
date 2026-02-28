@@ -39,10 +39,7 @@ import { complaintApiClient } from '@/lib/client/complaint';
 import { saveTokenToBackend } from '@/hooks/general/usePushNotifications';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 1: Instructions reminder screen
-// Step 2: The actual complaint form
-// ─────────────────────────────────────────────────────────────────────────────
+
 function InstructionsStep({
   barangayName,
   onProceed,
@@ -196,7 +193,7 @@ function InstructionsStep({
   );
 }
 
-// ── Form Step ─────────────────────────────────────────────────────────────────
+
 export default function ComplaintFormScreen() {
   const { t } = useTranslation();
   const { userData } = useCurrentUser();
@@ -206,7 +203,6 @@ export default function ComplaintFormScreen() {
   const barangayName = (params.barangayName as string) || 'Barangay';
   const barangayId = params.id as string;
 
-  // Two-step state
   const [step, setStep] = useState<'instructions' | 'form'>('instructions');
 
   const [selectedPreset, setSelectedPreset] = useState<PresetTitle | null>(null);

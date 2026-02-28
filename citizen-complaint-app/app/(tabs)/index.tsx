@@ -22,8 +22,9 @@ import {
   Circle,
   Sparkles,
 } from 'lucide-react-native';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import ChatbotFAB from '@/components/buttons/Chatbotfab';
+import { useState } from 'react';
+import ChatbotModal from '@/components/modals/Chatbot';
 
 type EmergencyType = 'flood' | 'fire' | 'power' | 'health' | 'typhoon' | 'crime';
 
@@ -96,33 +97,32 @@ const announcements: EmergencyAnnouncement[] = [
 ];
 
 const COMPLAINT_STATS = [
-  { label: 'Isinumite', value: 24, icon: ClipboardList },
-  { label: 'Sa Proseso', value: 11, icon: Circle },
-  { label: 'Nalutas',   value: 13, icon: CheckCircle },
+  { label: 'Isinumite', value: 24, icon: ClipboardList, color: '#bfdbfe' },
+  { label: 'Sa Proseso', value: 11, icon: Circle,        color: '#fde68a' },
+  { label: 'Nalutas',   value: 13, icon: CheckCircle,   color: '#bbf7d0' },
 ];
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 
-const BLUE        = '#2563EB'; // blue-600 — primary
-const BLUE_DARK   = '#1d4ed8'; // blue-700
-const BLUE_DEEPER = '#1e3a8a'; // blue-900
-const BLUE_LIGHT  = '#eff6ff'; // blue-50
+const BLUE      = '#2563EB';
+const BLUE_DARK = '#1d4ed8';
+const BLUE_LIGHT = '#eff6ff';
 
 // ─── Emergency Type Config ────────────────────────────────────────────────────
 
 const TYPE_CONFIG: Record<
   EmergencyType,
-  { Icon: any; label: string; iconBg: string; iconColor: string; accentColor: string }
+  { Icon: any; label: string; iconBg: string; iconColor: string; accentColor: string; accentBg: string }
 > = {
-  flood:   { Icon: Droplets,    label: 'Baha',      iconBg: '#dbeafe', iconColor: '#1d4ed8', accentColor: '#1d4ed8' },
-  fire:    { Icon: Flame,       label: 'Sunog',     iconBg: '#ffedd5', iconColor: '#ea580c', accentColor: '#ea580c' },
-  power:   { Icon: Zap,         label: 'Kuryente',  iconBg: '#fef9c3', iconColor: '#ca8a04', accentColor: '#ca8a04' },
-  health:  { Icon: Thermometer, label: 'Kalusugan', iconBg: '#ffe4e6', iconColor: '#e11d48', accentColor: '#e11d48' },
-  typhoon: { Icon: LifeBuoy,    label: 'Bagyo',     iconBg: '#ede9fe', iconColor: '#7c3aed', accentColor: '#7c3aed' },
-  crime:   { Icon: ShieldAlert, label: 'Seguridad', iconBg: '#fee2e2', iconColor: '#dc2626', accentColor: '#dc2626' },
+  flood:   { Icon: Droplets,    label: 'Baha',      iconBg: '#dbeafe', iconColor: '#1d4ed8', accentColor: '#1d4ed8', accentBg: '#eff6ff' },
+  fire:    { Icon: Flame,       label: 'Sunog',     iconBg: '#ffedd5', iconColor: '#ea580c', accentColor: '#ea580c', accentBg: '#fff7ed' },
+  power:   { Icon: Zap,         label: 'Kuryente',  iconBg: '#fef9c3', iconColor: '#ca8a04', accentColor: '#ca8a04', accentBg: '#fefce8' },
+  health:  { Icon: Thermometer, label: 'Kalusugan', iconBg: '#ffe4e6', iconColor: '#e11d48', accentColor: '#e11d48', accentBg: '#fff1f2' },
+  typhoon: { Icon: LifeBuoy,    label: 'Bagyo',     iconBg: '#ede9fe', iconColor: '#7c3aed', accentColor: '#7c3aed', accentBg: '#f5f3ff' },
+  crime:   { Icon: ShieldAlert, label: 'Seguridad', iconBg: '#fee2e2', iconColor: '#dc2626', accentColor: '#dc2626', accentBg: '#fef2f2' },
 };
 
-// ─── Quick Action ─────────────────────────────────────────────────────────────
+// ─── Quick Action Button ──────────────────────────────────────────────────────
 
 function QuickAction({
   Icon,
@@ -136,31 +136,31 @@ function QuickAction({
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.75} className="items-center flex-1">
       <View
-        className="rounded-2xl mb-2 w-14 h-14 items-center justify-center"
-        style={{ backgroundColor: BLUE_LIGHT, borderWidth: 1, borderColor: '#bfdbfe' }}
+        className="rounded-2xl mb-2.5 w-14 h-14 items-center justify-center"
+        style={{ backgroundColor: BLUE_LIGHT, borderWidth: 1.5, borderColor: '#bfdbfe' }}
       >
         <Icon size={22} color={BLUE} />
       </View>
-      <Text className="text-gray-600 text-xs font-semibold text-center leading-3">{label}</Text>
+      <Text className="text-gray-700 text-xs font-bold text-center leading-4">{label}</Text>
     </TouchableOpacity>
   );
 }
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, icon: Icon }: typeof COMPLAINT_STATS[0]) {
+function StatCard({ label, value, icon: Icon, color }: typeof COMPLAINT_STATS[0]) {
   return (
     <View
       className="flex-1 rounded-2xl p-3.5 items-center"
       style={{
-        backgroundColor: 'rgba(255,255,255,0.15)',
+        backgroundColor: 'rgba(255,255,255,0.12)',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
+        borderColor: 'rgba(255,255,255,0.18)',
       }}
     >
-      <Icon size={17} color="rgba(255,255,255,0.8)" />
-      <Text className="text-white text-xl font-bold mt-1">{value}</Text>
-      <Text className="text-blue-100 text-xs font-medium text-center mt-0.5">{label}</Text>
+      <Icon size={16} color={color} />
+      <Text className="text-white text-2xl font-bold mt-1.5">{value}</Text>
+      <Text className="text-blue-100 text-xs font-semibold text-center mt-0.5 leading-4">{label}</Text>
     </View>
   );
 }
@@ -173,74 +173,114 @@ function AnnouncementCard({ item }: { item: EmergencyAnnouncement }) {
 
   return (
     <TouchableOpacity
-      activeOpacity={0.8}
-      className="bg-white rounded-2xl overflow-hidden mb-3"
+      activeOpacity={0.82}
+      className="bg-white rounded-2xl mb-3 overflow-hidden"
       style={{
         borderWidth: 1,
         borderColor: '#f1f5f9',
-        shadowColor: '#2563EB',
+        shadowColor: '#64748b',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 10,
-        elevation: 3,
+        shadowOpacity: 0.07,
+        shadowRadius: 8,
+        elevation: 2,
       }}
     >
-      {/* Urgent stripe */}
+      {/* Urgent top stripe */}
       {item.isUrgent && (
-        <View className="bg-red-500 px-4 py-1.5 flex-row items-center gap-1.5">
-          <AlertTriangle size={11} color="white" />
-          <Text className="text-white text-xs font-bold tracking-widest uppercase">Kagyat</Text>
+        <View
+          className="flex-row items-center px-4 py-2 gap-2"
+          style={{ backgroundColor: '#FEF2F2', borderBottomWidth: 1, borderBottomColor: '#FECACA' }}
+        >
+          <AlertTriangle size={12} color="#DC2626" />
+          <Text className="text-red-700 text-xs font-bold tracking-widest uppercase flex-1">
+            Kagyat na Anunsyo
+          </Text>
+          <View className="w-2 h-2 rounded-full bg-red-500" />
         </View>
       )}
 
-      {/* Left accent bar */}
-      <View className="flex-row">
-        <View style={{ width: 3, backgroundColor: cfg.accentColor }} />
+      <View className="p-4">
+        {/* Header row */}
+        <View className="flex-row items-start gap-3 mb-3">
+          {/* Type icon */}
+          <View
+            className="rounded-xl p-2.5 items-center justify-center shrink-0"
+            style={{ backgroundColor: cfg.iconBg }}
+          >
+            <Icon size={20} color={cfg.iconColor} />
+          </View>
 
-        <View className="flex-1 p-4">
-          {/* Top row */}
-          <View className="flex-row items-start gap-3 mb-3">
+          {/* Title block */}
+          <View className="flex-1">
             <View
-              className="rounded-xl p-2.5 items-center justify-center"
-              style={{ backgroundColor: cfg.iconBg }}
+              className="self-start rounded-full px-2.5 py-0.5 mb-1.5"
+              style={{ backgroundColor: cfg.accentBg }}
             >
-              <Icon size={20} color={cfg.iconColor} />
-            </View>
-            <View className="flex-1">
-              <Text
-                className="text-xs font-bold uppercase tracking-widest mb-0.5"
-                style={{ color: cfg.accentColor }}
-              >
+              <Text className="text-xs font-bold" style={{ color: cfg.accentColor }}>
                 {cfg.label}
               </Text>
-              <Text className="text-gray-900 text-sm font-bold leading-5">{item.title}</Text>
             </View>
+            <Text className="text-gray-900 text-sm font-bold leading-5">{item.title}</Text>
           </View>
+        </View>
 
-          <Text className="text-gray-500 text-xs leading-5 mb-3">{item.description}</Text>
+        {/* Description */}
+        <Text className="text-gray-500 text-xs leading-[18px] mb-3">{item.description}</Text>
 
-          {/* Meta pills */}
-          <View className="flex-row flex-wrap gap-2">
-            <View className="flex-row items-center gap-1 rounded-lg px-2.5 py-1.5" style={{ backgroundColor: '#f8fafc' }}>
-              <CalendarDays size={11} color="#94a3b8" />
-              <Text className="text-slate-500 text-xs font-medium">{item.date}</Text>
-            </View>
-            {item.time && (
-              <View className="flex-row items-center gap-1 rounded-lg px-2.5 py-1.5" style={{ backgroundColor: '#f8fafc' }}>
-                <Clock size={11} color="#94a3b8" />
-                <Text className="text-slate-500 text-xs font-medium">{item.time}</Text>
-              </View>
-            )}
-            {item.location && (
-              <View className="flex-row items-center gap-1 rounded-lg px-2.5 py-1.5" style={{ backgroundColor: '#f8fafc' }}>
-                <MapPin size={11} color="#94a3b8" />
-                <Text className="text-slate-500 text-xs font-medium">{item.location}</Text>
-              </View>
-            )}
-          </View>
+        {/* Meta row */}
+        <View className="flex-row flex-wrap gap-2">
+          <MetaPill icon={CalendarDays} text={item.date} />
+          {item.time && <MetaPill icon={Clock} text={item.time} />}
+          {item.location && <MetaPill icon={MapPin} text={item.location} />}
         </View>
       </View>
     </TouchableOpacity>
+  );
+}
+
+function MetaPill({ icon: Icon, text }: { icon: any; text: string }) {
+  return (
+    <View
+      className="flex-row items-center gap-1.5 rounded-lg px-2.5 py-1.5"
+      style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }}
+    >
+      <Icon size={11} color="#94A3B8" />
+      <Text className="text-slate-500 text-xs font-medium">{text}</Text>
+    </View>
+  );
+}
+
+// ─── Section Header ───────────────────────────────────────────────────────────
+
+function SectionHeader({
+  Icon,
+  title,
+  actionLabel,
+  onAction,
+}: {
+  Icon: any;
+  title: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <View className="flex-row items-center justify-between mb-4">
+      <View className="flex-row items-center gap-2.5">
+        <View
+          className="rounded-xl p-2"
+          style={{ backgroundColor: BLUE_LIGHT, borderWidth: 1, borderColor: '#bfdbfe' }}
+        >
+          <Icon size={16} color={BLUE} />
+        </View>
+        <Text className="text-gray-900 text-base font-bold">{title}</Text>
+      </View>
+      {actionLabel && (
+        <TouchableOpacity onPress={onAction} className="flex-row items-center gap-0.5" activeOpacity={0.7}>
+          <Text className="text-sm font-semibold" style={{ color: BLUE }}>{actionLabel}</Text>
+          <ChevronRight size={14} color={BLUE} />
+        </TouchableOpacity>
+      )}
+    </View>
   );
 }
 
@@ -249,101 +289,57 @@ function AnnouncementCard({ item }: { item: EmergencyAnnouncement }) {
 export default function HomeScreen() {
   const router = useRouter();
   const urgentCount = announcements.filter((a) => a.isUrgent).length;
+  const [chatOpen, setChatOpen] = useState(false);
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 140 }}
       >
 
-        {/* ── Blue Gradient Header ──────────────────────────────────────── */}
+        {/* ── Header ──────────────────────────────────────────────────── */}
         <View
-          style={{
-            backgroundColor: BLUE,
-            // Subtle diagonal shimmer layer via border trick
-          }}
-          className="px-5 pt-5 pb-12"
+          className="px-5 pt-5 pb-14"
+          style={{ backgroundColor: BLUE }}
         >
-          {/* Decorative circle blobs for depth */}
-          <View
-            style={{
-              position: 'absolute',
-              top: -30,
-              right: -30,
-              width: 160,
-              height: 160,
-              borderRadius: 80,
-              backgroundColor: 'rgba(255,255,255,0.07)',
-            }}
-          />
-          <View
-            style={{
-              position: 'absolute',
-              top: 60,
-              right: 40,
-              width: 80,
-              height: 80,
-              borderRadius: 40,
-              backgroundColor: 'rgba(255,255,255,0.05)',
-            }}
-          />
+          {/* Decorative blobs */}
+          <View style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.06)' }} />
+          <View style={{ position: 'absolute', top: 70, right: 50, width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(255,255,255,0.04)' }} />
+          <View style={{ position: 'absolute', bottom: 20, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.04)' }} />
 
-          {/* Top row */}
-          <View className="flex-row items-start justify-between mb-6">
+          {/* Top row: location + notification */}
+          <View className="flex-row items-start justify-between mb-7">
             <View>
               <View className="flex-row items-center gap-1.5 mb-1">
                 <Sparkles size={11} color="#93c5fd" />
-                <Text className="text-blue-200 text-xs font-semibold uppercase tracking-widest">
+                <Text className="text-blue-200 text-xs font-bold uppercase tracking-widest">
                   Munisipalidad ng
                 </Text>
               </View>
               <Text className="text-white text-3xl font-bold leading-8">Santa Maria</Text>
-              <Text className="text-blue-200 text-sm mt-0.5 font-medium">Laguna, Pilipinas</Text>
+              <Text className="text-blue-200 text-sm mt-1 font-medium">Laguna, Pilipinas</Text>
             </View>
 
             <TouchableOpacity
               activeOpacity={0.8}
-              className="rounded-2xl p-2.5 relative"
+              className="rounded-2xl p-3 mt-1 relative"
               style={{
-                backgroundColor: 'rgba(255,255,255,0.15)',
+                backgroundColor: 'rgba(255,255,255,0.14)',
                 borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.25)',
+                borderColor: 'rgba(255,255,255,0.22)',
               }}
             >
               <Bell size={22} color="white" />
               {urgentCount > 0 && (
-                <View className="absolute -top-1 -right-1 bg-red-500 rounded-full w-5 h-5 items-center justify-center">
+                <View className="absolute -top-1.5 -right-1.5 bg-red-500 rounded-full w-5 h-5 items-center justify-center border-2 border-blue-600">
                   <Text className="text-white font-bold" style={{ fontSize: 9 }}>
                     {urgentCount}
                   </Text>
                 </View>
               )}
             </TouchableOpacity>
-          </View>
-
-          {/* Portal strip */}
-          <View
-            className="rounded-2xl px-4 py-3.5 mb-6 flex-row items-center gap-3"
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.12)',
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.18)',
-            }}
-          >
-            <View
-              className="rounded-xl p-2"
-              style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
-            >
-              <ShieldAlert size={16} color="white" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-white text-sm font-bold">Opisyal na Portal ng Reklamo</Text>
-              <Text className="text-blue-100 text-xs mt-0.5">
-                Ang iyong boses ay mahalaga. Mag-ulat ng alalahanin.
-              </Text>
-            </View>
           </View>
 
           {/* Complaint stats */}
@@ -357,67 +353,55 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* ── Floating Quick Access Card ────────────────────────────────── */}
+        {/* ── Floating Quick Access Card (overlaps header) ─────────────── */}
         <View
           className="bg-white mx-5 rounded-3xl p-5"
           style={{
-            marginTop: -22,
+            marginTop: -24,
             borderWidth: 1,
-            borderColor: '#e2e8f0',
-            shadowColor: BLUE,
+            borderColor: '#E2E8F0',
+            shadowColor: '#2563EB',
             shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.12,
+            shadowOpacity: 0.1,
             shadowRadius: 20,
             elevation: 8,
           }}
         >
-          <View className="flex-row items-center gap-2 mb-4">
-            <View
-              className="w-1.5 h-4 rounded-full"
-              style={{ backgroundColor: BLUE }}
-            />
-            <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-              Mabilis na Access
-            </Text>
-          </View>
+          <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+            Mabilis na Access
+          </Text>
           <View className="flex-row justify-between">
-            <QuickAction Icon={FileText}      label="Mga Serbisyo" />
+            <QuickAction Icon={FileText}      label={`Mga\nSerbisyo`} />
             <QuickAction
               Icon={ClipboardList}
-              label="Mga Reklamo"
+              label={`Mga\nReklamo`}
               onPress={() => router.push('/(tabs)/Complaints')}
             />
-            <QuickAction Icon={CalendarDays}  label="Mga Kaganapan" />
+            <QuickAction Icon={CalendarDays}  label={`Mga\nKaganapan`} />
             <QuickAction Icon={Phone}         label="Hotlines" />
           </View>
         </View>
 
-        {/* ── Urgent Alert Banner ───────────────────────────────────────── */}
+        {/* ── Urgent Alert Banner ──────────────────────────────────────── */}
         {urgentCount > 0 && (
-          <View className="mx-5 mt-4">
+          <View className="mx-5 mt-5">
             <View
-              className="rounded-2xl px-4 py-3.5 flex-row items-center gap-3"
+              className="rounded-2xl px-4 py-4 flex-row items-center gap-3"
               style={{
-                backgroundColor: '#fff7ed',
+                backgroundColor: '#FFF7ED',
                 borderWidth: 1,
-                borderColor: '#fed7aa',
+                borderColor: '#FDBA74',
               }}
             >
-              <View
-                className="rounded-xl p-2"
-                style={{ backgroundColor: '#ffedd5' }}
-              >
-                <AlertTriangle size={18} color="#ea580c" />
+              <View className="rounded-xl p-2.5" style={{ backgroundColor: '#FFEDD5' }}>
+                <AlertTriangle size={20} color="#EA580C" />
               </View>
               <View className="flex-1">
-                <Text
-                  className="text-xs font-bold uppercase tracking-wide mb-0.5"
-                  style={{ color: '#9a3412' }}
-                >
-                  Mga Aktibong Alerto
+                <Text className="text-sm font-bold text-orange-900 mb-0.5">
+                  {urgentCount} Kagyat na Alerto
                 </Text>
-                <Text className="text-sm font-medium" style={{ color: '#c2410c' }}>
-                  {urgentCount} kagyat na anunsyo ang nangangailangan ng iyong pansin
+                <Text className="text-xs text-orange-700 leading-4">
+                  Mangyaring basahin ang mga anunsyo sa ibaba at sundin ang mga tagubilin.
                 </Text>
               </View>
             </View>
@@ -425,23 +409,13 @@ export default function HomeScreen() {
         )}
 
         {/* ── Announcements ─────────────────────────────────────────────── */}
-        <View className="px-5 pt-5">
-          <View className="flex-row items-center justify-between mb-4">
-            <View className="flex-row items-center gap-2.5">
-              <View
-                className="rounded-xl p-2"
-                style={{ backgroundColor: BLUE_LIGHT, borderWidth: 1, borderColor: '#bfdbfe' }}
-              >
-                <ShieldAlert size={16} color={BLUE} />
-              </View>
-              <Text className="text-gray-900 text-base font-bold">Mga Anunsyo at Alerto</Text>
-            </View>
-            <TouchableOpacity activeOpacity={0.7} className="flex-row items-center gap-0.5">
-              <Text className="text-sm font-semibold" style={{ color: BLUE }}>Lahat</Text>
-              <ChevronRight size={14} color={BLUE} />
-            </TouchableOpacity>
-          </View>
-
+        <View className="px-5 mt-6">
+          <SectionHeader
+            Icon={ShieldAlert}
+            title="Mga Anunsyo at Alerto"
+            actionLabel="Lahat"
+            onAction={() => {}}
+          />
           {announcements.map((item) => (
             <AnnouncementCard key={item.id} item={item} />
           ))}
@@ -449,8 +423,11 @@ export default function HomeScreen() {
 
       </ScrollView>
 
-      {/* ── Floating Submit Button ────────────────────────────────────── */}
-      <View className="absolute bottom-0 left-0 right-0 px-5 pb-8 pt-2">
+    <ChatbotFAB onPress={() => setChatOpen(true)} />
+   <ChatbotModal visible={chatOpen} onClose={() => setChatOpen(false)} />
+
+      {/* ── Submit Complaint Button ───────────────────────────────────── */}
+      <View className="absolute bottom-0 left-0 right-0 px-5 pb-8 pt-3 bg-white border-t border-gray-100">
         <TouchableOpacity
           onPress={() => router.push('/(tabs)/Complaints')}
           activeOpacity={0.85}
@@ -458,18 +435,13 @@ export default function HomeScreen() {
           style={{
             backgroundColor: BLUE,
             shadowColor: BLUE_DARK,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.45,
-            shadowRadius: 20,
-            elevation: 14,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.35,
+            shadowRadius: 14,
+            elevation: 10,
           }}
         >
-          <View
-            className="rounded-xl p-1"
-            style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}
-          >
-            <MessageSquarePlus size={18} color="white" />
-          </View>
+          <MessageSquarePlus size={20} color="white" />
           <Text className="text-white text-base font-bold">Magsumite ng Reklamo</Text>
         </TouchableOpacity>
       </View>
