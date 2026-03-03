@@ -74,7 +74,7 @@ export default function LoginScreen({ navigation }: any) {
                     setErrors({ 
                         email: 'No user registered with this email address.' 
                     });
-                } else if (error?.status === 400) {
+                } else if (error?.status === 401) {
                    
                     setErrors({ 
                         password: 'Incorrect password. Please try again.' 

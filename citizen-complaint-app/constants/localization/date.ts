@@ -1,0 +1,4 @@
+export const TAGALOG_MONTHS = [
+  'Enero', 'Pebrero', 'Marso', 'Abril', 'Mayo', 'Hunyo',
+  'Hulyo', 'Agosto', 'Setyembre', 'Oktubre', 'Nobyembre', 'Disyembre',
+];

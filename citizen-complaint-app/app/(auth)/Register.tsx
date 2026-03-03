@@ -48,7 +48,7 @@ import {
   validateContactNumber,
   validateEmail,
 } from '@/utils/validation/register';
-
+import { TAGALOG_MONTHS } from '@/constants/localization/date';
 const SUFFIX_OPTIONS = ['Jr.', 'Sr.', 'II', 'III', 'IV'];
 
 export default function RegisterScreen({ navigation }: any) {
@@ -403,7 +403,7 @@ export default function RegisterScreen({ navigation }: any) {
       <View className="mb-4">
         <Text className="text-sm font-medium text-neutral-700 mb-2">
           {t('middleName')}{' '}
-          <Text className="text-neutral-400 font-normal text-xs">(Optional)</Text>
+          <Text className="text-black font-normal text-md">(Optional)</Text>
         </Text>
         <Controller
           control={control}
@@ -550,27 +550,50 @@ export default function RegisterScreen({ navigation }: any) {
       )}
 
       {Platform.OS === 'ios' && showDatePicker && (
-        <Modal transparent animationType="slide">
-          <TouchableOpacity className="flex-1 justify-end bg-black/50" activeOpacity={1} onPress={() => setShowDatePicker(false)}>
-            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-              <View className="bg-white rounded-t-3xl p-6 pb-8">
-                <View className="flex-row justify-between items-center mb-4">
-                  <Text className="text-xl font-bold text-neutral-900">Select Date of Birth</Text>
-                  <TouchableOpacity onPress={() => setShowDatePicker(false)} className="p-2" activeOpacity={0.7}>
-                    <X size={24} color="#6B7280" />
-                  </TouchableOpacity>
-                </View>
-                <View style={{ backgroundColor: 'white' }}>
-                  <DateTimePicker value={selectedDate} mode="date" display="spinner" onChange={handleDateChange} maximumDate={getMaxDate()} minimumDate={getMinDate()} textColor="#000000" />
-                </View>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)} className="bg-primary-600 rounded-xl py-4 items-center mt-4" activeOpacity={0.7}>
-                  <Text className="text-white font-semibold text-base">Done</Text>
-                </TouchableOpacity>
-              </View>
+  <Modal transparent animationType="slide">
+    <TouchableOpacity className="flex-1 justify-end bg-black/50" activeOpacity={1} onPress={() => setShowDatePicker(false)}>
+      <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+        <View className="bg-white rounded-t-3xl p-6 pb-8">
+          <View className="flex-row justify-between items-center mb-4">
+            <Text className="text-xl font-bold text-neutral-900">
+              {i18n.language === 'tl' ? 'Pumili ng Petsa ng Kapanganakan' : 'Select Date of Birth'}
+            </Text>
+            <TouchableOpacity onPress={() => setShowDatePicker(false)} className="p-2" activeOpacity={0.7}>
+              <X size={24} color="#6B7280" />
             </TouchableOpacity>
+          </View>
+
+          {/* Tagalog month label overlay */}
+          {i18n.language === 'tl' && (
+            <View className="flex-row justify-center items-center mb-3 bg-primary-50 rounded-xl py-2 px-4">
+              <Text className="text-base font-semibold text-primary-700">
+                {TAGALOG_MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}, {selectedDate.getFullYear()}
+              </Text>
+            </View>
+          )}
+
+          <View style={{ backgroundColor: 'white' }}>
+            <DateTimePicker
+              value={selectedDate}
+              mode="date"
+              display="spinner"
+              onChange={handleDateChange}
+              maximumDate={getMaxDate()}
+              minimumDate={getMinDate()}
+              textColor="#000000"
+            />
+          </View>
+
+          <TouchableOpacity onPress={() => setShowDatePicker(false)} className="bg-primary-600 rounded-xl py-4 items-center mt-4" activeOpacity={0.7}>
+            <Text className="text-white font-semibold text-base">
+              {i18n.language === 'tl' ? 'Tapos Na' : 'Done'}
+            </Text>
           </TouchableOpacity>
-        </Modal>
-      )}
+        </View>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  </Modal>
+)}
 
       {/* Age (auto-calculated) */}
       <View className="mb-4">

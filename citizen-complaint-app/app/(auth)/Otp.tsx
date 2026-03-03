@@ -431,7 +431,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
               {/* ── Inside-card errors (invalid_otp / expired_otp / generic) ── */}
               {errorMessage && isInsideCardError && activeError ? (
-                <View className={`flex-row items-start rounded-xl p-3.5 mb-4 border ${activeError.containerClass}`}>
+                <View className={`flex-row items-start rounded-xl p-3.5 mb-4 border border-red-500 ${activeError.containerClass}`}>
                   <activeError.Icon size={16} color={activeError.iconColor} style={{ marginTop: 1 }} />
                   <Text className={`text-sm ml-2 flex-1 leading-5 ${activeError.textClass}`}>
                     {errorMessage}

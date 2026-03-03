@@ -238,8 +238,8 @@ export default function ComplaintFormScreen() {
   const resolvedTitle = isOtherSelected
     ? customTitle.trim()
     : selectedTitleKey
-    ? t(selectedTitleKey)
-    : '';
+      ? t(selectedTitleKey)
+      : '';
   const resolvedCategoryId = selectedPreset?.category_id ?? null;
 
   // ── Show instructions step ──
@@ -311,8 +311,8 @@ export default function ComplaintFormScreen() {
         setSelectedPreset(null);
         setCustomTitle('');
         setMessage('');
-
-        try {
+        {/* 
+             try {
           const result = await requestNotificationPermissionForComplaints();
           if (result.granted && result.token && userId) {
             await saveTokenToBackend(userId, result.token);
@@ -320,6 +320,9 @@ export default function ComplaintFormScreen() {
         } catch (notifError) {
           console.warn('Notification setup failed:', notifError);
         }
+    
+    */}
+
       }
     } catch (error: any) {
       showToast('Something Went Wrong. Please try again.', 'error');
@@ -340,7 +343,7 @@ export default function ComplaintFormScreen() {
     switch (type) {
       case 'image': return <ImageIcon size={20} color="#3B82F6" />;
       case 'video': return <Video size={20} color="#3B82F6" />;
-      default:      return <FileText size={20} color="#3B82F6" />;
+      default: return <FileText size={20} color="#3B82F6" />;
     }
   };
 
@@ -425,9 +428,8 @@ export default function ComplaintFormScreen() {
 
           <TouchableOpacity
             onPress={() => setShowTitlePicker(true)}
-            className={`flex-row items-center justify-between bg-white border-2 rounded-2xl px-4 py-4 ${
-              titleError ? 'border-red-400' : 'border-gray-200'
-            }`}
+            className={`flex-row items-center justify-between bg-white border-2 rounded-2xl px-4 py-4 ${titleError ? 'border-red-400' : 'border-gray-200'
+              }`}
             style={{ shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}
           >
             <Text numberOfLines={1} className={`flex-1 text-base ${selectedPreset ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
@@ -488,9 +490,8 @@ export default function ComplaintFormScreen() {
             multiline
             textAlignVertical="top"
             maxLength={1000}
-            className={`bg-white border-2 rounded-2xl px-4 py-4 text-base text-gray-900 min-h-[180px] ${
-              messageError ? 'border-red-400' : 'border-gray-200'
-            }`}
+            className={`bg-white border-2 rounded-2xl px-4 py-4 text-base text-gray-900 min-h-[180px] ${messageError ? 'border-red-400' : 'border-gray-200'
+              }`}
             style={{ shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}
           />
           <View className="flex-row items-center justify-between mt-2">
@@ -591,23 +592,21 @@ export default function ComplaintFormScreen() {
                 return (
                   <TouchableOpacity
                     onPress={() => handleSelectPreset(item)}
-                    className={`flex-row items-center py-4 px-4 mb-1.5 rounded-2xl border ${
-                      isSelected
+                    className={`flex-row items-center py-4 px-4 mb-1.5 rounded-2xl border ${isSelected
                         ? 'bg-blue-50 border-blue-400'
                         : isOther
-                        ? 'bg-gray-50 border-gray-200'
-                        : 'bg-white border-gray-100'
-                    }`}
+                          ? 'bg-gray-50 border-gray-200'
+                          : 'bg-white border-gray-100'
+                      }`}
                   >
                     {isOther && <PenLine size={16} color="#6B7280" className="mr-2" />}
                     <Text
-                      className={`flex-1 text-base ${
-                        isSelected
+                      className={`flex-1 text-base ${isSelected
                           ? 'font-bold text-blue-700'
                           : isOther
-                          ? 'italic text-gray-500'
-                          : 'text-gray-900'
-                      }`}
+                            ? 'italic text-gray-500'
+                            : 'text-gray-900'
+                        }`}
                     >
                       {t(item.key)}
                     </Text>
