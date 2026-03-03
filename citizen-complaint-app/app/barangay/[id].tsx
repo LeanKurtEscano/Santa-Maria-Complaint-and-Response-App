@@ -202,6 +202,7 @@ export default function ComplaintFormScreen() {
   const params = useLocalSearchParams();
   const barangayName = (params.barangayName as string) || 'Barangay';
   const barangayId = params.id as string;
+  const barangayAccountId = params.barangayAccountId as string;
 
   const [step, setStep] = useState<'instructions' | 'form'>('instructions');
 
@@ -280,6 +281,7 @@ export default function ComplaintFormScreen() {
         title: resolvedTitle,
         description: message,
         barangay_id: barangayId,
+        barangay_account_id: barangayAccountId,
         location_details: null,
         category_id: resolvedCategoryId,
         sector_id: null,

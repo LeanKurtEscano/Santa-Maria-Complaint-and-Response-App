@@ -35,6 +35,7 @@ export default function ComplaintsScreen() {
       params: {
         id: barangay.id.toString(),
         barangayName: barangay.barangay_name,
+        barangayAccountId: barangay.barangay_account.id.toString(),
       },
     });
   };
