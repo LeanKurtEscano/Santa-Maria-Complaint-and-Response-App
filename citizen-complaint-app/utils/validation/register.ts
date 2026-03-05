@@ -1,7 +1,7 @@
 export const validateFirstName = (firstName: string): string => {
-  const regex = /^[A-Za-z]+([-][A-Za-z]+)*$/; // Allows hyphenated (e.g. Mary-Jane)
-  const invalidCharsRegex = /[^A-Za-z-]/; // Only letters and hyphens
-  const repeatedCharRegex = /(.)\1{2,}/; // 3+ repeated characters
+  const regex = /^[A-Za-z]+([ -][A-Za-z]+)*$/; // Allows spaces and hyphens (e.g. "Mary Jane", "Mary-Jane")
+  const invalidCharsRegex = /[^A-Za-z\s-]/; // Only letters, spaces, and hyphens
+  const repeatedCharRegex = /(.)\1{2,}/; // 3+ repeated consecutive characters
   const maxLength = 50;
   const minLength = 2;
 
@@ -16,13 +16,51 @@ export const validateFirstName = (firstName: string): string => {
   if (!regex.test(trimmed)) return "First name must only contain letters.";
   if (repeatedCharRegex.test(trimmed.toLowerCase())) return "First name must not contain repeated characters.";
 
+  // Reject repeated tokens (e.g. "A A A", "Juan Juan")
+  const tokens = trimmed.toLowerCase().split(/[\s-]+/);
+  const uniqueTokens = new Set(tokens);
+  if (uniqueTokens.size < tokens.length) return "First name must not contain repeated words or characters.";
+
+  // Reject all single-character tokens (e.g. "A B C")
+  if (tokens.every((token) => token.length === 1)) return "First name must not consist of single letters.";
+
+  return "";
+};
+
+export const validateMiddleName = (middleName: string): string => {
+  const regex = /^[A-Za-z]+([ -][A-Za-z]+)*$/; // Allows spaces and hyphens (e.g. "De La Cruz", "Santos-Reyes")
+  const invalidCharsRegex = /[^A-Za-z\s-]/; // Only letters, spaces, and hyphens
+  const repeatedCharRegex = /(.)\1{2,}/; // 3+ repeated consecutive characters
+  const maxLength = 50;
+  const minLength = 2;
+
+  // Middle name is optional — skip validation if empty
+  if (!middleName || !middleName.trim()) return "";
+
+  const trimmed = middleName.trim();
+
+  if (trimmed.length < minLength) return "Middle name must be at least 2 characters long.";
+  if (trimmed.length > maxLength) return `Middle name must be at most ${maxLength} characters long.`;
+
+  if (invalidCharsRegex.test(trimmed)) return "Middle name must not contain numbers or special characters.";
+  if (!regex.test(trimmed)) return "Middle name must only contain letters.";
+  if (repeatedCharRegex.test(trimmed.toLowerCase())) return "Middle name must not contain repeated characters.";
+
+  // Reject repeated tokens (e.g. "A A A", "Santos Santos")
+  const tokens = trimmed.toLowerCase().split(/[\s-]+/);
+  const uniqueTokens = new Set(tokens);
+  if (uniqueTokens.size < tokens.length) return "Middle name must not contain repeated words or characters.";
+
+  // Reject all single-character tokens (e.g. "A B C")
+  if (tokens.every((token) => token.length === 1)) return "Middle name must not consist of single letters.";
+
   return "";
 };
 
 export const validateLastName = (lastName: string): string => {
-  const regex = /^[A-Za-z]+([ -][A-Za-z]+)*$/; // Allows hyphenated or spaced (e.g. De La Cruz)
+  const regex = /^[A-Za-z]+([ -][A-Za-z]+)*$/; // Allows spaces and hyphens (e.g. "De La Cruz", "Santos-Reyes")
   const invalidCharsRegex = /[^A-Za-z\s-]/; // Only letters, spaces, and hyphens
-  const repeatedCharRegex = /(.)\1{2,}/; // 3+ repeated characters
+  const repeatedCharRegex = /(.)\1{2,}/; // 3+ repeated consecutive characters
   const maxLength = 50;
   const minLength = 2;
 
@@ -37,56 +75,43 @@ export const validateLastName = (lastName: string): string => {
   if (!regex.test(trimmed)) return "Last name must only contain letters.";
   if (repeatedCharRegex.test(trimmed.toLowerCase())) return "Last name must not contain repeated characters.";
 
+  // Reject repeated tokens (e.g. "A A A", "Cruz Cruz")
+  const tokens = trimmed.toLowerCase().split(/[\s-]+/);
+  const uniqueTokens = new Set(tokens);
+  if (uniqueTokens.size < tokens.length) return "Last name must not contain repeated words or characters.";
+
+  // Reject all single-character tokens (e.g. "A B C")
+  if (tokens.every((token) => token.length === 1)) return "Last name must not consist of single letters.";
+
   return "";
 };
-export const validateUsername = (username: string) => {
-  const minLen = 4;
-  const maxLen = 50;
 
-  // Allow spaces now
-  const invalidCharsRegex = /[^a-zA-Z0-9._\s]/; // Allow letters, numbers, dots, underscores, spaces
-  const consecutiveSymbolsRegex = /[._]{2,}/; // No consecutive dots or underscores
-  const startsOrEndsWithSymbol = /^[._]|[._]$/; // Can't start or end with dot or underscore
-  const onlyNumbersRegex = /^\d+$/; // Prevent all numbers
-  const repeatedCharRegex = /(.)\1{3,}/; // Prevent 4+ same consecutive characters
 
-  if (!username || !username.trim()) 
-    return "Username is required.";
 
-  const trimmed = username.trim();
 
-  // Length check
-  if (trimmed.length < minLen)
-    return `Username must be at least ${minLen} characters long.`;
 
-  if (trimmed.length > maxLen)
-    return `Username must be at most ${maxLen} characters long.`;
+export const validateContactNumber = (contactNumber: string): string => {
+    if (!contactNumber) return "Contact number is required.";
 
-  // Invalid characters (now allows spaces)
-  if (invalidCharsRegex.test(trimmed))
-    return "Username can only contain letters, numbers, dots, underscores, or spaces.";
+    const trimmedNumber = contactNumber.trim();
 
-  // Consecutive symbols
-  if (consecutiveSymbolsRegex.test(trimmed))
-    return "Username cannot contain consecutive dots or underscores.";
+    // Already in '9123456789' format (without leading 0)
+    if (/[^0-9]/.test(trimmedNumber)) {
+        return "Contact number must not contain letters or special characters.";
+    }
 
-  // Start or end with symbol
-  if (startsOrEndsWithSymbol.test(trimmed))
-    return "Username cannot start or end with a dot or underscore.";
+    // Must be exactly 10 digits after +63
+    if (trimmedNumber.length !== 10) {
+        return "Contact number must be a valid Philippine mobile number.";
+    }
 
-  // Repeated characters (e.g., aaaaa)
-  if (repeatedCharRegex.test(trimmed))
-    return "Username must not contain long sequences of the same character.";
+    // Check for 4 or more repeating digits
+    if (/(\d)\1{3,}/.test(trimmedNumber)) {
+        return "Contact number must not contain 4 or more repeating digits.";
+    }
 
-  // Only numbers
-  if (onlyNumbersRegex.test(trimmed))
-    return "Username cannot contain only numbers.";
-
-  // ✅ If all checks pass
-  return null;
+    return "";
 };
-
-
 
 
 export const validateEmail = (email: string) => {
@@ -140,27 +165,3 @@ export const validateEmail = (email: string) => {
      }
  
 }
-
-
-export const validateContactNumber = (contactNumber: string): string => {
-    if (!contactNumber) return "Contact number is required.";
-
-    const trimmedNumber = contactNumber.trim();
-
-    // Already in '9123456789' format (without leading 0)
-    if (/[^0-9]/.test(trimmedNumber)) {
-        return "Contact number must not contain letters or special characters.";
-    }
-
-    // Must be exactly 10 digits after +63
-    if (trimmedNumber.length !== 10) {
-        return "Contact number must be a valid Philippine mobile number.";
-    }
-
-    // Check for 4 or more repeating digits
-    if (/(\d)\1{3,}/.test(trimmedNumber)) {
-        return "Contact number must not contain 4 or more repeating digits.";
-    }
-
-    return "";
-};

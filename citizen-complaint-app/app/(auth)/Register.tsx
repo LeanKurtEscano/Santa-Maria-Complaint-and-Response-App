@@ -44,6 +44,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import convertImageToBase64 from '@/utils/general/image';
 import {
   validateFirstName,
+  validateMiddleName,
   validateLastName,
   validateContactNumber,
   validateEmail,
@@ -183,19 +184,13 @@ export default function RegisterScreen({ navigation }: any) {
 
   // Phone number handler — strips leading 63 → 0, keeps 11 digits
   const handlePhoneNumberChange = (text: string, onChange: (val: string) => void) => {
-    // Remove any non-digit characters
     let digits = text.replace(/\D/g, '');
-
-    // If user types 63 at the start, convert to 0
     if (digits.startsWith('63')) {
       digits = '0' + digits.slice(2);
     }
-
-    // Limit to 11 digits (09XXXXXXXXX)
     if (digits.length > 11) {
       digits = digits.slice(0, 11);
     }
-
     onChange(digits);
   };
 
@@ -260,6 +255,11 @@ export default function RegisterScreen({ navigation }: any) {
     const firstNameError = validateFirstName(data.firstName);
     if (firstNameError) step1Errors.push({ field: 'firstName', message: firstNameError });
 
+    if (data.middleName) {
+      const middleNameError = validateMiddleName(data.middleName);
+      if (middleNameError) step1Errors.push({ field: 'middleName', message: middleNameError });
+    }
+
     const lastNameError = validateLastName(data.lastName);
     if (lastNameError) step1Errors.push({ field: 'lastName', message: lastNameError });
 
@@ -292,6 +292,8 @@ export default function RegisterScreen({ navigation }: any) {
       step2Errors.push({ field: 'confirmPassword', message: t('passwordMismatch') });
     }
 
+    if (!data.barangay) step2Errors.push({ field: 'barangay', message: t('required') });
+
     if (step2Errors.length > 0) {
       step2Errors.forEach(({ field, message }) => setError(field, { type: 'manual', message }));
       setStep(2);
@@ -301,27 +303,15 @@ export default function RegisterScreen({ navigation }: any) {
     // ── Step 3 validation ─────────────────────────────────────────────────
     const step3Errors: { field: keyof RegistrationFormData; message: string }[] = [];
 
-    if (!data.barangay) step3Errors.push({ field: 'barangay', message: t('required') });
-    if (!data.streetAddress) step3Errors.push({ field: 'streetAddress', message: t('required') });
+    if (!data.idType) step3Errors.push({ field: 'idType', message: t('required') });
+    if (!data.idNumber) step3Errors.push({ field: 'idNumber', message: t('required') });
+    if (!data.idFrontImage) step3Errors.push({ field: 'idFrontImage', message: t('required') });
+    if (!data.selfieImage) step3Errors.push({ field: 'selfieImage', message: t('required') });
+    if (!data.agreedToTerms) step3Errors.push({ field: 'agreedToTerms', message: t('required') });
 
     if (step3Errors.length > 0) {
       step3Errors.forEach(({ field, message }) => setError(field, { type: 'manual', message }));
       setStep(3);
-      return;
-    }
-
-    // ── Step 4 validation ─────────────────────────────────────────────────
-    const step4Errors: { field: keyof RegistrationFormData; message: string }[] = [];
-
-    if (!data.idType) step4Errors.push({ field: 'idType', message: t('required') });
-    if (!data.idNumber) step4Errors.push({ field: 'idNumber', message: t('required') });
-    if (!data.idFrontImage) step4Errors.push({ field: 'idFrontImage', message: t('required') });
-    if (!data.selfieImage) step4Errors.push({ field: 'selfieImage', message: t('required') });
-    if (!data.agreedToTerms) step4Errors.push({ field: 'agreedToTerms', message: t('required') });
-
-    if (step4Errors.length > 0) {
-      step4Errors.forEach(({ field, message }) => setError(field, { type: 'manual', message }));
-      setStep(4);
       return;
     }
 
@@ -408,13 +398,27 @@ export default function RegisterScreen({ navigation }: any) {
         <Controller
           control={control}
           name="middleName"
+          rules={{
+            validate: (value) => {
+              if (!value) return true;
+              const err = validateMiddleName(value);
+              return err ? err : true;
+            },
+          }}
           render={({ field: { onChange, onBlur, value } }) => (
-            <View className="flex-row items-center border-2 border-neutral-200 rounded-xl px-4 py-1 bg-white">
+            <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.middleName ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
               <User size={20} color="#6B7280" />
               <TextInput
                 className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
-                onBlur={onBlur}
-                onChangeText={(text) => onChange(toProperCase(text))}
+                onBlur={() => {
+                  onBlur();
+                  if (value) {
+                    const err = validateMiddleName(value);
+                    if (err) setError('middleName', { type: 'manual', message: err });
+                    else clearErrors('middleName');
+                  }
+                }}
+                onChangeText={(text) => { onChange(toProperCase(text)); clearErrors('middleName'); }}
                 value={value}
                 placeholder="Santos"
                 autoCapitalize="words"
@@ -423,6 +427,7 @@ export default function RegisterScreen({ navigation }: any) {
             </View>
           )}
         />
+        <ErrorMessage message={errors.middleName?.message} />
       </View>
 
       {/* Last Name */}
@@ -550,50 +555,49 @@ export default function RegisterScreen({ navigation }: any) {
       )}
 
       {Platform.OS === 'ios' && showDatePicker && (
-  <Modal transparent animationType="slide">
-    <TouchableOpacity className="flex-1 justify-end bg-black/50" activeOpacity={1} onPress={() => setShowDatePicker(false)}>
-      <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-        <View className="bg-white rounded-t-3xl p-6 pb-8">
-          <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-xl font-bold text-neutral-900">
-              {i18n.language === 'tl' ? 'Pumili ng Petsa ng Kapanganakan' : 'Select Date of Birth'}
-            </Text>
-            <TouchableOpacity onPress={() => setShowDatePicker(false)} className="p-2" activeOpacity={0.7}>
-              <X size={24} color="#6B7280" />
+        <Modal transparent animationType="slide">
+          <TouchableOpacity className="flex-1 justify-end bg-black/50" activeOpacity={1} onPress={() => setShowDatePicker(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+              <View className="bg-white rounded-t-3xl p-6 pb-8">
+                <View className="flex-row justify-between items-center mb-4">
+                  <Text className="text-xl font-bold text-neutral-900">
+                    {i18n.language === 'tl' ? 'Pumili ng Petsa ng Kapanganakan' : 'Select Date of Birth'}
+                  </Text>
+                  <TouchableOpacity onPress={() => setShowDatePicker(false)} className="p-2" activeOpacity={0.7}>
+                    <X size={24} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+
+                {i18n.language === 'tl' && (
+                  <View className="flex-row justify-center items-center mb-3 bg-primary-50 rounded-xl py-2 px-4">
+                    <Text className="text-base font-semibold text-primary-700">
+                      {TAGALOG_MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}, {selectedDate.getFullYear()}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={{ backgroundColor: 'white' }}>
+                  <DateTimePicker
+                    value={selectedDate}
+                    mode="date"
+                    display="spinner"
+                    onChange={handleDateChange}
+                    maximumDate={getMaxDate()}
+                    minimumDate={getMinDate()}
+                    textColor="#000000"
+                  />
+                </View>
+
+                <TouchableOpacity onPress={() => setShowDatePicker(false)} className="bg-primary-600 rounded-xl py-4 items-center mt-4" activeOpacity={0.7}>
+                  <Text className="text-white font-semibold text-base">
+                    {i18n.language === 'tl' ? 'Tapos Na' : 'Done'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </TouchableOpacity>
-          </View>
-
-          {/* Tagalog month label overlay */}
-          {i18n.language === 'tl' && (
-            <View className="flex-row justify-center items-center mb-3 bg-primary-50 rounded-xl py-2 px-4">
-              <Text className="text-base font-semibold text-primary-700">
-                {TAGALOG_MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}, {selectedDate.getFullYear()}
-              </Text>
-            </View>
-          )}
-
-          <View style={{ backgroundColor: 'white' }}>
-            <DateTimePicker
-              value={selectedDate}
-              mode="date"
-              display="spinner"
-              onChange={handleDateChange}
-              maximumDate={getMaxDate()}
-              minimumDate={getMinDate()}
-              textColor="#000000"
-            />
-          </View>
-
-          <TouchableOpacity onPress={() => setShowDatePicker(false)} className="bg-primary-600 rounded-xl py-4 items-center mt-4" activeOpacity={0.7}>
-            <Text className="text-white font-semibold text-base">
-              {i18n.language === 'tl' ? 'Tapos Na' : 'Done'}
-            </Text>
           </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    </TouchableOpacity>
-  </Modal>
-)}
+        </Modal>
+      )}
 
       {/* Age (auto-calculated) */}
       <View className="mb-4">
@@ -639,7 +643,7 @@ export default function RegisterScreen({ navigation }: any) {
             <TouchableOpacity onPress={() => setShowGenderModal(false)} className="absolute top-6 right-6" activeOpacity={0.7}>
               <X size={24} color="#6B7280" />
             </TouchableOpacity>
-            {[{ label: t('male'), value: 'male' }, { label: t('female'), value: 'female' }, { label: t('other'), value: 'other' }].map((option) => (
+            {[{ label: t('male'), value: 'male' }, { label: t('female'), value: 'female' }].map((option) => (
               <TouchableOpacity
                 key={option.value}
                 onPress={() => { setValue('gender', option.value); clearErrors('gender'); setShowGenderModal(false); saveFormData(); }}
@@ -659,7 +663,7 @@ export default function RegisterScreen({ navigation }: any) {
     </View>
   );
 
-  // ─── Step 2: Contact Info ──────────────────────────────────────────────────
+  // ─── Step 2: Contact & Address Info ───────────────────────────────────────
   const renderStep2 = () => (
     <View>
       <Text className="text-2xl font-bold text-neutral-900 mb-6">{t('contactInfo')}</Text>
@@ -717,7 +721,6 @@ export default function RegisterScreen({ navigation }: any) {
           rules={{
             required: t('required'),
             validate: (value) => {
-              // Strip leading 0 for the validateContactNumber function (expects 10 digits)
               const stripped = value.startsWith('0') ? value.slice(1) : value;
               const err = validateContactNumber(stripped);
               return err || true;
@@ -726,7 +729,6 @@ export default function RegisterScreen({ navigation }: any) {
           render={({ field: { onChange, onBlur, value } }) => (
             <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
               <Phone size={20} color="#6B7280" />
-              {/* Static +63 prefix */}
               <View className="ml-3 mr-1 border-r border-neutral-300 pr-3">
                 <Text className="text-base text-neutral-700 py-2.5">+63</Text>
               </View>
@@ -809,24 +811,11 @@ export default function RegisterScreen({ navigation }: any) {
         <ErrorMessage message={errors.confirmPassword?.message} />
       </View>
 
-      <View className="flex-row gap-3">
-        <TouchableOpacity onPress={() => setStep(1)} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
-          <Text className="text-neutral-700 font-semibold text-base">{t('back')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setStep(3)} className="flex-1 bg-primary-600 rounded-xl py-4 items-center shadow-sm" activeOpacity={0.85}>
-          <Text className="text-white font-semibold text-base">{t('continue')}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  // ─── Step 3: Address Info ──────────────────────────────────────────────────
-  const renderStep3 = () => (
-    <View>
-      <Text className="text-2xl font-bold text-neutral-900 mb-6">{t('addressInfo')}</Text>
+      {/* ── Address Section ── */}
+      <Text className="text-lg font-semibold text-neutral-800 mb-4">{t('addressInfo')}</Text>
 
       {/* Barangay */}
-      <View className="mb-4">
+      <View className="mb-6">
         <Text className="text-sm font-medium text-neutral-700 mb-2">{t('barangay')} *</Text>
         <Controller
           control={control}
@@ -872,66 +861,21 @@ export default function RegisterScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* Street Address */}
-      <View className="mb-4">
-        <Text className="text-sm font-medium text-neutral-700 mb-2">{t('streetAddress')} *</Text>
-        <Controller
-          control={control}
-          name="streetAddress"
-          rules={{ required: t('required') }}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.streetAddress ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
-              <MapPin size={20} color="#6B7280" />
-              <TextInput
-                className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
-                placeholder="123 Rizal Street"
-                placeholderTextColor="#9CA3AF"
-                multiline
-              />
-            </View>
-          )}
-        />
-        <ErrorMessage message={errors.streetAddress?.message} />
-      </View>
 
-      {/* Zone */}
-      <View className="mb-6">
-        <Text className="text-sm font-medium text-neutral-700 mb-2">{t('zone')}</Text>
-        <Controller
-          control={control}
-          name="zone"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <View className="flex-row items-center border-2 border-neutral-200 rounded-xl px-4 py-1 bg-white">
-              <MapPin size={20} color="#6B7280" />
-              <TextInput
-                className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
-                placeholder="Purok 1"
-                placeholderTextColor="#9CA3AF"
-              />
-            </View>
-          )}
-        />
-      </View>
 
       <View className="flex-row gap-3">
-        <TouchableOpacity onPress={() => setStep(2)} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
+        <TouchableOpacity onPress={() => setStep(1)} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
           <Text className="text-neutral-700 font-semibold text-base">{t('back')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setStep(4)} className="flex-1 bg-primary-600 rounded-xl py-4 items-center shadow-sm" activeOpacity={0.85}>
+        <TouchableOpacity onPress={() => setStep(3)} className="flex-1 bg-primary-600 rounded-xl py-4 items-center shadow-sm" activeOpacity={0.85}>
           <Text className="text-white font-semibold text-base">{t('continue')}</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  // ─── Step 4: ID Verification ───────────────────────────────────────────────
-  const renderStep4 = () => (
+  // ─── Step 3: ID Verification ───────────────────────────────────────────────
+  const renderStep3 = () => (
     <View>
       <Text className="text-2xl font-bold text-neutral-900 mb-2">{t('idVerification')}</Text>
       <Text className="text-sm text-neutral-600 mb-6">{t('idVerificationNote')}</Text>
@@ -1178,7 +1122,7 @@ export default function RegisterScreen({ navigation }: any) {
       )}
 
       <View className="flex-row gap-3">
-        <TouchableOpacity onPress={() => setStep(3)} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
+        <TouchableOpacity onPress={() => setStep(2)} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
           <Text className="text-neutral-700 font-semibold text-base">{t('back')}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleSubmit(onSubmit)} disabled={isLoading} className="flex-1 bg-primary-600 rounded-xl py-4 items-center shadow-sm" activeOpacity={0.85}>
@@ -1210,9 +1154,9 @@ export default function RegisterScreen({ navigation }: any) {
 
           <Text className="text-3xl font-bold text-neutral-900 mb-8">{t('register')}</Text>
 
-          {/* Progress Indicator */}
+          {/* Progress Indicator — 3 steps */}
           <View className="flex-row mb-8 gap-2">
-            {[1, 2, 3, 4].map((s) => (
+            {[1, 2, 3].map((s) => (
               <View key={s} className={`flex-1 h-1.5 rounded-full ${s <= step ? 'bg-primary-600' : 'bg-neutral-200'}`} />
             ))}
           </View>
@@ -1220,7 +1164,6 @@ export default function RegisterScreen({ navigation }: any) {
           {step === 1 && renderStep1()}
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
-          {step === 4 && renderStep4()}
 
           <View className="flex-row justify-center items-center mt-6">
             <Text className="text-neutral-600 text-sm">{t('haveAccount')} </Text>
