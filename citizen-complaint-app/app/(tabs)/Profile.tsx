@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { LocationPermissionModal } from '@/components/modals/LocationPermissionModal';
 import { LocationPicker } from '@/components/modals/LocationPicker';
+import { LocationCard } from '@/components/location/Locationcard';
 import ErrorScreen from '@/screen/general/ErrorScreen';
 import { handleApiError } from '@/utils/general/errorHandler';
 import { useProfileLogic } from '@/hooks/general/useProfile';
@@ -29,6 +30,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import GeneralToast from '@/components/Toast/GeneralToast';
+
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
@@ -50,7 +52,7 @@ export default function ProfileScreen() {
     toastType,
     toastMessage,
     setToastVisible,
-    toastVisible
+    toastVisible,
   } = useProfileLogic();
 
   if (loading) {
@@ -67,7 +69,6 @@ export default function ProfileScreen() {
   if (!userData) {
     const error = new Error('Failed to load profile');
     const appError = handleApiError(error);
-
     return (
       <ErrorScreen
         type={appError.type}
@@ -79,13 +80,13 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-50" edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-neutral-50" edges={['top']}>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header with Settings Button */}
+        {/* Header */}
         <View className="bg-primary-600 px-6 pt-6 pb-12">
           <View className="flex-row items-center justify-between">
             <Text className="text-white text-2xl font-bold">{t('profile.title')}</Text>
@@ -120,7 +121,7 @@ export default function ProfileScreen() {
               <Text className="text-neutral-600 text-sm mt-1">{userData.email}</Text>
             </View>
 
-            {/* Location Status - Not Enabled */}
+            {/* Location Status — Not Enabled */}
             {!hasLocation && (
               <View className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                 <View className="flex-row items-start">
@@ -135,15 +136,12 @@ export default function ProfileScreen() {
                   </View>
                 </View>
 
-                {/* Action Buttons */}
                 <View className="mt-3 gap-2">
                   <TouchableOpacity
                     onPress={() => setShowLocationModal(true)}
                     disabled={updateLocationMutation.isPending}
                     className={`rounded-lg py-2.5 items-center flex-row justify-center ${
-                      updateLocationMutation.isPending
-                        ? 'bg-amber-400'
-                        : 'bg-amber-600'
+                      updateLocationMutation.isPending ? 'bg-amber-400' : 'bg-amber-600'
                     }`}
                     activeOpacity={0.8}
                   >
@@ -179,7 +177,7 @@ export default function ProfileScreen() {
               </View>
             )}
 
-            {/* Location Status - Enabled */}
+            {/* Location Status — Enabled (compact update button only, map is shown below) */}
             {hasLocation && (
               <View className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
                 <View className="flex-row items-center mb-2">
@@ -188,37 +186,30 @@ export default function ProfileScreen() {
                     {t('profile.location.enabled')}
                   </Text>
                 </View>
-                <Text className="text-green-700 text-xs mb-3">
+                <Text className="text-green-700 text-xs">
                   {t('profile.location.enabledMessage')}
                 </Text>
-
-                {/* Update Location Button */}
-                <TouchableOpacity
-                  onPress={() => setShowMapPicker(true)}
-                  disabled={updateLocationMutation.isPending}
-                  className="bg-green-100 border border-green-300 rounded-lg py-2 items-center flex-row justify-center"
-                  activeOpacity={0.8}
-                >
-                  {updateLocationMutation.isPending ? (
-                    <>
-                      <ActivityIndicator size="small" color="#059669" />
-                      <Text className="text-green-700 font-medium text-xs ml-2">
-                        {t('profile.location.updating')}
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Map size={14} color="#059669" />
-                      <Text className="text-green-700 font-medium text-xs ml-2">
-                        {t('profile.location.updateLocation')}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
               </View>
             )}
           </View>
         </View>
+
+        {/* ── Location Map Card (shown only when lat/lng exist) ── */}
+        {hasLocation && (
+          <View className="px-6 mt-6">
+            <Text className="text-lg font-bold text-neutral-900 mb-4">
+              {t('profile.location.myLocation')}
+            </Text>
+            <LocationCard
+              latitude={userData.latitude}
+              longitude={userData.longitude}
+              onUpdatePress={() => setShowMapPicker(true)}
+              updateLabel={t('profile.location.updateLocation')}
+              // To swap to Google Maps later:
+              // mapProvider={GoogleMapsProvider}
+            />
+          </View>
+        )}
 
         {/* Personal Information */}
         <View className="px-6 mt-6">
@@ -238,7 +229,6 @@ export default function ProfileScreen() {
               <Text className="text-base text-neutral-900">{userData.email}</Text>
             </View>
 
-            {/* Divider */}
             <View className="h-px bg-neutral-200 my-4" />
 
             {/* Full Name */}
@@ -254,7 +244,6 @@ export default function ProfileScreen() {
               </Text>
             </View>
 
-            {/* Divider */}
             <View className="h-px bg-neutral-200 my-4" />
 
             {/* Age */}
@@ -271,8 +260,6 @@ export default function ProfileScreen() {
                     {userData.age} {t('profile.personalInfo.yearsOld')}
                   </Text>
                 </View>
-
-                {/* Divider */}
                 <View className="h-px bg-neutral-200 my-4" />
               </>
             )}
@@ -291,8 +278,6 @@ export default function ProfileScreen() {
                     {userData.gender}
                   </Text>
                 </View>
-
-                {/* Divider */}
                 <View className="h-px bg-neutral-200 my-4" />
               </>
             )}
@@ -307,12 +292,8 @@ export default function ProfileScreen() {
                       {t('profile.personalInfo.barangay')}
                     </Text>
                   </View>
-                  <Text className="text-base text-neutral-900">
-                    {userData.barangay}
-                  </Text>
+                  <Text className="text-base text-neutral-900">{userData.barangay}</Text>
                 </View>
-
-                {/* Divider */}
                 <View className="h-px bg-neutral-200 my-4" />
               </>
             )}
@@ -342,20 +323,15 @@ export default function ProfileScreen() {
           </Text>
 
           <View className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6">
-            {/* Role */}
             <View className="mb-4">
               <Text className="text-xs font-medium text-neutral-500 mb-2">
                 {t('profile.accountInfo.role')}
               </Text>
-              <Text className="text-base text-neutral-900 capitalize">
-                {userData.role}
-              </Text>
+              <Text className="text-base text-neutral-900 capitalize">{userData.role}</Text>
             </View>
 
-            {/* Divider */}
             <View className="h-px bg-neutral-200 my-4" />
 
-            {/* Created At */}
             {userData.created_at && (
               <View>
                 <Text className="text-xs font-medium text-neutral-500 mb-2">
@@ -373,7 +349,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Logout Button */}
+        {/* Logout */}
         <View className="px-6 mt-6 mb-6">
           <TouchableOpacity
             onPress={handleLogout}
@@ -388,7 +364,7 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
-      {/* Location Permission Modal (Auto-Detect) */}
+      {/* Location Permission Modal */}
       <LocationPermissionModal
         visible={showLocationModal}
         loading={locationLoading || updateLocationMutation.isPending}
@@ -396,7 +372,7 @@ export default function ProfileScreen() {
         onCancel={() => setShowLocationModal(false)}
       />
 
-      {/* Map-Based Location Picker (Manual Pin) */}
+      {/* Map Picker Modal */}
       <LocationPicker
         visible={showMapPicker}
         initialLatitude={userData.latitude ? parseFloat(userData.latitude) : undefined}
@@ -404,11 +380,13 @@ export default function ProfileScreen() {
         onConfirm={handleLocationFromMap}
         onCancel={() => setShowMapPicker(false)}
       />
-      <GeneralToast   
-      visible={toastVisible}
+
+      <GeneralToast
+        visible={toastVisible}
         onHide={() => setToastVisible(false)}
         message={toastMessage}
-        type={toastType} />
+        type={toastType}
+      />
     </SafeAreaView>
   );
 }

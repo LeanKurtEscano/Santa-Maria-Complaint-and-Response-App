@@ -135,6 +135,7 @@ const resources = {
         failedToLoad: "Failed to Load Profile",
         unableToRetrieve: "Unable to retrieve your profile information.",
         location: {
+          myLocation: "Your Location",
           required: "Location Required",
           requiredMessage: "Enable location access to file complaints in your area.",
           autoDetect: "Auto-Detect Location",
@@ -526,6 +527,7 @@ const resources = {
         failedToLoad: "Hindi Na-load ang Profile",
         unableToRetrieve: "Hindi makuha ang iyong impormasyon sa profile.",
         location: {
+          myLocation: "Ang iyong Lokasyon",
           required: "Kailangan ang Lokasyon",
           requiredMessage: "Paganahin ang access sa lokasyon upang magsumite ng reklamo sa iyong lugar.",
           autoDetect: "Auto-Detect ng Lokasyon",
