@@ -169,7 +169,7 @@ function InstructionsStep({
           <View className="flex-row items-center bg-green-50 border border-green-200 rounded-xl px-4 py-3.5 mb-2">
             <CheckCircle2 size={16} color="#16A34A" />
             <Text className="text-sm text-green-800 font-medium ml-2.5 flex-1 leading-5">
-              By proceeding, you confirm that you have read and understood the above guidelines.
+               {t('complaint_form.agreement')}
             </Text>
           </View>
 
@@ -184,7 +184,7 @@ function InstructionsStep({
           style={{ shadowColor: '#2563EB', shadowOpacity: 0.25, shadowRadius: 10, elevation: 4 }}
         >
           <Text className="text-white font-bold text-base mr-2">
-            I Understand — Proceed to Form
+            {t('complaint_form.proceed_to_form')}
           </Text>
           <ArrowRight size={18} color="white" />
         </TouchableOpacity>

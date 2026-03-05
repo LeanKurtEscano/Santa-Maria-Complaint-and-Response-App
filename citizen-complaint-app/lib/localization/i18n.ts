@@ -312,7 +312,10 @@ const resources = {
       "title_required": "Complaint category is required.",
       "title_too_short": "Complaint title must be at least 3 characters long.",
       "details_required": "Complaint details are required."
-    }
+    },
+
+     "agreement": "By proceeding, you confirm that you have read and understood the above guidelines.",
+      "proceed_to_form": "I Understand — Proceed to Form"
   },
 
 
@@ -735,7 +738,9 @@ const resources = {
       "title_required": "Kinakailangan ang kategorya ng reklamo.",
       "title_too_short": "Ang pamagat ng reklamo ay dapat may hindi bababa sa 3 na karakter.",
       "details_required": "Kinakailangan ang detalye ng reklamo."
-    }
+    },
+    "agreement": "Sa pagpapatuloy, kinukumpirma mo na nabasa mo at naintindihan mo ang mga gabay na nasa itaas.",
+      "proceed_to_form": "Naiintindihan ko — Magpatuloy sa Form"
   },
 
 

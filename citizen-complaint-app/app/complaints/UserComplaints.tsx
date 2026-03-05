@@ -351,8 +351,9 @@ export default function UserComplaints() {
               }`}
             >
               {activeFilterCount > 0
-                ? t("complaints.filter.labelWithCount", { count: activeFilterCount })
-                : t("complaints.filter.label")}
+                ? `Filter (${activeFilterCount})`
+                : "Filter" 
+              }
             </Text>
           </TouchableOpacity>
 
