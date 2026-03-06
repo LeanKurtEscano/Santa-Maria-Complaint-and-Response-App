@@ -1,295 +1,614 @@
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+// app/(tabs)/index.tsx
+// ─────────────────────────────────────────────────────────────────────────────
+// HomeScreen — 100% NativeWind, real API, paginated list,
+//              tappable image lightbox + video player modal, EN/TL i18n.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  FlatList,
+  Image,
+  Dimensions,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
-  AlertTriangle,
   Bell,
-  Droplets,
   FileText,
-  Flame,
-  LifeBuoy,
-  MapPin,
-  MessageSquarePlus,
   Phone,
-  ShieldAlert,
-  Thermometer,
-  Zap,
+  MessageSquarePlus,
   ChevronRight,
-  Clock,
   CalendarDays,
   ClipboardList,
   CheckCircle,
   Circle,
   Sparkles,
+  Play,
+  ImageIcon,
+  Video as VideoIcon,
+  AlertCircle,
+  RefreshCw,
+  MapPin,
+  Clock,
+  ChevronDown,
+  Megaphone,
+  Languages,
 } from 'lucide-react-native';
-import ChatbotFAB from '@/components/buttons/Chatbotfab';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { announcementApiClient } from '@/lib/client/announcement';
+import { ImageViewer,VideoPlayer } from '@/components/media/MediaViewer';
+import { useTranslation } from 'react-i18next';
+import ChatbotFAB from '@/components/buttons/Chatbotfab';
 import ChatbotModal from '@/components/modals/Chatbot';
 
-type EmergencyType = 'flood' | 'fire' | 'power' | 'health' | 'typhoon' | 'crime';
+// ─── Config ───────────────────────────────────────────────────────────────────
 
-interface EmergencyAnnouncement {
-  id: string;
-  title: string;
-  description: string;
-  date: string;
-  time?: string;
-  location?: string;
-  type: EmergencyType;
-  isUrgent: boolean;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// card mx-5 (20px each side) + inner px-4 (16px each side) = 72px total
+const SLIDE_WIDTH = SCREEN_WIDTH - 72;
+const PAGE_SIZE   = 5;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface MediaItem {
+  id: number;
+  announcement_id: number;
+  media_url: string;
+  media_type: 'image' | 'video';
 }
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
+interface UploaderInfo {
+  id: number;
+  email: string;
+  role: string;
+  first_name: string | null;
+  last_name: string | null;
+  profile_image: string | null;
+}
 
-const announcements: EmergencyAnnouncement[] = [
-  {
-    id: '1',
-    title: 'Babala sa Pagbaha',
-    description:
-      'Mataas na antas ng tubig sa Ilog Santa Maria. Inirerekumenda ang agarang paglipat ng mga residente sa mababang lugar.',
-    date: 'Pebrero 20, 2026',
-    time: '6:00 AM',
-    location: 'Barangay Sto. Cristo, Zones 3–5',
-    type: 'flood',
-    isUrgent: true,
-  },
-  {
-    id: '2',
-    title: 'Abiso ng Pagkawala ng Kuryente',
-    description:
-      'Nakaplanong pagpapanatili ng linya ng kuryente. Maaaring makaranas ng pagkawala ng kuryente ang mga apektadong barangay.',
-    date: 'Pebrero 22, 2026',
-    time: '8:00 AM – 5:00 PM',
-    location: 'Barangay Bagong Bayan & San Calix',
-    type: 'power',
-    isUrgent: false,
-  },
-  {
-    id: '3',
-    title: 'Alerto sa Dengue',
-    description:
-      'Tumaas ang bilang ng kaso ng dengue. Ipinapayo sa mga residente na alisin ang nakatenggang tubig at magsuot ng pangproteksyon.',
-    date: 'Patuloy',
-    type: 'health',
-    isUrgent: true,
-  },
-  {
-    id: '4',
-    title: 'Babala sa Bagyo: Bagyong Ester',
-    description:
-      'Papalapit na bagyo sa lalawigan. Ihanda ang emergency kit at makinig sa opisyal na anunsyo mula sa NDRRMC.',
-    date: 'Pebrero 24, 2026',
-    time: '12:00 NN',
-    type: 'typhoon',
-    isUrgent: true,
-  },
-  {
-    id: '5',
-    title: 'Nasunog na Bahay sa Brgy. Pulong Buhangin',
-    description:
-      'Kasalukuyang tinutugunan ng BFP ang sunog. Iwasang pumasok sa lugar. Huwag mag-panic.',
-    date: 'Pebrero 19, 2026',
-    time: '10:45 PM',
-    location: 'Barangay Pulong Buhangin',
-    type: 'fire',
-    isUrgent: false,
-  },
-];
+interface Announcement {
+  id: number;
+  title: string;
+  content: string;
+  uploader_id: number;
+  uploader: UploaderInfo;
+  created_at: string;
+  updated_at: string;
+  media: MediaItem[];
+}
 
-const COMPLAINT_STATS = [
-  { label: 'Isinumite', value: 24, icon: ClipboardList, color: '#bfdbfe' },
-  { label: 'Sa Proseso', value: 11, icon: Circle,        color: '#fde68a' },
-  { label: 'Nalutas',   value: 13, icon: CheckCircle,   color: '#bbf7d0' },
-];
+// ─── Static complaint stats data ──────────────────────────────────────────────
 
-// ─── Colors ───────────────────────────────────────────────────────────────────
+const STAT_ITEMS = [
+  { tKey: 'stats.submitted',   value: 24, Icon: ClipboardList, dot: '#93C5FD' },
+  { tKey: 'stats.in_progress', value: 11, Icon: Circle,        dot: '#FCD34D' },
+  { tKey: 'stats.resolved',    value: 13, Icon: CheckCircle,   dot: '#6EE7B7' },
+] as const;
 
-const BLUE      = '#2563EB';
-const BLUE_DARK = '#1d4ed8';
-const BLUE_LIGHT = '#eff6ff';
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// ─── Emergency Type Config ────────────────────────────────────────────────────
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('fil-PH', {
+    year: 'numeric', month: 'short', day: 'numeric',
+  });
+}
 
-const TYPE_CONFIG: Record<
-  EmergencyType,
-  { Icon: any; label: string; iconBg: string; iconColor: string; accentColor: string; accentBg: string }
-> = {
-  flood:   { Icon: Droplets,    label: 'Baha',      iconBg: '#dbeafe', iconColor: '#1d4ed8', accentColor: '#1d4ed8', accentBg: '#eff6ff' },
-  fire:    { Icon: Flame,       label: 'Sunog',     iconBg: '#ffedd5', iconColor: '#ea580c', accentColor: '#ea580c', accentBg: '#fff7ed' },
-  power:   { Icon: Zap,         label: 'Kuryente',  iconBg: '#fef9c3', iconColor: '#ca8a04', accentColor: '#ca8a04', accentBg: '#fefce8' },
-  health:  { Icon: Thermometer, label: 'Kalusugan', iconBg: '#ffe4e6', iconColor: '#e11d48', accentColor: '#e11d48', accentBg: '#fff1f2' },
-  typhoon: { Icon: LifeBuoy,    label: 'Bagyo',     iconBg: '#ede9fe', iconColor: '#7c3aed', accentColor: '#7c3aed', accentBg: '#f5f3ff' },
-  crime:   { Icon: ShieldAlert, label: 'Seguridad', iconBg: '#fee2e2', iconColor: '#dc2626', accentColor: '#dc2626', accentBg: '#fef2f2' },
-};
+function timeAgo(iso: string, lang: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  const isTl = lang === 'tl';
+  if (m < 1)   return isTl ? 'kararating lang'            : 'just now';
+  if (m < 60)  return isTl ? `${m}m ang nakakaraan`       : `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24)  return isTl ? `${h}h ang nakakaraan`       : `${h}h ago`;
+  return         isTl ? `${Math.floor(h/24)}d ang nakakaraan` : `${Math.floor(h/24)}d ago`;
+}
 
-// ─── Quick Action Button ──────────────────────────────────────────────────────
+function uploaderLabel(u: UploaderInfo) {
+  if (u.first_name || u.last_name)
+    return [u.first_name, u.last_name].filter(Boolean).join(' ');
+  return u.email.split('@')[0];
+}
 
-function QuickAction({
-  Icon,
-  label,
+// ═══════════════════════════════════════════════════════════════════════════════
+// ATOMS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function Tag({ label }: { label: string }) {
+  return (
+    <View className="self-start rounded-full bg-blue-50 border border-blue-100 px-3 py-1">
+      <Text className="text-blue-600 text-[10px] font-bold tracking-wider uppercase">
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function Avatar({ name }: { name: string }) {
+  return (
+    <View className="w-7 h-7 rounded-full bg-blue-100 items-center justify-center">
+      <Text className="text-blue-600 text-[11px] font-bold">
+        {name[0]?.toUpperCase() ?? 'L'}
+      </Text>
+    </View>
+  );
+}
+
+function DateChip({ date }: { date: string }) {
+  return (
+    <View className="flex-row items-center gap-1 bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5">
+      <CalendarDays size={10} color="#94A3B8" />
+      <Text className="text-slate-400 text-[11px] font-semibold">{date}</Text>
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MEDIA SLIDE — tappable, opens viewer/player
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function ImageSlide({
+  uri,
   onPress,
 }: {
-  Icon: any;
-  label: string;
-  onPress?: () => void;
+  uri: string;
+  onPress: () => void;
 }) {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.75} className="items-center flex-1">
-      <View
-        className="rounded-2xl mb-2.5 w-14 h-14 items-center justify-center"
-        style={{ backgroundColor: BLUE_LIGHT, borderWidth: 1.5, borderColor: '#bfdbfe' }}
-      >
-        <Icon size={22} color={BLUE} />
-      </View>
-      <Text className="text-gray-700 text-xs font-bold text-center leading-4">{label}</Text>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.92}>
+      <Image
+        source={{ uri }}
+        style={{ width: SLIDE_WIDTH, height: 190, borderRadius: 12 }}
+        resizeMode="cover"
+      />
     </TouchableOpacity>
   );
 }
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
+function VideoSlide({
+  tapLabel,
+  onPress,
+}: {
+  tapLabel: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.88}>
+      <View
+        style={{ width: SLIDE_WIDTH, height: 190, borderRadius: 12 }}
+        className="bg-slate-900 items-center justify-center overflow-hidden"
+      >
+        {[...Array(7)].map((_, i) => (
+          <View
+            key={i}
+            style={{
+              position: 'absolute', left: 0, right: 0,
+              top: i * 28, height: 1,
+              backgroundColor: 'rgba(255,255,255,0.04)',
+            }}
+          />
+        ))}
+        <View className="w-14 h-14 rounded-full bg-white/10 border border-white/20 items-center justify-center">
+          <Play size={24} color="white" fill="white" />
+        </View>
+        <Text className="text-white/40 text-xs font-semibold mt-3">{tapLabel}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
-function StatCard({ label, value, icon: Icon, color }: typeof COMPLAINT_STATS[0]) {
+// ═══════════════════════════════════════════════════════════════════════════════
+// MEDIA CAROUSEL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function MediaCountBadges({ media }: { media: MediaItem[] }) {
+  const imgs = media.filter(m => m.media_type === 'image').length;
+  const vids = media.filter(m => m.media_type === 'video').length;
+  if (!imgs && !vids) return null;
+  return (
+    <View className="absolute top-3 right-3 flex-row gap-1.5">
+      {imgs > 0 && (
+        <View className="flex-row items-center gap-1 bg-black/50 rounded-full px-2 py-1">
+          <ImageIcon size={9} color="#fff" />
+          <Text className="text-white text-[10px] font-bold">{imgs}</Text>
+        </View>
+      )}
+      {vids > 0 && (
+        <View className="flex-row items-center gap-1 bg-black/50 rounded-full px-2 py-1">
+          <VideoIcon size={9} color="#fff" />
+          <Text className="text-white text-[10px] font-bold">{vids}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function CarouselDots({ count, active }: { count: number; active: number }) {
+  if (count <= 1) return null;
+  return (
+    <View className="flex-row justify-center items-center gap-1.5 mt-2.5">
+      {[...Array(count)].map((_, i) => (
+        <View
+          key={i}
+          style={{
+            width: i === active ? 20 : 6,
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: i === active ? '#2563EB' : '#CBD5E1',
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+function MediaCarousel({ media }: { media: MediaItem[] }) {
+  const { t } = useTranslation();
+  const [active, setActive] = useState(0);
+
+  // State for viewer modals
+  const [imageUri,      setImageUri]      = useState('');
+  const [videoUri,      setVideoUri]      = useState('');
+  const [imageVisible,  setImageVisible]  = useState(false);
+  const [videoVisible,  setVideoVisible]  = useState(false);
+
+  if (media.length === 0) return null;
+
+  return (
+    <>
+      <View className="px-4 pt-4 pb-1">
+        <View>
+          <FlatList
+            data={media}
+            keyExtractor={m => m.id.toString()}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={SLIDE_WIDTH + 10}
+            decelerationRate="fast"
+            ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+            onScroll={e => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / (SLIDE_WIDTH + 10));
+              setActive(idx);
+            }}
+            scrollEventThrottle={16}
+            renderItem={({ item }) =>
+              item.media_type === 'image' ? (
+                <ImageSlide
+                  uri={item.media_url}
+                  onPress={() => {
+                    setImageUri(item.media_url);
+                    setImageVisible(true);
+                  }}
+                />
+              ) : (
+                <VideoSlide
+                  tapLabel={t('media.tap_to_watch')}
+                  onPress={() => {
+                    setVideoUri(item.media_url);
+                    setVideoVisible(true);
+                  }}
+                />
+              )
+            }
+          />
+          <MediaCountBadges media={media} />
+        </View>
+        <CarouselDots count={media.length} active={active} />
+      </View>
+
+      {/* Image lightbox */}
+      <ImageViewer
+        visible={imageVisible}
+        uri={imageUri}
+        onClose={() => setImageVisible(false)}
+      />
+
+      {/* Video player */}
+      <VideoPlayer
+        visible={videoVisible}
+        uri={videoUri}
+        onClose={() => setVideoVisible(false)}
+      />
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ANNOUNCEMENT CARD
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function AnnouncementCard({ item }: { item: Announcement }) {
+  const { t, language } = useTranslation();
+  const hasMedia = item.media.length > 0;
+  const name = uploaderLabel(item.uploader);
+
   return (
     <View
-      className="flex-1 rounded-2xl p-3.5 items-center"
+      className="bg-white rounded-2xl mb-3.5 overflow-hidden"
       style={{
-        backgroundColor: 'rgba(255,255,255,0.12)',
+        borderWidth: 1,
+        borderColor: '#E8EFFE',
+        shadowColor: '#1A56DB',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.07,
+        shadowRadius: 12,
+        elevation: 3,
+      }}
+    >
+      {/* Media carousel */}
+      {hasMedia && <MediaCarousel media={item.media} />}
+
+      {/* Body */}
+      <View className={`px-4 pb-4 ${hasMedia ? 'pt-3' : 'pt-4'}`}>
+
+        {/* Tag + time */}
+        <View className="flex-row items-center justify-between mb-2.5">
+          <Tag label={t('announcements.tag')} />
+          <View className="flex-row items-center gap-1">
+            <Clock size={10} color="#94A3B8" />
+            <Text className="text-slate-400 text-[10px] font-semibold">
+              {timeAgo(item.created_at, language)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Title */}
+        <Text
+          className="text-slate-900 text-[15px] font-extrabold leading-snug mb-2"
+          numberOfLines={2}
+        >
+          {item.title}
+        </Text>
+
+        {/* Content */}
+        <Text
+          className="text-slate-500 text-[13px] leading-5 mb-3"
+          numberOfLines={3}
+        >
+          {item.content}
+        </Text>
+
+        {/* Date chip */}
+        <View className="flex-row flex-wrap gap-2 mb-3.5">
+          <DateChip date={formatDate(item.created_at)} />
+        </View>
+
+        {/* Divider */}
+        <View className="h-px bg-slate-100 mb-3" />
+
+        {/* Footer: uploader + read CTA */}
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center gap-2 flex-1 mr-3">
+            <Avatar name={name} />
+            <Text className="text-slate-500 text-[11px] font-semibold flex-1" numberOfLines={1}>
+              {name}
+            </Text>
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.75}
+            className="flex-row items-center gap-1 bg-blue-50 rounded-xl px-3 py-2"
+          >
+            <Text className="text-blue-600 text-[12px] font-bold">
+              {t('announcements.read_more')}
+            </Text>
+            <ChevronRight size={12} color="#2563EB" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// QUICK ACTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function QuickAction({ Icon, label, onPress }: { Icon: any; label: string; onPress?: () => void }) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.75} className="items-center flex-1">
+      <View className="w-[54px] h-[54px] rounded-2xl mb-2 bg-blue-50 border border-blue-100 items-center justify-center">
+        <Icon size={22} color="#2563EB" />
+      </View>
+      <Text className="text-slate-700 text-[11px] font-bold text-center leading-[15px]">
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STAT CARD
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function StatCard({ label, value, Icon, dot }: { label: string; value: number; Icon: any; dot: string }) {
+  return (
+    <View
+      className="flex-1 rounded-2xl py-3.5 px-2 items-center"
+      style={{
+        backgroundColor: 'rgba(255,255,255,0.11)',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.18)',
       }}
     >
-      <Icon size={16} color={color} />
-      <Text className="text-white text-2xl font-bold mt-1.5">{value}</Text>
-      <Text className="text-blue-100 text-xs font-semibold text-center mt-0.5 leading-4">{label}</Text>
+      <Icon size={15} color={dot} />
+      <Text className="text-white text-2xl font-black mt-1.5">{value}</Text>
+      <Text className="text-blue-200 text-[10px] font-semibold text-center mt-0.5 leading-[14px]">
+        {label}
+      </Text>
     </View>
   );
 }
 
-// ─── Announcement Card ────────────────────────────────────────────────────────
-
-function AnnouncementCard({ item }: { item: EmergencyAnnouncement }) {
-  const cfg = TYPE_CONFIG[item.type];
-  const { Icon } = cfg;
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.82}
-      className="bg-white rounded-2xl mb-3 overflow-hidden"
-      style={{
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-        shadowColor: '#64748b',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.07,
-        shadowRadius: 8,
-        elevation: 2,
-      }}
-    >
-      {/* Urgent top stripe */}
-      {item.isUrgent && (
-        <View
-          className="flex-row items-center px-4 py-2 gap-2"
-          style={{ backgroundColor: '#FEF2F2', borderBottomWidth: 1, borderBottomColor: '#FECACA' }}
-        >
-          <AlertTriangle size={12} color="#DC2626" />
-          <Text className="text-red-700 text-xs font-bold tracking-widest uppercase flex-1">
-            Kagyat na Anunsyo
-          </Text>
-          <View className="w-2 h-2 rounded-full bg-red-500" />
-        </View>
-      )}
-
-      <View className="p-4">
-        {/* Header row */}
-        <View className="flex-row items-start gap-3 mb-3">
-          {/* Type icon */}
-          <View
-            className="rounded-xl p-2.5 items-center justify-center shrink-0"
-            style={{ backgroundColor: cfg.iconBg }}
-          >
-            <Icon size={20} color={cfg.iconColor} />
-          </View>
-
-          {/* Title block */}
-          <View className="flex-1">
-            <View
-              className="self-start rounded-full px-2.5 py-0.5 mb-1.5"
-              style={{ backgroundColor: cfg.accentBg }}
-            >
-              <Text className="text-xs font-bold" style={{ color: cfg.accentColor }}>
-                {cfg.label}
-              </Text>
-            </View>
-            <Text className="text-gray-900 text-sm font-bold leading-5">{item.title}</Text>
-          </View>
-        </View>
-
-        {/* Description */}
-        <Text className="text-gray-500 text-xs leading-[18px] mb-3">{item.description}</Text>
-
-        {/* Meta row */}
-        <View className="flex-row flex-wrap gap-2">
-          <MetaPill icon={CalendarDays} text={item.date} />
-          {item.time && <MetaPill icon={Clock} text={item.time} />}
-          {item.location && <MetaPill icon={MapPin} text={item.location} />}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function MetaPill({ icon: Icon, text }: { icon: any; text: string }) {
-  return (
-    <View
-      className="flex-row items-center gap-1.5 rounded-lg px-2.5 py-1.5"
-      style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }}
-    >
-      <Icon size={11} color="#94A3B8" />
-      <Text className="text-slate-500 text-xs font-medium">{text}</Text>
-    </View>
-  );
-}
-
-// ─── Section Header ───────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// SECTION HEADER
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function SectionHeader({
-  Icon,
-  title,
-  actionLabel,
-  onAction,
+  Icon, title, actionLabel, onAction,
 }: {
-  Icon: any;
-  title: string;
-  actionLabel?: string;
-  onAction?: () => void;
+  Icon: any; title: string; actionLabel?: string; onAction?: () => void;
 }) {
   return (
     <View className="flex-row items-center justify-between mb-4">
       <View className="flex-row items-center gap-2.5">
-        <View
-          className="rounded-xl p-2"
-          style={{ backgroundColor: BLUE_LIGHT, borderWidth: 1, borderColor: '#bfdbfe' }}
-        >
-          <Icon size={16} color={BLUE} />
+        <View className="rounded-xl p-2 bg-blue-50 border border-blue-100">
+          <Icon size={16} color="#2563EB" />
         </View>
-        <Text className="text-gray-900 text-base font-bold">{title}</Text>
+        <Text className="text-slate-900 text-base font-extrabold">{title}</Text>
       </View>
       {actionLabel && (
-        <TouchableOpacity onPress={onAction} className="flex-row items-center gap-0.5" activeOpacity={0.7}>
-          <Text className="text-sm font-semibold" style={{ color: BLUE }}>{actionLabel}</Text>
-          <ChevronRight size={14} color={BLUE} />
+        <TouchableOpacity onPress={onAction} activeOpacity={0.7} className="flex-row items-center gap-0.5">
+          <Text className="text-[13px] font-bold text-blue-600">{actionLabel}</Text>
+          <ChevronRight size={13} color="#2563EB" />
         </TouchableOpacity>
       )}
     </View>
   );
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// STATE SCREENS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function LoadingState() {
+  const { t } = useTranslation();
+  return (
+    <View className="items-center py-12">
+      <ActivityIndicator size="large" color="#2563EB" />
+      <Text className="text-slate-400 text-[13px] font-semibold mt-3">
+        {t('announcements.loading')}
+      </Text>
+    </View>
+  );
+}
+
+function EmptyState() {
+  const { t } = useTranslation();
+  return (
+    <View className="items-center py-12">
+      <View className="w-16 h-16 rounded-full bg-blue-50 items-center justify-center mb-3">
+        <Megaphone size={28} color="#2563EB" />
+      </View>
+      <Text className="text-slate-700 text-[15px] font-bold mb-1">
+        {t('announcements.empty_title')}
+      </Text>
+      <Text className="text-slate-400 text-[13px] text-center">
+        {t('announcements.empty_body')}
+      </Text>
+    </View>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <View className="items-center py-12">
+      <View className="w-16 h-16 rounded-full bg-red-50 items-center justify-center mb-3">
+        <AlertCircle size={28} color="#E11D48" />
+      </View>
+      <Text className="text-slate-700 text-[15px] font-bold mb-1">
+        {t('announcements.error_title')}
+      </Text>
+      <Text className="text-slate-400 text-[13px] text-center mb-4">
+        {t('announcements.error_body')}
+      </Text>
+      <TouchableOpacity
+        onPress={onRetry}
+        activeOpacity={0.8}
+        className="flex-row items-center gap-2 bg-blue-50 border border-blue-100 rounded-full px-4 py-2.5"
+      >
+        <RefreshCw size={13} color="#2563EB" />
+        <Text className="text-[13px] font-bold text-blue-600">{t('announcements.retry')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAGINATED ANNOUNCEMENTS LIST
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function AnnouncementsList({
+  data, isLoading, isError, onRetry,
+}: {
+  data?: Announcement[];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation();
+  const [visible, setVisible] = useState(PAGE_SIZE);
+
+  if (isLoading) return <LoadingState />;
+  if (isError)   return <ErrorState onRetry={onRetry} />;
+  if (!data || data.length === 0) return <EmptyState />;
+
+  const shown     = data.slice(0, visible);
+  const remaining = data.length - visible;
+
+  return (
+    <>
+      {shown.map(item => (
+        <AnnouncementCard key={item.id} item={item} />
+      ))}
+
+      {/* See more button */}
+      {remaining > 0 && (
+        <TouchableOpacity
+          onPress={() => setVisible(v => v + PAGE_SIZE)}
+          activeOpacity={0.85}
+          className="flex-row items-center justify-center gap-2 py-4 rounded-2xl bg-white border border-slate-200 mb-4"
+          style={{
+            shadowColor: '#94A3B8',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.06,
+            shadowRadius: 8,
+            elevation: 2,
+          }}
+        >
+          <ChevronDown size={16} color="#2563EB" />
+          <Text className="text-blue-600 text-[14px] font-bold">
+            {t('announcements.see_more')} ({remaining} {t('announcements.remaining')})
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* End of list */}
+      {visible >= data.length && data.length > PAGE_SIZE && (
+        <View className="items-center py-3 mb-2">
+          <Text className="text-slate-300 text-xs font-semibold">
+            {t('announcements.end_of_list')}
+          </Text>
+        </View>
+      )}
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HOME SCREEN
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export default function HomeScreen() {
   const router = useRouter();
-  const urgentCount = announcements.filter((a) => a.isUrgent).length;
+  const { t, language, setLanguage } = useTranslation();
   const [chatOpen, setChatOpen] = useState(false);
+
+  const { data, isLoading, isError, refetch, isRefetching } =
+    useQuery<Announcement[]>({
+      queryKey: ['announcements'],
+      queryFn: async () => {
+        const res = await announcementApiClient.get('/');
+        return res.data;
+      },
+    });
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
@@ -297,63 +616,86 @@ export default function HomeScreen() {
         className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 140 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor="#2563EB"
+            colors={['#2563EB']}
+          />
+        }
       >
 
-        {/* ── Header ──────────────────────────────────────────────────── */}
-        <View
-          className="px-5 pt-5 pb-14"
-          style={{ backgroundColor: BLUE }}
-        >
+        {/* ─────────────────────── HEADER ─────────────────────────────── */}
+        <View className="px-5 pt-5 pb-14 bg-blue-600 overflow-hidden">
           {/* Decorative blobs */}
-          <View style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.06)' }} />
-          <View style={{ position: 'absolute', top: 70, right: 50, width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(255,255,255,0.04)' }} />
-          <View style={{ position: 'absolute', bottom: 20, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.04)' }} />
+          <View style={{ position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.05)' }} />
+          <View style={{ position: 'absolute', bottom: 0, left: -30, width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.04)' }} />
+          <View style={{ position: 'absolute', top: 60, right: 70, width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.04)' }} />
 
-          {/* Top row: location + notification */}
+          {/* Top row: title + lang toggle + bell */}
           <View className="flex-row items-start justify-between mb-7">
-            <View>
+            <View className="flex-1">
               <View className="flex-row items-center gap-1.5 mb-1">
-                <Sparkles size={11} color="#93c5fd" />
-                <Text className="text-blue-200 text-xs font-bold uppercase tracking-widest">
-                  Munisipalidad ng
+                <Sparkles size={10} color="#93C5FD" />
+                <Text className="text-blue-200 text-[11px] font-bold tracking-widest uppercase">
+                  {t('header.municipality')}
                 </Text>
               </View>
-              <Text className="text-white text-3xl font-bold leading-8">Santa Maria</Text>
-              <Text className="text-blue-200 text-sm mt-1 font-medium">Laguna, Pilipinas</Text>
+              <Text className="text-white text-[30px] font-black leading-8">
+                {t('header.city')}
+              </Text>
+              <View className="flex-row items-center gap-1 mt-1">
+                <MapPin size={11} color="#93C5FD" />
+                <Text className="text-blue-200 text-[12px] font-medium">
+                  {t('header.location')}
+                </Text>
+              </View>
             </View>
 
-            <TouchableOpacity
-              activeOpacity={0.8}
-              className="rounded-2xl p-3 mt-1 relative"
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.14)',
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.22)',
-              }}
-            >
-              <Bell size={22} color="white" />
-              {urgentCount > 0 && (
-                <View className="absolute -top-1.5 -right-1.5 bg-red-500 rounded-full w-5 h-5 items-center justify-center border-2 border-blue-600">
-                  <Text className="text-white font-bold" style={{ fontSize: 9 }}>
-                    {urgentCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            <View className="flex-row items-center gap-2 mt-1">
+              {/* Language toggle */}
+              <TouchableOpacity
+                onPress={() => setLanguage(language === 'en' ? 'tl' : 'en')}
+                activeOpacity={0.8}
+                className="rounded-2xl px-3 py-2.5 flex-row items-center gap-1.5"
+                style={{ backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+              >
+                <Languages size={14} color="white" />
+                <Text className="text-white text-[12px] font-bold">
+                  {language === 'en' ? 'EN' : 'TL'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Bell */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                className="rounded-2xl p-3"
+                style={{ backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+              >
+                <Bell size={22} color="white" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Complaint stats */}
-          <Text className="text-blue-200 text-xs font-bold uppercase tracking-widest mb-3">
-            Iyong mga Reklamo
+          <Text className="text-blue-200 text-[10px] font-bold uppercase tracking-widest mb-3">
+            {t('stats.heading')}
           </Text>
-          <View className="flex-row gap-3">
-            {COMPLAINT_STATS.map((s) => (
-              <StatCard key={s.label} {...s} />
+          <View className="flex-row gap-2.5">
+            {STAT_ITEMS.map(s => (
+              <StatCard
+                key={s.tKey}
+                label={t(s.tKey)}
+                value={s.value}
+                Icon={s.Icon}
+                dot={s.dot}
+              />
             ))}
           </View>
         </View>
 
-        {/* ── Floating Quick Access Card (overlaps header) ─────────────── */}
+        {/* ─────────────── FLOATING QUICK ACCESS CARD ─────────────────── */}
         <View
           className="bg-white mx-5 rounded-3xl p-5"
           style={{
@@ -362,79 +704,56 @@ export default function HomeScreen() {
             borderColor: '#E2E8F0',
             shadowColor: '#2563EB',
             shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.1,
+            shadowOpacity: 0.10,
             shadowRadius: 20,
             elevation: 8,
           }}
         >
-          <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
-            Mabilis na Access
+          <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+            {t('quick.heading')}
           </Text>
           <View className="flex-row justify-between">
-            <QuickAction Icon={FileText}      label={`Mga\nSerbisyo`} />
+            <QuickAction Icon={FileText}     label={t('quick.services')} />
             <QuickAction
               Icon={ClipboardList}
-              label={`Mga\nReklamo`}
+              label={t('quick.complaints')}
               onPress={() => router.push('/(tabs)/Complaints')}
             />
-            <QuickAction Icon={CalendarDays}  label={`Mga\nKaganapan`} />
-            <QuickAction Icon={Phone}         label="Hotlines" />
+            <QuickAction Icon={CalendarDays} label={t('quick.events')} />
+            <QuickAction Icon={Phone}        label={t('quick.hotlines')} />
           </View>
         </View>
 
-        {/* ── Urgent Alert Banner ──────────────────────────────────────── */}
-        {urgentCount > 0 && (
-          <View className="mx-5 mt-5">
-            <View
-              className="rounded-2xl px-4 py-4 flex-row items-center gap-3"
-              style={{
-                backgroundColor: '#FFF7ED',
-                borderWidth: 1,
-                borderColor: '#FDBA74',
-              }}
-            >
-              <View className="rounded-xl p-2.5" style={{ backgroundColor: '#FFEDD5' }}>
-                <AlertTriangle size={20} color="#EA580C" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-sm font-bold text-orange-900 mb-0.5">
-                  {urgentCount} Kagyat na Alerto
-                </Text>
-                <Text className="text-xs text-orange-700 leading-4">
-                  Mangyaring basahin ang mga anunsyo sa ibaba at sundin ang mga tagubilin.
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* ── Announcements ─────────────────────────────────────────────── */}
+        {/* ─────────────────────── ANNOUNCEMENTS ──────────────────────── */}
         <View className="px-5 mt-6">
           <SectionHeader
-            Icon={ShieldAlert}
-            title="Mga Anunsyo at Alerto"
-            actionLabel="Lahat"
+            Icon={Megaphone}
+            title={t('announcements.heading')}
+            actionLabel={t('announcements.all')}
             onAction={() => {}}
           />
-          {announcements.map((item) => (
-            <AnnouncementCard key={item.id} item={item} />
-          ))}
+          <AnnouncementsList
+            data={data}
+            isLoading={isLoading}
+            isError={isError}
+            onRetry={refetch}
+          />
         </View>
 
       </ScrollView>
 
-    <ChatbotFAB onPress={() => setChatOpen(true)} />
-   <ChatbotModal visible={chatOpen} onClose={() => setChatOpen(false)} />
+      {/* Chatbot */}
+      <ChatbotFAB onPress={() => setChatOpen(true)} />
+      <ChatbotModal visible={chatOpen} onClose={() => setChatOpen(false)} />
 
-      {/* ── Submit Complaint Button ───────────────────────────────────── */}
-      <View className="absolute bottom-0 left-0 right-0 px-5 pb-8 pt-3 bg-white border-t border-gray-100">
+      {/* ─────────────────────── BOTTOM CTA ─────────────────────────── */}
+      <View className="absolute bottom-0 left-0 right-0 px-5 pb-8 pt-3 bg-white border-t border-slate-100">
         <TouchableOpacity
           onPress={() => router.push('/(tabs)/Complaints')}
-          activeOpacity={0.85}
-          className="flex-row items-center justify-center gap-2.5 py-4 rounded-2xl"
+          activeOpacity={0.88}
+          className="flex-row items-center justify-center gap-2.5 py-4 rounded-2xl bg-blue-600"
           style={{
-            backgroundColor: BLUE,
-            shadowColor: BLUE_DARK,
+            shadowColor: '#1D4ED8',
             shadowOffset: { width: 0, height: 6 },
             shadowOpacity: 0.35,
             shadowRadius: 14,
@@ -442,7 +761,9 @@ export default function HomeScreen() {
           }}
         >
           <MessageSquarePlus size={20} color="white" />
-          <Text className="text-white text-base font-bold">Magsumite ng Reklamo</Text>
+          <Text className="text-white text-[15px] font-extrabold">
+            {t('cta.submit_complaint')}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
