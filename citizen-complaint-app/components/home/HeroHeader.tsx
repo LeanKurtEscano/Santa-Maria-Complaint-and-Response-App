@@ -1,0 +1,177 @@
+// components/home/HeroHeader.tsx
+// Contains: StickyMiniHeader, ParallaxBlob, HeroHeader, BottomCTA
+import {
+  View, Text, Animated, TouchableOpacity, Platform, StatusBar,
+} from 'react-native';
+import { useRef, useEffect } from 'react';
+import { Bell, MapPin, Sparkles, Languages, MessageSquarePlus } from 'lucide-react-native';
+import { StatCard } from './StatCard';
+import { STAT_ITEMS } from '@/constants/home/home';
+
+// ── Sticky mini header (fades in on scroll) ───────────────────────────────────
+
+export function StickyMiniHeader({ scrollY, title }: { scrollY: Animated.Value; title: string }) {
+  const opacity    = scrollY.interpolate({ inputRange: [120, 180], outputRange: [0, 1], extrapolate: 'clamp' });
+  const translateY = scrollY.interpolate({ inputRange: [120, 180], outputRange: [-20, 0], extrapolate: 'clamp' });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
+        opacity, transform: [{ translateY }],
+        backgroundColor: '#2563EB',
+        paddingTop: Platform.OS === 'ios' ? 54 : (StatusBar.currentHeight ?? 24) + 8,
+        paddingBottom: 14, paddingHorizontal: 20,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        shadowColor: '#1D4ED8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 10,
+      }}
+    >
+      <Text style={{ color: 'white', fontSize: 17, fontWeight: '800' }}>{title}</Text>
+      <Bell size={20} color="white" />
+    </Animated.View>
+  );
+}
+
+// ── Parallax blob ─────────────────────────────────────────────────────────────
+
+export function ParallaxBlob({ scrollY, size, top, right, left, speed = 0.3, opacity = 0.05 }: {
+  scrollY: Animated.Value; size: number; top: number; right?: number; left?: number; speed?: number; opacity?: number;
+}) {
+  const tY = scrollY.interpolate({ inputRange: [0, 300], outputRange: [0, -300 * speed], extrapolate: 'clamp' });
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', top, right, left,
+        width: size, height: size, borderRadius: size / 2,
+        backgroundColor: `rgba(255,255,255,${opacity})`,
+        transform: [{ translateY: tY }],
+      }}
+    />
+  );
+}
+
+// ── Hero header (full blue section) ──────────────────────────────────────────
+
+export function HeroHeader({
+  scrollY, cityTitle, municipality, location,
+  currentLanguage, onChangeLanguage, onBell,
+}: {
+  scrollY: Animated.Value;
+  cityTitle: string; municipality: string; location: string;
+  currentLanguage: string;
+  onChangeLanguage: () => void;
+  onBell: () => void;
+}) {
+  const DIST = 80;
+  const paddingBottom  = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 28], extrapolate: 'clamp' });
+  const titleFontSize  = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [30, 22], extrapolate: 'clamp' });
+  const subOpacity     = scrollY.interpolate({ inputRange: [0, 60],   outputRange: [1, 0],   extrapolate: 'clamp' });
+  const statsOpacity   = scrollY.interpolate({ inputRange: [40, 100], outputRange: [1, 0],   extrapolate: 'clamp' });
+  const statsTY        = scrollY.interpolate({ inputRange: [0, 100],  outputRange: [0, -20], extrapolate: 'clamp' });
+  const paddingTop     = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [20, 10], extrapolate: 'clamp' });
+
+  return (
+    <Animated.View
+      className="px-5 bg-blue-600 overflow-hidden"
+      style={{ paddingTop, paddingBottom }}
+    >
+      <ParallaxBlob scrollY={scrollY} size={200} top={-50} right={-50} speed={0.25} opacity={0.05} />
+      <ParallaxBlob scrollY={scrollY} size={160} top={60}  left={-30}  speed={0.4}  opacity={0.04} />
+      <ParallaxBlob scrollY={scrollY} size={80}  top={60}  right={70}  speed={0.15} opacity={0.04} />
+
+      {/* Top row */}
+      <View className="flex-row items-start justify-between mb-7">
+        <View className="flex-1">
+          <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1.5 mb-1">
+            <Sparkles size={10} color="#93C5FD" />
+            <Text className="text-blue-200 text-[11px] font-bold tracking-widest uppercase">{municipality}</Text>
+          </Animated.View>
+          <Animated.Text className="text-white font-black leading-8" style={{ fontSize: titleFontSize }}>
+            {cityTitle}
+          </Animated.Text>
+          <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1 mt-1">
+            <MapPin size={11} color="#93C5FD" />
+            <Text className="text-blue-200 text-[12px] font-medium">{location}</Text>
+          </Animated.View>
+        </View>
+
+        <View className="flex-row items-center gap-2 mt-1">
+          <TouchableOpacity
+            onPress={onChangeLanguage}
+            activeOpacity={0.8}
+            className="rounded-2xl px-3 py-2.5 flex-row items-center gap-1.5"
+            style={{ backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+          >
+            <Languages size={14} color="white" />
+            <Text className="text-white text-[12px] font-bold">{currentLanguage === 'en' ? 'EN' : 'TL'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onBell}
+            activeOpacity={0.8}
+            className="rounded-2xl p-3"
+            style={{ backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+          >
+            <Bell size={22} color="white" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Stats */}
+      <Animated.View style={{ opacity: statsOpacity, transform: [{ translateY: statsTY }] }}>
+        <Text className="text-blue-200 text-[10px] font-bold uppercase tracking-widest mb-3">My Complaint Stats</Text>
+        <View className="flex-row gap-2.5">
+          {STAT_ITEMS.map(s => (
+            <StatCard key={s.tKey} label={s.tKey} value={s.value} Icon={s.Icon} dot={s.dot} />
+          ))}
+        </View>
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+// ── Bottom CTA ────────────────────────────────────────────────────────────────
+
+export function BottomCTA({ onPress, label }: { onPress: () => void; label: string }) {
+  const mountY     = useRef(new Animated.Value(80)).current;
+  const mountOp    = useRef(new Animated.Value(0)).current;
+  const scalePress = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(mountY,  { toValue: 0, useNativeDriver: true, damping: 14, stiffness: 120, delay: 700 }),
+      Animated.timing(mountOp, { toValue: 1, duration: 400, delay: 700, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        paddingHorizontal: 20, paddingBottom: 32, paddingTop: 12,
+        backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#F1F5F9',
+        opacity: mountOp, transform: [{ translateY: mountY }],
+      }}
+    >
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={() =>  Animated.spring(scalePress, { toValue: 0.97, useNativeDriver: true, damping: 15, stiffness: 300 }).start()}
+        onPressOut={() => Animated.spring(scalePress, { toValue: 1,    useNativeDriver: true, damping: 8,  stiffness: 200 }).start()}
+        activeOpacity={1}
+      >
+        <Animated.View
+          style={{
+            transform: [{ scale: scalePress }],
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+            paddingVertical: 16, borderRadius: 16, backgroundColor: '#2563EB',
+            shadowColor: '#1D4ED8', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 14, elevation: 10,
+          }}
+        >
+          <MessageSquarePlus size={20} color="white" />
+          <Text style={{ color: 'white', fontSize: 15, fontWeight: '800' }}>{label}</Text>
+        </Animated.View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
