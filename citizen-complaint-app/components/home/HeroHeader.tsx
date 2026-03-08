@@ -10,13 +10,20 @@ import { STAT_ITEMS } from '@/constants/home/home';
 
 // ── Sticky mini header (fades in on scroll) ───────────────────────────────────
 
-export function StickyMiniHeader({ scrollY, title }: { scrollY: Animated.Value; title: string }) {
+export function StickyMiniHeader({
+  scrollY, title, currentLanguage, onChangeLanguage, onBell,
+}: {
+  scrollY: Animated.Value;
+  title: string;
+  currentLanguage: string;
+  onChangeLanguage: () => void;
+  onBell: () => void;
+}) {
   const opacity    = scrollY.interpolate({ inputRange: [120, 180], outputRange: [0, 1], extrapolate: 'clamp' });
   const translateY = scrollY.interpolate({ inputRange: [120, 180], outputRange: [-20, 0], extrapolate: 'clamp' });
 
   return (
     <Animated.View
-      pointerEvents="none"
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
         opacity, transform: [{ translateY }],
@@ -28,7 +35,36 @@ export function StickyMiniHeader({ scrollY, title }: { scrollY: Animated.Value; 
       }}
     >
       <Text style={{ color: 'white', fontSize: 17, fontWeight: '800' }}>{title}</Text>
-      <Bell size={20} color="white" />
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <TouchableOpacity
+          onPress={onChangeLanguage}
+          activeOpacity={0.8}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 5,
+            backgroundColor: 'rgba(255,255,255,0.13)',
+            borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+            borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6,
+          }}
+        >
+          <Languages size={13} color="white" />
+          <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>
+            {currentLanguage === 'en' ? 'EN' : 'TL'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={onBell}
+          activeOpacity={0.8}
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.13)',
+            borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+            borderRadius: 12, padding: 7,
+          }}
+        >
+          <Bell size={18} color="white" />
+        </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 }

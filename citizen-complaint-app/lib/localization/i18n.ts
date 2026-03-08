@@ -440,7 +440,20 @@ const resources = {
       },
       "cta": {
         "submit_complaint": "Submit a Complaint"
+      },
+
+      "greeting": {
+        "morning": "Good Morning",
+        "afternoon": "Good Afternoon",
+        "evening": "Good Evening"
+      },
+
+      "home": {
+        "resident": "Resident",
+        "stay_updated": "Stay updated with your community today.",
+        "weather_fair": "Fair"
       }
+
 
 
     },
@@ -840,12 +853,18 @@ const resources = {
       },
       "cta": {
         "submit_complaint": "Magsumite ng Reklamo"
+      },
+      "greeting": {
+        "morning": "Magandang Umaga",
+        "afternoon": "Magandang Hapon",
+        "evening": "Magandang Gabi"
+      },
+
+      "home": {
+        "resident": "Residente",
+        "stay_updated": "Manatiling updated sa iyong komunidad ngayong araw.",
+        "weather_fair": "Maaliwalas"
       }
-
-
-
-
-
 
     },
   },

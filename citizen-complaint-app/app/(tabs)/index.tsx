@@ -1,4 +1,4 @@
-// app/(tabs)/index.tsx
+
 import { View, Text, Animated, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -11,8 +11,6 @@ import { useTranslation } from 'react-i18next';
 import { useSettingsLogic } from '@/hooks/general/useSetting';
 import { announcementApiClient } from '@/lib/client/announcement';
 import { Announcement } from '@/types/general/home';
-
-// ── Home components ───────────────────────────────────────────────────────────
 import { StickyMiniHeader, HeroHeader, BottomCTA } from '@/components/home/HeroHeader';
 import { QuickAction } from '@/components/home/QuickAction';
 import { GreetingBanner } from '@/components/home/GreetingBanner';
@@ -47,7 +45,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
 
-      <StickyMiniHeader scrollY={scrollY} title={t('header.city')} />
+      <StickyMiniHeader scrollY={scrollY} title={t('header.city')} currentLanguage={currentLanguage} onChangeLanguage={() => changeLanguage(currentLanguage === 'en' ? 'tl' : 'en')} />
 
       <Animated.ScrollView
         className="flex-1"
@@ -88,7 +86,7 @@ export default function HomeScreen() {
             {t('quick.heading')}
           </Text>
           <View className="flex-row justify-between">
-            <QuickAction Icon={FileText}      label={t('quick.services')}   delay={0} />
+           
             <QuickAction
               Icon={ClipboardList}
               label={t('quick.complaints')}

@@ -9,11 +9,12 @@ import {
   Pressable,
   FlatList,
   Animated,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { requestNotificationPermissionForComplaints } from '@/utils/general/requestNotificationPermission';
+import * as Location from 'expo-location';
 import {
   X,
   Upload,
@@ -36,9 +37,9 @@ import { useTranslation } from 'react-i18next';
 import { PRESET_TITLE_KEYS, OTHER_KEY, PresetTitle } from '@/constants/localization/complaint-title-key';
 import ComplaintLetterPreview from '@/components/letter-preview/ComplaintLetterPreview';
 import { complaintApiClient } from '@/lib/client/complaint';
-import { saveTokenToBackend } from '@/hooks/general/usePushNotifications';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
-
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 function InstructionsStep({
   barangayName,
@@ -126,7 +127,7 @@ function InstructionsStep({
           </View>
 
           {/* Instruction cards */}
-          {instructions.map((item, index) => (
+          {instructions.map((item) => (
             <View
               key={item.num}
               className="bg-white border border-gray-100 rounded-2xl px-5 py-5 mb-3 shadow-sm"
@@ -196,16 +197,14 @@ function InstructionsStep({
 
 export default function ComplaintFormScreen() {
   const { t } = useTranslation();
-  const { userData } = useCurrentUser();
-  const userId = userData?.id;
+  const { userData, fetchCurrentUser } = useCurrentUser();
   const router = useRouter();
   const params = useLocalSearchParams();
   const barangayName = (params.barangayName as string) || 'Barangay';
   const barangayId = params.id as string;
   const barangayAccountId = params.barangayAccountId as string;
-
+ 
   const [step, setStep] = useState<'instructions' | 'form'>('instructions');
-
   const [selectedPreset, setSelectedPreset] = useState<PresetTitle | null>(null);
   const [customTitle, setCustomTitle] = useState('');
   const [showTitlePicker, setShowTitlePicker] = useState(false);
@@ -214,6 +213,13 @@ export default function ComplaintFormScreen() {
   const [titleError, setTitleError] = useState('');
   const [messageError, setMessageError] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+
+
+  // ── Pre-captured GPS location — set at review time, used at submit time ──
+  const [capturedLocation, setCapturedLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
   const {
     attachments,
@@ -233,6 +239,12 @@ export default function ComplaintFormScreen() {
     toastType,
   } = useAttachments();
 
+  useFocusEffect(
+  useCallback(() => {
+    fetchCurrentUser(true); // background = true, no loading spinner
+  }, [])
+);
+
   const selectedTitleKey = selectedPreset?.key ?? '';
   const isOtherSelected = selectedTitleKey === OTHER_KEY;
   const resolvedTitle = isOtherSelected
@@ -241,6 +253,12 @@ export default function ComplaintFormScreen() {
       ? t(selectedTitleKey)
       : '';
   const resolvedCategoryId = selectedPreset?.category_id ?? null;
+
+  // ── Profile location guard ───────────────────────────────────────────────
+  // userData lat/lng being set means the user has gone through profile setup.
+  // We use this as the "account is location-verified" check — NOT as the
+  // coordinates we send to the API (we capture live GPS for that).
+  const hasProfileLocation = !!(userData?.latitude && userData?.longitude);
 
   // ── Show instructions step ──
   if (step === 'instructions') {
@@ -274,18 +292,111 @@ export default function ComplaintFormScreen() {
     return valid;
   };
 
+  // ── Review button handler — captures GPS here so submit is instant ───────
+  const handleReviewPress = async () => {
+    // 1. Validate form fields
+    if (!validateFields()) return;
+
+    // 2. Guard: user must have a saved profile location
+    if (!hasProfileLocation) {
+      Alert.alert(
+        'Location Required',
+        'You need to set your location in your profile before submitting a complaint.',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          {
+            text: 'Go to Profile',
+            onPress: () => router.push('/(tabs)/Profile'),
+          },
+        ]
+      );
+      return;
+    }
+
+    // 3. Guard: device GPS permission must be granted
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Location Permission Needed',
+        'We need your current GPS location to process this complaint. Please enable location access in your device settings.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // 4. Capture GPS now — before opening preview so submit is instant
+    try {
+      const { coords } = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('GPS timeout')), 15000)
+        ),
+      ]);
+      setCapturedLocation({ latitude: coords.latitude, longitude: coords.longitude });
+    } catch {
+      // Live GPS failed — fall back to last known position
+      try {
+        const last = await Location.getLastKnownPositionAsync();
+        if (last) {
+          setCapturedLocation({
+            latitude: last.coords.latitude,
+            longitude: last.coords.longitude,
+          });
+        } else {
+          Alert.alert(
+            'Location Unavailable',
+            'Unable to get your location. Please try again outdoors.'
+          );
+          return;
+        }
+      } catch {
+        Alert.alert(
+          'Location Unavailable',
+          'Unable to get your location. Please try again outdoors.'
+        );
+        return;
+      }
+    }
+
+    setShowPreview(true);
+  };
+
+  // ── Final submit — uses pre-captured GPS, no wait ────────────────────────
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+
+      // 1. Use pre-captured location — no GPS wait here
+      if (!capturedLocation) {
+        showToast('Location unavailable. Please go back and try again.', 'error');
+        return;
+      }
+
+      // 2. Parse barangay IDs to integers — params come in as strings
+      const parsedBarangayId = parseInt(barangayId, 10);
+      const parsedBarangayAccountId = barangayAccountId
+        ? parseInt(barangayAccountId, 10)
+        : null;
+
+      if (isNaN(parsedBarangayId)) {
+        showToast('Invalid barangay. Please go back and try again.', 'error');
+        return;
+      }
+
+      // 3. Guard: category must be resolved
+      if (!resolvedCategoryId) {
+        showToast('Please select a complaint category.', 'error');
+        return;
+      }
+
       const complaintData = {
         title: resolvedTitle,
         description: message,
-        barangay_id: barangayId,
-        barangay_account_id: barangayAccountId,
-        location_details: null,
+        barangay_id: parsedBarangayId,
+        barangay_account_id: parsedBarangayAccountId,
+        latitude: capturedLocation.latitude,
+        longitude: capturedLocation.longitude,
         category_id: resolvedCategoryId,
-        sector_id: null,
-        priority_level_id: null,
       };
 
       const formData = new FormData();
@@ -306,26 +417,18 @@ export default function ComplaintFormScreen() {
       });
 
       if (response.status === 201) {
+    
         showToast('Complaint submitted successfully!', 'success');
         resetAttachments();
         setSelectedPreset(null);
         setCustomTitle('');
         setMessage('');
-        {/* 
-             try {
-          const result = await requestNotificationPermissionForComplaints();
-          if (result.granted && result.token && userId) {
-            await saveTokenToBackend(userId, result.token);
-          }
-        } catch (notifError) {
-          console.warn('Notification setup failed:', notifError);
-        }
-    
-    */}
-
+        setCapturedLocation(null);
       }
+
     } catch (error: any) {
-      showToast('Something Went Wrong. Please try again.', 'error');
+      const detail = error?.response?.data?.detail;
+      showToast(detail ?? 'Something went wrong. Please try again.', 'error');
     } finally {
       setIsSubmitting(false);
       setShowPreview(false);
@@ -417,6 +520,24 @@ export default function ComplaintFormScreen() {
         showsVerticalScrollIndicator={false}
       >
 
+        {/* ── Profile location warning banner ── */}
+        {!hasProfileLocation && (
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/Profile')}
+            activeOpacity={0.8}
+            className="bg-amber-50 border border-amber-300 rounded-2xl px-4 py-4 mb-5 flex-row items-start"
+          >
+            <AlertCircle size={18} color="#D97706" style={{ marginTop: 1, flexShrink: 0 }} />
+            <View className="flex-1 ml-3">
+              <Text className="text-sm font-bold text-amber-900">Profile Location Required</Text>
+              <Text className="text-xs text-amber-700 mt-0.5 leading-5">
+                You haven't set your location yet. Tap here to update your profile before submitting.
+              </Text>
+            </View>
+            <ArrowRight size={16} color="#D97706" style={{ marginTop: 2 }} />
+          </TouchableOpacity>
+        )}
+
         {/* ── Complaint Title ── */}
         <View className="mb-5">
           <Text className="text-base font-bold text-gray-800 mb-2">
@@ -428,8 +549,7 @@ export default function ComplaintFormScreen() {
 
           <TouchableOpacity
             onPress={() => setShowTitlePicker(true)}
-            className={`flex-row items-center justify-between bg-white border-2 rounded-2xl px-4 py-4 ${titleError ? 'border-red-400' : 'border-gray-200'
-              }`}
+            className={`flex-row items-center justify-between bg-white border-2 rounded-2xl px-4 py-4 ${titleError ? 'border-red-400' : 'border-gray-200'}`}
             style={{ shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}
           >
             <Text numberOfLines={1} className={`flex-1 text-base ${selectedPreset ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
@@ -490,8 +610,7 @@ export default function ComplaintFormScreen() {
             multiline
             textAlignVertical="top"
             maxLength={1000}
-            className={`bg-white border-2 rounded-2xl px-4 py-4 text-base text-gray-900 min-h-[180px] ${messageError ? 'border-red-400' : 'border-gray-200'
-              }`}
+            className={`bg-white border-2 rounded-2xl px-4 py-4 text-base text-gray-900 min-h-[180px] ${messageError ? 'border-red-400' : 'border-gray-200'}`}
             style={{ shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}
           />
           <View className="flex-row items-center justify-between mt-2">
@@ -547,10 +666,7 @@ export default function ComplaintFormScreen() {
       {/* ── Review & Submit Button ── */}
       <View className="bg-white border-t border-gray-100 px-5 py-4">
         <TouchableOpacity
-          onPress={() => {
-            if (!validateFields()) return;
-            setShowPreview(true);
-          }}
+          onPress={handleReviewPress}
           className="py-4 rounded-2xl items-center justify-center bg-blue-600 active:bg-blue-700"
           style={{ shadowColor: '#2563EB', shadowOpacity: 0.25, shadowRadius: 10, elevation: 4 }}
         >

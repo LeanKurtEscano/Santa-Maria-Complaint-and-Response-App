@@ -101,7 +101,7 @@ export function FeaturedServicesGrid() {
           style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.10)', paddingTop: 12 }}
         >
           {[
-            { Icon: Lock,       label: 'Encrypted', color: '#A78BFA' },
+          
             { Icon: BadgeCheck, label: 'Verified',  color: '#6EE7B7' },
             { Icon: Zap,        label: 'Instant',   color: '#FCD34D' },
           ].map((b, i) => (
@@ -123,8 +123,8 @@ export function FeaturedServicesGrid() {
           ))}
         </View>
 
-        {/* ── Bottom CTA — same divider + glass style ── */}
-        <TouchableOpacity
+        {/*
+          <TouchableOpacity
           activeOpacity={0.8}
           className="flex-row items-center justify-center gap-2 mx-4 mb-4 rounded-2xl"
           style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', paddingVertical: 12 }}
@@ -133,6 +133,9 @@ export function FeaturedServicesGrid() {
           <Text style={{ color: '#93C5FD', fontSize: 12, fontWeight: '800' }}>Need help? Talk to our support team</Text>
           <ChevronRight size={12} color="#93C5FD" />
         </TouchableOpacity>
+        
+        */}
+       
       </NavyCard>
     </Animated.View>
   );

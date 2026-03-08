@@ -1,13 +1,14 @@
 // utils/home.ts
 import { UploaderInfo } from '@/types/general/home';
 
+
 export function getGreeting() {
   const h = new Date().getHours();
-  if (h < 12) return 'Good Morning';
-  if (h < 17) return 'Good Afternoon';
-  return 'Good Evening';
-}
 
+  if (h < 12) return 'greeting.morning';
+  if (h < 17) return 'greeting.afternoon';
+  return 'greeting.evening';
+}
 export function timeAgo(iso: string, lang: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);

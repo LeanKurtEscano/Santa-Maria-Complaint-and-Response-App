@@ -22,7 +22,7 @@ export const UPCOMING_EVENTS = [
 export const FEATURED_SERVICES = [
   { label: 'File a Complaint',  desc: 'Secure & confidential',   Icon: ClipboardList,  accent: '#60A5FA', glow: 'rgba(96,165,250,0.20)',   badge: 'FAST' },
   { label: 'Track My Case',     desc: 'Real-time updates',        Icon: FileSearch,     accent: '#34D399', glow: 'rgba(52,211,153,0.20)',   badge: 'LIVE' },
-  { label: 'Secure Messaging',  desc: 'End-to-end encrypted',     Icon: Lock,           accent: '#A78BFA', glow: 'rgba(167,139,250,0.20)',  badge: null   },
+  { label: 'Secure Messaging',  desc: 'Protected Messages',     Icon: Lock,           accent: '#A78BFA', glow: 'rgba(167,139,250,0.20)',  badge: null   },
   { label: 'Verified Reports',  desc: 'Tamper-proof records',     Icon: ShieldCheck,    accent: '#FCD34D', glow: 'rgba(252,211,77,0.20)',   badge: null   },
   { label: 'Support Center',    desc: '24/7 assistance',          Icon: Headphones,     accent: '#F87171', glow: 'rgba(248,113,113,0.20)', badge: '24/7' },
   { label: 'Resolution Status', desc: 'Transparent process',      Icon: ClipboardCheck, accent: '#38BDF8', glow: 'rgba(56,189,248,0.20)',   badge: null   },

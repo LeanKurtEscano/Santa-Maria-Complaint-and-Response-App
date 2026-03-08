@@ -37,9 +37,14 @@ export const isValidCoordinate = (lat: number, lng: number): boolean =>
 const reverseGeocode = async (lat: number, lng: number): Promise<GeocodedAddress | null> => {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-      { headers: { 'Accept-Language': 'en' } }
-    );
+     `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+  { 
+    headers: { 
+      'Accept-Language': 'en',
+       'User-Agent': 'citizen-complaint-app/1.0 (noreply.stamaria.ucrs@gmail.com)'
+    } 
+  }
+);
     if (!res.ok) return null;
     const data = await res.json();
     const a = data.address ?? {};
