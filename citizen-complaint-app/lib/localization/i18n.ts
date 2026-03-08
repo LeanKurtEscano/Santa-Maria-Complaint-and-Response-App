@@ -125,7 +125,8 @@ const resources = {
         error: "Error",
         loading: "Loading...",
         save: "Save",
-        update: "Update"
+        update: "Update",
+        back: "Back"
       },
 
       // Profile
@@ -401,7 +402,7 @@ const resources = {
       "stats": {
         "heading": "Your Complaints",
         "submitted": "Submitted",
-        "in_progress": "In Progress",
+        "inProgress": "In Progress",
         "resolved": "Resolved"
       },
       "quick": {
@@ -415,6 +416,7 @@ const resources = {
         "heading": "Announcements",
         "all": "All",
         "tag": "Announcement",
+         "posted_by": "Posted by",
         "read_more": "Read",
         "see_more": "See More",
         "remaining": "more",
@@ -452,9 +454,9 @@ const resources = {
         "resident": "Resident",
         "stay_updated": "Stay updated with your community today.",
         "weather_fair": "Fair"
-      }
-
-
+      }, 
+      
+  
 
     },
   },
@@ -578,7 +580,8 @@ const resources = {
         error: "May Mali",
         loading: "Naglo-load...",
         save: "I-save",
-        update: "I-update"
+        update: "I-update",
+         back: "Bumalik"
       },
 
       // Profile
@@ -811,12 +814,12 @@ const resources = {
         "city": "Santa Maria",
         "location": "Laguna, Pilipinas"
       },
-      "stats": {
-        "heading": "Iyong mga Reklamo",
-        "submitted": "Isinumite",
-        "in_progress": "Sa Proseso",
-        "resolved": "Nalutas"
-      },
+        "stats": {
+    "heading": "Mga Reklamo Mo",
+    "submitted": "Isinumite",
+    "inProgress": "Naproseso",
+    "resolved": "Nalutas"
+  },
       "quick": {
         "heading": "Mabilis na Access",
         "services": "Mga\nSerbisyo",
@@ -831,6 +834,7 @@ const resources = {
         "read_more": "Basahin",
         "see_more": "Tignan Pa",
         "remaining": "pa",
+        "posted_by": "Ipinost ni",
         "end_of_list": "— Katapusan ng listahan —",
         "loading": "Nilo-load ang mga anunsyo…",
         "empty_title": "Walang Anunsyo",

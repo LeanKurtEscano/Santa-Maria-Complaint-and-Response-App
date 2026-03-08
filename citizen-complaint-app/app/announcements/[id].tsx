@@ -41,7 +41,7 @@ import { formatDate } from '@/constants/complaint/complaint';
 import { useSettingsLogic } from '@/hooks/general/useSetting';
 import { UploaderInfo, MediaItem, Announcement } from '@/types/general/home';
 import * as VideoThumbnails from 'expo-video-thumbnails';
-
+import { uploaderLabel } from '@/utils/home/home';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DETAIL_MEDIA_WIDTH = SCREEN_WIDTH - 40; // px-5 padding on both sides
 const HEADER_HEIGHT = Platform.OS === 'ios' ? 96 : (StatusBar.currentHeight ?? 24) + 60;
@@ -59,13 +59,7 @@ function timeAgo(iso: string, lang: string) {
   return        isTl ? `${Math.floor(h / 24)}d ang nakakaraan`  : `${Math.floor(h / 24)}d ago`;
 }
 
-function uploaderLabel(u: UploaderInfo) {
-  if (u.first_name || u.last_name)
-    return [u.first_name, u.last_name].filter(Boolean).join(' ');
-  return u.email.split('@')[0];
-}
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Avatar({ name, size = 40 }: { name: string; size?: number }) {
   return (

@@ -8,7 +8,7 @@ import {
 
 export const STAT_ITEMS = [
   { tKey: 'stats.submitted',   value: 24, Icon: ClipboardList, dot: '#93C5FD' },
-  { tKey: 'stats.in_progress', value: 11, Icon: Circle,        dot: '#FCD34D' },
+  { tKey: 'stats.inProgress', value: 11, Icon: Circle,        dot: '#FCD34D' },
   { tKey: 'stats.resolved',    value: 13, Icon: CheckCircle,   dot: '#6EE7B7' },
 ] as const;
 
