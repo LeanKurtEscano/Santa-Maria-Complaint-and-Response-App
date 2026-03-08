@@ -416,7 +416,7 @@ const resources = {
         "heading": "Announcements",
         "all": "All",
         "tag": "Announcement",
-         "posted_by": "Posted by",
+        "posted_by": "Posted by",
         "read_more": "Read",
         "see_more": "See More",
         "remaining": "more",
@@ -454,9 +454,53 @@ const resources = {
         "resident": "Resident",
         "stay_updated": "Stay updated with your community today.",
         "weather_fair": "Fair"
-      }, 
-      
-  
+      },
+
+
+        "emergency": {
+    "title": "Emergency",
+    "bannerText": "Only call in a real emergency. Misuse of emergency lines is a punishable offense.",
+    "callButton": "Call",
+    "disclaimer": "For non-emergency concerns, please visit your nearest barangay hall.",
+    "sections": {
+      "hotlines": "Emergency Hotlines",
+      "evacuationCenters": "Evacuation Centers"
+    },
+    "services": {
+      "pnp": "Philippine National Police",
+      "bfp": "Bureau of Fire Protection"
+    },
+    "modal": {
+      "title": "Confirm Call",
+      "body": "Do you want to call {{service}}?",
+      "cancel": "Cancel",
+      "confirm": "Call Now"
+    },
+    "dialerUnavailableTitle": "Cannot Place Call",
+    "dialerUnavailableMessage": "Your device does not support phone calls.",
+    "evacuation": {
+      "notice": "These centers are designated evacuation areas during emergencies. Proceed to the nearest one if instructed by local authorities.",
+      "fetchingAddress": "Fetching address…",
+      "addressUnavailable": "Address unavailable",
+      "mapUnavailable": "Map unavailable",
+      "viewRoute": "View Route",
+      "getRoute": "Get Route",
+      "calculatingRoute": "Calculating route…",
+      "away": "away",
+      "routeModal": {
+        "subtitle": "Best route via OSRM · OpenStreetMap",
+        "legendUser": "Your location",
+        "legendDest": "Evacuation center",
+        "legendRoute": "Route",
+        "loadingMap": "Loading map…"
+      }
+    }
+  }
+
+
+    
+
+
 
     },
   },
@@ -581,7 +625,7 @@ const resources = {
         loading: "Naglo-load...",
         save: "I-save",
         update: "I-update",
-         back: "Bumalik"
+        back: "Bumalik"
       },
 
       // Profile
@@ -814,12 +858,12 @@ const resources = {
         "city": "Santa Maria",
         "location": "Laguna, Pilipinas"
       },
-        "stats": {
-    "heading": "Mga Reklamo Mo",
-    "submitted": "Isinumite",
-    "inProgress": "Naproseso",
-    "resolved": "Nalutas"
-  },
+      "stats": {
+        "heading": "Mga Reklamo Mo",
+        "submitted": "Isinumite",
+        "inProgress": "Naproseso",
+        "resolved": "Nalutas"
+      },
       "quick": {
         "heading": "Mabilis na Access",
         "services": "Mga\nSerbisyo",
@@ -868,7 +912,50 @@ const resources = {
         "resident": "Residente",
         "stay_updated": "Manatiling updated sa iyong komunidad ngayong araw.",
         "weather_fair": "Maaliwalas"
+      },
+
+     "emergency": {
+    "title": "Emergency",
+    "bannerText": "Tumawag lamang sa tunay na emergency. Ang maling paggamit ng linya ng emergency ay parusahan.",
+    "callButton": "Tumawag",
+    "disclaimer": "Para sa mga hindi emergency na alalahanin, bisitahin ang pinakamalapit na barangay hall.",
+    "sections": {
+      "hotlines": "Mga Emergency Hotline",
+      "evacuationCenters": "Mga Evacuation Center"
+    },
+    "services": {
+      "pnp": "Philippine National Police",
+      "bfp": "Bureau of Fire Protection"
+    },
+    "modal": {
+      "title": "Kumpirmahin ang Tawag",
+      "body": "Nais mo bang tawagan ang {{service}}?",
+      "cancel": "Kanselahin",
+      "confirm": "Tumawag Ngayon"
+    },
+    "dialerUnavailableTitle": "Hindi Makatawag",
+    "dialerUnavailableMessage": "Hindi sinusuportahan ng iyong device ang pagtawag.",
+    "evacuation": {
+      "notice": "Ang mga sentrong ito ay itinalagang lugar ng evacuation sa panahon ng emergency. Pumunta sa pinakamalapit kapag inutusan ng lokal na awtoridad.",
+      "fetchingAddress": "Kinukuha ang address…",
+      "addressUnavailable": "Hindi available ang address",
+      "mapUnavailable": "Hindi available ang mapa",
+      "viewRoute": "Tingnan ang Ruta",
+      "getRoute": "Kunin ang Ruta",
+      "calculatingRoute": "Kinakalkula ang ruta…",
+      "away": "ang layo",
+      "routeModal": {
+        "subtitle": "Pinakamaikling ruta via OSRM · OpenStreetMap",
+        "legendUser": "Iyong lokasyon",
+        "legendDest": "Evacuation center",
+        "legendRoute": "Ruta",
+        "loadingMap": "Nilo-load ang mapa…"
       }
+    }
+  }
+
+    
+
 
     },
   },

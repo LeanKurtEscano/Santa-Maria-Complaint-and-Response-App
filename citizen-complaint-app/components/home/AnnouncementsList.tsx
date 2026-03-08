@@ -39,41 +39,45 @@ export function AnnouncementCard({ item, index }: { item: Announcement; index: n
         className="bg-white rounded-2xl mb-3.5 overflow-hidden"
         style={{ borderWidth: 1, borderColor: '#E8EFFE', shadowColor: '#1A56DB', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 3 }}
       >
+        {/* Media sits outside the touchable so taps on it don't navigate */}
         {item.media.length > 0 && <MediaCarousel media={item.media} />}
 
-        <View className={`px-4 pb-4 ${item.media.length > 0 ? 'pt-3' : 'pt-4'}`}>
-          <View className="flex-row items-center justify-between mb-2.5">
-            <Tag label={t('announcements.tag')} />
-            <View className="flex-row items-center gap-1">
-              <Clock size={10} color="#94A3B8" />
-              <Text className="text-slate-400 text-[10px] font-semibold">{timeAgo(item.created_at, currentLanguage)}</Text>
+        {/* Tapping anywhere on the content area navigates to the detail page */}
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() => router.push(`/announcements/${item.id}`)}
+        >
+          <View className={`px-4 pb-4 ${item.media.length > 0 ? 'pt-3' : 'pt-4'}`}>
+            <View className="flex-row items-center justify-between mb-2.5">
+              <Tag label={t('announcements.tag')} />
+              <View className="flex-row items-center gap-1">
+                <Clock size={10} color="#94A3B8" />
+                <Text className="text-slate-400 text-[10px] font-semibold">{timeAgo(item.created_at, currentLanguage)}</Text>
+              </View>
+            </View>
+
+            <Text className="text-slate-900 text-[15px] font-extrabold leading-snug mb-2" numberOfLines={2}>{item.title}</Text>
+            <Text className="text-slate-500 text-[13px] leading-5 mb-3" numberOfLines={3}>{item.content}</Text>
+
+            <View className="flex-row flex-wrap gap-2 mb-3.5">
+              <DateChip date={formatDate(item.created_at)} />
+            </View>
+
+            <View className="h-px bg-slate-100 mb-3" />
+
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center gap-2 flex-1 mr-3">
+                <Avatar name={name} />
+                <Text className="text-slate-500 text-[11px] font-semibold flex-1" numberOfLines={1}>{name}</Text>
+              </View>
+              {/* "Read more" is now just a visual indicator, the whole content area is tappable */}
+              <View className="flex-row items-center gap-1 bg-blue-50 rounded-xl px-3 py-2">
+                <Text className="text-blue-600 text-[12px] font-bold">{t('announcements.read_more')}</Text>
+                <ChevronRight size={12} color="#2563EB" />
+              </View>
             </View>
           </View>
-
-          <Text className="text-slate-900 text-[15px] font-extrabold leading-snug mb-2" numberOfLines={2}>{item.title}</Text>
-          <Text className="text-slate-500 text-[13px] leading-5 mb-3" numberOfLines={3}>{item.content}</Text>
-
-          <View className="flex-row flex-wrap gap-2 mb-3.5">
-            <DateChip date={formatDate(item.created_at)} />
-          </View>
-
-          <View className="h-px bg-slate-100 mb-3" />
-
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-2 flex-1 mr-3">
-              <Avatar name={name} />
-              <Text className="text-slate-500 text-[11px] font-semibold flex-1" numberOfLines={1}>{name}</Text>
-            </View>
-            <TouchableOpacity
-              activeOpacity={0.75}
-              onPress={() => router.push(`/announcements/${item.id}`)}
-              className="flex-row items-center gap-1 bg-blue-50 rounded-xl px-3 py-2"
-            >
-              <Text className="text-blue-600 text-[12px] font-bold">{t('announcements.read_more')}</Text>
-              <ChevronRight size={12} color="#2563EB" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        </TouchableOpacity>
       </View>
     </Animated.View>
   );

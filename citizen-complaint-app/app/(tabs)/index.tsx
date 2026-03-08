@@ -95,7 +95,10 @@ export default function HomeScreen() {
               badge="3"
             />
             <QuickAction Icon={CalendarDays}  label={t('quick.events')}     delay={120} />
-            <QuickAction Icon={Phone}         label={t('quick.hotlines')}   delay={180} />
+            <QuickAction Icon={Phone}
+  label={t('emergency.title')}   // uses the new "emergency.title" key → "Emergency"
+  onPress={() => router.push('/emergency/emergency')}
+  delay={180} />
           </View>
         </Animated.View>
 
