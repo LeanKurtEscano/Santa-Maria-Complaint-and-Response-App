@@ -66,31 +66,19 @@ export default function LoginScreen({ navigation }: any) {
 
     const handleLogin = () => {
         loginMutation.mutate(formData, {
-            onError: (error: any) => {
-                if (error?.type === 'validation') {
-                    setErrors(error.errors);
-                } else if (error?.status === 404) {
-                
-                    setErrors({ 
-                        email: 'No user registered with this email address.' 
-                    });
-                } else if (error?.status === 401) {
-                   
-                    setErrors({ 
-                        password: 'Incorrect password. Please try again.' 
-                    });
-                } else if (error?.code === 'OFFLINE' || error?.code === 'NETWORK_ERROR' || error?.code === 'TIMEOUT') {
-                  
-                    setErrors({ 
-                        general: 'Network error. Please check your connection.' 
-                    });
-                } else {
-                 
-                    setErrors({ 
-                        general:  'Login failed. Please try again.' 
-                    });
-                }
-            },
+           onError: (error: any) => {
+  if (error?.type === 'validation') {
+    setErrors(error.errors);
+  } else if (error?.status === 404) {
+    setErrors({ email: t('noAccountEmail') });
+  } else if (error?.status === 401) {
+    setErrors({ password: t('incorrectPassword') });
+  } else if (error?.code === 'OFFLINE' || error?.code === 'NETWORK_ERROR' || error?.code === 'TIMEOUT') {
+    setErrors({ general: t('networkError') });
+  } else {
+    setErrors({ general: t('loginFailed') });
+  }
+},
         });
     };
 

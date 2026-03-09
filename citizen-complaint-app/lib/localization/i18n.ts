@@ -17,6 +17,11 @@ const resources = {
       forgotPassword: 'Forgot Password?',
       noAccount: "Don't have an account?",
       haveAccount: 'Already have an account?',
+      "noAccountEmail": "No user registered with this email address.",
+"incorrectPassword": "Incorrect password. Please try again.",
+"networkError": "Network error. Please check your connection.",
+"loginFailed": "Login failed. Please try again.",
+      
 
       // Registration
       personalInfo: 'Personal Information',
@@ -495,7 +500,56 @@ const resources = {
         "loadingMap": "Loading map…"
       }
     }
-  }
+  }, 
+
+
+  "registerValidation": {
+  "firstNameRequired": "First name is required.",
+  "firstNameMinLength": "First name must be at least 2 characters long.",
+  "firstNameMaxLength": "First name must be at most {{max}} characters long.",
+  "firstNameInvalidChars": "First name must not contain numbers or special characters.",
+  "firstNameLettersOnly": "First name must only contain letters.",
+  "firstNameRepeatedChars": "First name must not contain repeated characters.",
+  "firstNameRepeatedWords": "First name must not contain repeated words.",
+  "firstNameSingleLetters": "First name must not consist of single letters.",
+
+  "middleNameMinLength": "Middle name must be at least 2 characters long.",
+  "middleNameMaxLength": "Middle name must be at most {{max}} characters long.",
+  "middleNameInvalidChars": "Middle name must not contain numbers or special characters.",
+  "middleNameLettersOnly": "Middle name must only contain letters.",
+  "middleNameRepeatedChars": "Middle name must not contain repeated characters.",
+  "middleNameRepeatedWords": "Middle name must not contain repeated words.",
+  "middleNameSingleLetters": "Middle name must not consist of single letters.",
+
+  "lastNameRequired": "Last name is required.",
+  "lastNameMinLength": "Last name must be at least 2 characters long.",
+  "lastNameMaxLength": "Last name must be at most {{max}} characters long.",
+  "lastNameInvalidChars": "Last name must not contain numbers or special characters.",
+  "lastNameLettersOnly": "Last name must only contain letters.",
+  "lastNameRepeatedChars": "Last name must not contain repeated characters.",
+  "lastNameRepeatedWords": "Last name must not contain repeated words.",
+  "lastNameSingleLetters": "Last name must not consist of single letters.",
+
+  "contactNumberRequired": "Contact number is required.",
+  "contactNumberInvalidChars": "Contact number must not contain letters or special characters.",
+  "contactNumberInvalidLength": "Contact number must be a valid Philippine mobile number.",
+  "contactNumberRepeatingDigits": "Contact number must not contain 4 or more repeating digits.",
+
+  "emailRequired": "Email is required.",
+  "emailLocalPartTooLong": "The part before '@' cannot exceed 64 characters.",
+  "emailInvalidFormat": "Invalid email format. Please enter a valid email address.",
+  "emailInvalidDomain": "{{domain}} is not a recognized email provider.",
+
+  "passwordRequired": "Password is required.",
+  "passwordNoSpaces": "Password must not contain spaces.",
+  "passwordMinLength": "Password must be at least 8 characters long.",
+  "passwordWeak": "Weak",
+  "passwordMedium": "Medium",
+  "passwordStrong": "Strong",
+  "passwordHint": "No spaces allowed. Must be at least 8 characters.",
+  "passwordMaxLength": "Password must not exceed 128 characters."
+},
+    
 
 
     
@@ -517,6 +571,11 @@ const resources = {
       noAccount: 'Walang account?',
       haveAccount: 'Mayroon nang account?',
       age: 'Edad',
+
+      "noAccountEmail": "Hindi pa nakaregister ang email na ito.",
+"incorrectPassword": "Mali ang password. Pakisubukan muli.",
+"networkError": "Hindi makakonekta. Pakisuriin ang iyong koneksyon.",
+"loginFailed": "Nabigong mag-login. Pakisubukan muli.",
 
       // Registration
       personalInfo: 'Personal na Impormasyon',
@@ -952,7 +1011,53 @@ const resources = {
         "loadingMap": "Nilo-load ang mapa…"
       }
     }
-  }
+  }, 
+  "registerValidation": {
+  "firstNameRequired": "Kailangan ang pangalan.",
+  "firstNameMinLength": "Ang pangalan ay dapat hindi mas maikli sa 2 karakter.",
+  "firstNameMaxLength": "Ang pangalan ay dapat hindi hihigit sa {{max}} karakter.",
+  "firstNameInvalidChars": "Ang pangalan ay hindi dapat may numero o espesyal na karakter.",
+  "firstNameLettersOnly": "Ang pangalan ay dapat may mga letra lamang.",
+  "firstNameRepeatedChars": "Ang pangalan ay hindi dapat may paulit-ulit na karakter.",
+  "firstNameRepeatedWords": "Ang pangalan ay hindi dapat may paulit-ulit na salita.",
+  "firstNameSingleLetters": "Ang pangalan ay hindi dapat binubuo ng iisang letra.",
+
+  "middleNameMinLength": "Ang gitnang pangalan ay dapat hindi mas maikli sa 2 karakter.",
+  "middleNameMaxLength": "Ang gitnang pangalan ay dapat hindi hihigit sa {{max}} karakter.",
+  "middleNameInvalidChars": "Ang gitnang pangalan ay hindi dapat may numero o espesyal na karakter.",
+  "middleNameLettersOnly": "Ang gitnang pangalan ay dapat may mga letra lamang.",
+  "middleNameRepeatedChars": "Ang gitnang pangalan ay hindi dapat may paulit-ulit na karakter.",
+  "middleNameRepeatedWords": "Ang gitnang pangalan ay hindi dapat may paulit-ulit na salita.",
+  "middleNameSingleLetters": "Ang gitnang pangalan ay hindi dapat binubuo ng iisang letra.",
+
+  "lastNameRequired": "Kailangan ang apelyido.",
+  "lastNameMinLength": "Ang apelyido ay dapat hindi mas maikli sa 2 karakter.",
+  "lastNameMaxLength": "Ang apelyido ay dapat hindi hihigit sa {{max}} karakter.",
+  "lastNameInvalidChars": "Ang apelyido ay hindi dapat may numero o espesyal na karakter.",
+  "lastNameLettersOnly": "Ang apelyido ay dapat may mga letra lamang.",
+  "lastNameRepeatedChars": "Ang apelyido ay hindi dapat may paulit-ulit na karakter.",
+  "lastNameRepeatedWords": "Ang apelyido ay hindi dapat may paulit-ulit na salita.",
+  "lastNameSingleLetters": "Ang apelyido ay hindi dapat binubuo ng iisang letra.",
+
+  "contactNumberRequired": "Kailangan ang numero ng telepono.",
+  "contactNumberInvalidChars": "Ang numero ay hindi dapat may letra o espesyal na karakter.",
+  "contactNumberInvalidLength": "Ang numero ay dapat isang wastong Philippine mobile number.",
+  "contactNumberRepeatingDigits": "Ang numero ay hindi dapat may 4 o higit pang paulit-ulit na digit.",
+
+  "emailRequired": "Kailangan ang email.",
+  "emailLocalPartTooLong": "Ang bahagi bago ang '@' ay hindi dapat hihigit sa 64 karakter.",
+  "emailInvalidFormat": "Hindi wastong format ng email. Mangyaring maglagay ng wastong email.",
+  "emailInvalidDomain": "Ang {{domain}} ay hindi isang kilalang email provider.",
+
+  "passwordRequired": "Kailangan ang password.",
+  "passwordNoSpaces": "Ang password ay hindi dapat may espasyo.",
+  "passwordMinLength": "Ang password ay dapat hindi mas maikli sa 8 karakter.",
+  "passwordWeak": "Mahina",
+  "passwordMedium": "Katamtaman",
+  "passwordStrong": "Malakas",
+  "passwordHint": "Walang espasyo. Hindi dapat mas maikli sa 8 karakter.",
+  "passwordMaxLength": "Ang password ay hindi dapat hihigit sa 128 karakter."
+}
 
     
 

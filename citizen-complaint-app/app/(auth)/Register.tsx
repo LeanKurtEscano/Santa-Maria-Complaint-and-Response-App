@@ -48,8 +48,10 @@ import {
   validateLastName,
   validateContactNumber,
   validateEmail,
+  validatePassword,
 } from '@/utils/validation/register';
 import { TAGALOG_MONTHS } from '@/constants/localization/date';
+
 const SUFFIX_OPTIONS = ['Jr.', 'Sr.', 'II', 'III', 'IV'];
 
 export default function RegisterScreen({ navigation }: any) {
@@ -174,7 +176,6 @@ export default function RegisterScreen({ navigation }: any) {
     }
   };
 
-  // Auto-capitalize each word as the user types (e.g. "juan dela cruz" → "Juan Dela Cruz")
   const toProperCase = (text: string): string => {
     return text
       .split(' ')
@@ -182,15 +183,10 @@ export default function RegisterScreen({ navigation }: any) {
       .join(' ');
   };
 
-  // Phone number handler — strips leading 63 → 0, keeps 11 digits
   const handlePhoneNumberChange = (text: string, onChange: (val: string) => void) => {
     let digits = text.replace(/\D/g, '');
-    if (digits.startsWith('63')) {
-      digits = '0' + digits.slice(2);
-    }
-    if (digits.length > 11) {
-      digits = digits.slice(0, 11);
-    }
+    if (digits.startsWith('63')) digits = '0' + digits.slice(2);
+    if (digits.length > 11) digits = digits.slice(0, 11);
     onChange(digits);
   };
 
@@ -246,21 +242,34 @@ export default function RegisterScreen({ navigation }: any) {
     try { await AsyncStorage.removeItem('registrationFormData'); } catch (error) { console.error('Error clearing saved form data:', error); }
   };
 
+  // ─── Password strength helper ──────────────────────────────────────────────
+  const getPasswordStrength = (password: string): { label: string; color: string; width: string } => {
+    if (!password) return { label: '', color: 'bg-neutral-200', width: 'w-0' };
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+    if (score <= 1) return { label: t('registerValidation.passwordWeak'), color: 'bg-red-500', width: 'w-1/3' };
+    if (score <= 2) return { label: t('registerValidation.passwordMedium'), color: 'bg-yellow-400', width: 'w-2/3' };
+    return { label: t('registerValidation.passwordStrong'), color: 'bg-green-500', width: 'w-full' };
+  };
+
   const onSubmit = async (data: RegistrationFormData) => {
     setNetworkError(null);
 
     // ── Step 1 validation ─────────────────────────────────────────────────
     const step1Errors: { field: keyof RegistrationFormData; message: string }[] = [];
 
-    const firstNameError = validateFirstName(data.firstName);
+    const firstNameError = validateFirstName(data.firstName, t);
     if (firstNameError) step1Errors.push({ field: 'firstName', message: firstNameError });
 
     if (data.middleName) {
-      const middleNameError = validateMiddleName(data.middleName);
+      const middleNameError = validateMiddleName(data.middleName, t);
       if (middleNameError) step1Errors.push({ field: 'middleName', message: middleNameError });
     }
 
-    const lastNameError = validateLastName(data.lastName);
+    const lastNameError = validateLastName(data.lastName, t);
     if (lastNameError) step1Errors.push({ field: 'lastName', message: lastNameError });
 
     if (!data.dateOfBirth) step1Errors.push({ field: 'dateOfBirth', message: t('required') });
@@ -275,18 +284,15 @@ export default function RegisterScreen({ navigation }: any) {
     // ── Step 2 validation ─────────────────────────────────────────────────
     const step2Errors: { field: keyof RegistrationFormData; message: string }[] = [];
 
-    const emailError = validateEmail(data.email);
+    const emailError = validateEmail(data.email, t);
     if (emailError) step2Errors.push({ field: 'email', message: emailError });
 
     const stripped = data.phoneNumber.startsWith('0') ? data.phoneNumber.slice(1) : data.phoneNumber;
-    const phoneError = validateContactNumber(stripped);
+    const phoneError = validateContactNumber(stripped, t);
     if (phoneError) step2Errors.push({ field: 'phoneNumber', message: phoneError });
 
-    if (!data.password) {
-      step2Errors.push({ field: 'password', message: t('required') });
-    } else if (data.password.length < 8) {
-      step2Errors.push({ field: 'password', message: t('minLength', { count: 8 }) });
-    }
+    const passwordError = validatePassword(data.password, t);
+    if (passwordError) step2Errors.push({ field: 'password', message: passwordError });
 
     if (data.password !== data.confirmPassword) {
       step2Errors.push({ field: 'confirmPassword', message: t('passwordMismatch') });
@@ -364,7 +370,7 @@ export default function RegisterScreen({ navigation }: any) {
           name="firstName"
           rules={{
             required: t('required'),
-            validate: (value) => validateFirstName(value) || true,
+            validate: (value) => validateFirstName(value, t) || true,
           }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.firstName ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
@@ -373,7 +379,7 @@ export default function RegisterScreen({ navigation }: any) {
                 className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
                 onBlur={() => {
                   onBlur();
-                  const err = validateFirstName(value);
+                  const err = validateFirstName(value, t);
                   if (err) setError('firstName', { type: 'manual', message: err });
                   else clearErrors('firstName');
                 }}
@@ -401,7 +407,7 @@ export default function RegisterScreen({ navigation }: any) {
           rules={{
             validate: (value) => {
               if (!value) return true;
-              const err = validateMiddleName(value);
+              const err = validateMiddleName(value, t);
               return err ? err : true;
             },
           }}
@@ -413,7 +419,7 @@ export default function RegisterScreen({ navigation }: any) {
                 onBlur={() => {
                   onBlur();
                   if (value) {
-                    const err = validateMiddleName(value);
+                    const err = validateMiddleName(value, t);
                     if (err) setError('middleName', { type: 'manual', message: err });
                     else clearErrors('middleName');
                   }
@@ -438,7 +444,7 @@ export default function RegisterScreen({ navigation }: any) {
           name="lastName"
           rules={{
             required: t('required'),
-            validate: (value) => validateLastName(value) || true,
+            validate: (value) => validateLastName(value, t) || true,
           }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.lastName ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
@@ -447,7 +453,7 @@ export default function RegisterScreen({ navigation }: any) {
                 className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
                 onBlur={() => {
                   onBlur();
-                  const err = validateLastName(value);
+                  const err = validateLastName(value, t);
                   if (err) setError('lastName', { type: 'manual', message: err });
                   else clearErrors('lastName');
                 }}
@@ -493,8 +499,6 @@ export default function RegisterScreen({ navigation }: any) {
             <TouchableOpacity onPress={() => setShowSuffixModal(false)} className="absolute top-6 right-6" activeOpacity={0.7}>
               <X size={24} color="#6B7280" />
             </TouchableOpacity>
-
-            {/* None option */}
             <TouchableOpacity
               onPress={() => { setValue('suffix', ''); setShowSuffixModal(false); saveFormData(); }}
               className={`py-4 border-b border-neutral-200 ${watch('suffix') === '' ? 'bg-primary-50' : ''}`}
@@ -502,7 +506,6 @@ export default function RegisterScreen({ navigation }: any) {
             >
               <Text className="text-base text-neutral-500 italic">None</Text>
             </TouchableOpacity>
-
             {SUFFIX_OPTIONS.map((option) => (
               <TouchableOpacity
                 key={option}
@@ -567,7 +570,6 @@ export default function RegisterScreen({ navigation }: any) {
                     <X size={24} color="#6B7280" />
                   </TouchableOpacity>
                 </View>
-
                 {i18n.language === 'tl' && (
                   <View className="flex-row justify-center items-center mb-3 bg-primary-50 rounded-xl py-2 px-4">
                     <Text className="text-base font-semibold text-primary-700">
@@ -575,7 +577,6 @@ export default function RegisterScreen({ navigation }: any) {
                     </Text>
                   </View>
                 )}
-
                 <View style={{ backgroundColor: 'white' }}>
                   <DateTimePicker
                     value={selectedDate}
@@ -587,7 +588,6 @@ export default function RegisterScreen({ navigation }: any) {
                     textColor="#000000"
                   />
                 </View>
-
                 <TouchableOpacity onPress={() => setShowDatePicker(false)} className="bg-primary-600 rounded-xl py-4 items-center mt-4" activeOpacity={0.7}>
                   <Text className="text-white font-semibold text-base">
                     {i18n.language === 'tl' ? 'Tapos Na' : 'Done'}
@@ -684,7 +684,7 @@ export default function RegisterScreen({ navigation }: any) {
           rules={{
             required: t('required'),
             validate: (value) => {
-              const err = validateEmail(value);
+              const err = validateEmail(value, t);
               return err ? err : true;
             },
           }}
@@ -695,7 +695,7 @@ export default function RegisterScreen({ navigation }: any) {
                 className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
                 onBlur={() => {
                   onBlur();
-                  const err = validateEmail(value);
+                  const err = validateEmail(value, t);
                   if (err) setError('email', { type: 'manual', message: err });
                   else clearErrors('email');
                 }}
@@ -722,7 +722,7 @@ export default function RegisterScreen({ navigation }: any) {
             required: t('required'),
             validate: (value) => {
               const stripped = value.startsWith('0') ? value.slice(1) : value;
-              const err = validateContactNumber(stripped);
+              const err = validateContactNumber(stripped, t);
               return err || true;
             },
           }}
@@ -737,7 +737,7 @@ export default function RegisterScreen({ navigation }: any) {
                 onBlur={() => {
                   onBlur();
                   const stripped = value.startsWith('0') ? value.slice(1) : value;
-                  const err = validateContactNumber(stripped);
+                  const err = validateContactNumber(stripped, t);
                   if (err) setError('phoneNumber', { type: 'manual', message: err });
                   else clearErrors('phoneNumber');
                 }}
@@ -761,24 +761,47 @@ export default function RegisterScreen({ navigation }: any) {
         <Controller
           control={control}
           name="password"
-          rules={{ required: t('required'), minLength: { value: 8, message: t('minLength', { count: 8 }) } }}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.password ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
-              <Lock size={20} color="#6B7280" />
-              <TextInput
-                className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
-                placeholder="••••••••"
-                placeholderTextColor="#9CA3AF"
-                secureTextEntry={!showPassword}
-              />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-1" activeOpacity={0.7}>
-                {showPassword ? <EyeOff size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
-              </TouchableOpacity>
-            </View>
-          )}
+          rules={{
+            required: t('required'),
+            validate: (value) => validatePassword(value, t) || true,
+          }}
+          render={({ field: { onChange, onBlur, value } }) => {
+            const strength = getPasswordStrength(value);
+            return (
+              <>
+                <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.password ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+                  <Lock size={20} color="#6B7280" />
+                  <TextInput
+                    className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
+                    maxLength={128}
+                    onBlur={() => {
+                      onBlur();
+                      const err = validatePassword(value, t);
+                      if (err) setError('password', { type: 'manual', message: err });
+                      else clearErrors('password');
+                    }}
+                    onChangeText={(text) => {
+                      onChange(text.replace(/\s/g, ''));
+                      clearErrors('password');
+                    }}
+                    value={value}
+                    placeholder="••••••••"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showPassword}
+                  />
+                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-1" activeOpacity={0.7}>
+                    {showPassword ? <EyeOff size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
+                  </TouchableOpacity>
+                </View>
+
+
+
+                <Text className="text-xs text-neutral-500 mt-1">
+                  {t('registerValidation.passwordHint')}
+                </Text>
+              </>
+            );
+          }}
         />
         <ErrorMessage message={errors.password?.message} />
       </View>
@@ -860,8 +883,6 @@ export default function RegisterScreen({ navigation }: any) {
           </View>
         </View>
       </Modal>
-
-
 
       <View className="flex-row gap-3">
         <TouchableOpacity onPress={() => setStep(1)} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
