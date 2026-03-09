@@ -26,7 +26,6 @@ interface OTPVerificationScreenProps {
   };
 }
 
-// Error type to drive distinct UI treatments
 type ErrorType = 'invalid_otp' | 'expired_otp' | 'server' | 'validation' | 'generic' | null;
 
 export default function OTPVerificationScreen({ navigation, route }: OTPVerificationScreenProps) {
@@ -66,7 +65,6 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Clear inline OTP errors as soon as the user starts re-entering
     if (errorType === 'invalid_otp' || errorType === 'expired_otp') {
       clearErrors();
     }
@@ -84,9 +82,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
   const handleResendOtp = async () => {
     if (!canResend) return;
-
     clearErrors();
-
     try {
       await authApiClient.post('/register', { email });
       setResendTimer(60);
@@ -95,14 +91,14 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
       inputRefs.current[0]?.focus();
     } catch (err: any) {
       if (err?.code === 'ECONNABORTED' || err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
-        setNetworkError('Network error. Please check your connection and try again.');
+        setNetworkError(t('otpResendNetworkError'));
       } else if (err?.code === 'ETIMEDOUT') {
-        setNetworkError('Request timed out. Please try again.');
+        setNetworkError(t('otpResendTimeout'));
       } else {
         setErrorMessage(
           err?.response?.data?.detail ||
           err?.response?.data?.message ||
-          'Failed to resend OTP. Please try again.'
+          t('otpResendFailed')
         );
         setErrorType('generic');
       }
@@ -144,7 +140,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     const otpString = otp.join('');
 
     if (otpString.length !== 6) {
-      setErrorMessage('Please enter all 6 digits.');
+      setErrorMessage(t('otpEnterAllDigits'));
       setErrorType('generic');
       return;
     }
@@ -155,7 +151,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     try {
       const registrationDataString = await AsyncStorage.getItem('registrationData');
       if (!registrationDataString) {
-        setErrorMessage('Registration data not found. Please register again.');
+        setErrorMessage(t('otpRegistrationDataNotFound'));
         setErrorType('generic');
         setIsVerifying(false);
         return;
@@ -226,35 +222,35 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
         const detail = extractErrorMessage(err?.response?.data?.detail);
 
         if (detail.includes('expired') || detail.includes('not found')) {
-          setErrorMessage('Your OTP has expired. Please request a new code.');
+          setErrorMessage(t('otpExpired'));
           setErrorType('expired_otp');
           setOtp(['', '', '', '', '', '']);
           setTimeout(() => inputRefs.current[0]?.focus(), 100);
 
         } else if (detail.includes('Invalid OTP')) {
-          setErrorMessage('Incorrect code. Please try again.');
+          setErrorMessage(t('otpIncorrect'));
           setErrorType('invalid_otp');
 
         } else if (detail.includes('ID images')) {
-          setErrorMessage('All ID images (front, back, selfie with ID) are required.');
+          setErrorMessage(t('otpIdImagesRequired'));
           setErrorType('validation');
 
         } else if (detail.includes('birthdate') || detail.includes('datetime') || detail.includes('date')) {
-          setErrorMessage('Invalid date format. Please check your birth date and register again.');
+          setErrorMessage(t('otpInvalidDate'));
           setErrorType('validation');
 
         } else {
-          setErrorMessage(detail || 'Verification failed. Please try again.');
+          setErrorMessage(detail || t('otpVerificationFailed'));
           setErrorType('generic');
         }
 
       } else if (status === 422) {
         const detail = extractErrorMessage(err?.response?.data?.detail);
-        setErrorMessage(detail || 'Validation error. Please check your information.');
+        setErrorMessage(detail || t('otpValidationError'));
         setErrorType('validation');
 
       } else if (status >= 500) {
-        setErrorMessage('Something went wrong on our end. Please try again later.');
+        setErrorMessage(t('otpServerError'));
         setErrorType('server');
 
       } else if (
@@ -262,16 +258,16 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
         err?.code === 'ERR_NETWORK' ||
         err?.message === 'Network Error'
       ) {
-        setNetworkError('Network error. Please check your connection and try again.');
+        setNetworkError(t('otpNetworkError'));
 
       } else if (err?.code === 'ETIMEDOUT') {
-        setNetworkError('Request timed out. Please try again.');
+        setNetworkError(t('otpRequestTimeout'));
 
       } else {
         const msg = extractErrorMessage(
           err?.response?.data?.detail || err?.response?.data?.message
         );
-        setErrorMessage(msg || 'Verification failed. Please try again.');
+        setErrorMessage(msg || t('otpVerificationFailed'));
         setErrorType('generic');
       }
     } finally {
@@ -294,19 +290,13 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     return `${maskedUsername}@${domain}`;
   };
 
-  // ─── Input border colour per error state ─────────────────────────────────
   const getInputClassName = (digit: string) => {
     const hasOtpError = errorType === 'invalid_otp' || errorType === 'expired_otp';
-    if (hasOtpError) {
-      return 'border-error-500 bg-error-50 text-error-700';
-    }
-    if (digit) {
-      return 'border-primary-600 bg-primary-50 text-primary-700';
-    }
+    if (hasOtpError) return 'border-error-500 bg-error-50 text-error-700';
+    if (digit) return 'border-primary-600 bg-primary-50 text-primary-700';
     return 'border-neutral-300 bg-white text-neutral-900';
   };
 
-  // ─── Error banner config per type ─────────────────────────────────────────
   const errorConfig = {
     invalid_otp: {
       containerClass: 'bg-error-50 border-error-400',
@@ -341,8 +331,6 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
   };
 
   const activeError = errorType ? errorConfig[errorType] : null;
-
-  // Server/validation errors render above the card; OTP/generic errors render inside the card
   const isAboveCardError = errorType === 'server' || errorType === 'validation';
   const isInsideCardError = errorType === 'invalid_otp' || errorType === 'expired_otp' || errorType === 'generic';
 
@@ -388,7 +376,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
               </Text>
             </View>
 
-            {/* ── Network Error banner ─────────────────────────────────── */}
+            {/* Network Error banner */}
             {networkError ? (
               <View className="bg-error-50 border border-error-400 rounded-xl p-4 mb-4 flex-row items-start">
                 <WifiOff size={18} color="#DC2626" />
@@ -396,7 +384,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
               </View>
             ) : null}
 
-            {/* ── Above-card errors (server / validation) ──────────────── */}
+            {/* Above-card errors (server / validation) */}
             {errorMessage && isAboveCardError && activeError ? (
               <View className={`border rounded-xl p-4 mb-4 flex-row items-start ${activeError.containerClass}`}>
                 <activeError.Icon size={18} color={activeError.iconColor} />
@@ -406,7 +394,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
               </View>
             ) : null}
 
-            {/* ── OTP Card ─────────────────────────────────────────────── */}
+            {/* OTP Card */}
             <View className="bg-white rounded-2xl p-6 shadow-sm border border-neutral-200 mb-6">
               <Text className="text-neutral-700 text-sm font-medium text-center mb-4">
                 {t('enterVerificationCode')}
@@ -429,7 +417,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
                 ))}
               </View>
 
-              {/* ── Inside-card errors (invalid_otp / expired_otp / generic) ── */}
+              {/* Inside-card errors (invalid_otp / expired_otp / generic) */}
               {errorMessage && isInsideCardError && activeError ? (
                 <View className={`flex-row items-start rounded-xl p-3.5 mb-4 border border-red-500 ${activeError.containerClass}`}>
                   <activeError.Icon size={16} color={activeError.iconColor} style={{ marginTop: 1 }} />

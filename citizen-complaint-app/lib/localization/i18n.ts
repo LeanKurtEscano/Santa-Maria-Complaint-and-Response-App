@@ -21,6 +21,21 @@ const resources = {
 "incorrectPassword": "Incorrect password. Please try again.",
 "networkError": "Network error. Please check your connection.",
 "loginFailed": "Login failed. Please try again.",
+
+"otpEnterAllDigits": "Mangyaring ilagay ang lahat ng 6 na digit.",
+"otpRegistrationDataNotFound": "Hindi nahanap ang datos ng pagpaparehistro. Mangyaring mag-rehistro muli.",
+"otpExpired": "Nag-expire na ang iyong OTP. Mangyaring humingi ng bagong code.",
+"otpIncorrect": "Mali ang code. Pakisubukan muli.",
+"otpIdImagesRequired": "Kailangan ang lahat ng larawan ng ID (harap, likod, selfie na may ID).",
+"otpInvalidDate": "Hindi wastong format ng petsa. Pakisuriin ang iyong petsa ng kapanganakan at mag-rehistro muli.",
+"otpVerificationFailed": "Nabigong i-verify. Pakisubukan muli.",
+"otpValidationError": "May error sa validation. Pakisuriin ang iyong impormasyon.",
+"otpServerError": "May nangyaring mali sa aming sistema. Pakisubukan muli mamaya.",
+"otpNetworkError": "Hindi makakonekta. Pakisuriin ang iyong koneksyon at subukan muli.",
+"otpRequestTimeout": "Nag-timeout ang kahilingan. Pakisubukan muli.",
+"otpResendNetworkError": "Hindi makakonekta. Pakisuriin ang iyong koneksyon at subukan muli.",
+"otpResendTimeout": "Nag-timeout ang kahilingan. Pakisubukan muli.",
+"otpResendFailed": "Nabigong muling magpadala ng OTP. Pakisubukan muli.",
       
 
       // Registration
@@ -576,6 +591,22 @@ const resources = {
 "incorrectPassword": "Mali ang password. Pakisubukan muli.",
 "networkError": "Hindi makakonekta. Pakisuriin ang iyong koneksyon.",
 "loginFailed": "Nabigong mag-login. Pakisubukan muli.",
+
+
+"otpEnterAllDigits": "Mangyaring ilagay ang lahat ng 6 na digit.",
+"otpRegistrationDataNotFound": "Hindi nahanap ang datos ng pagpaparehistro. Mangyaring mag-rehistro muli.",
+"otpExpired": "Nag-expire na ang iyong OTP. Mangyaring humingi ng bagong code.",
+"otpIncorrect": "Mali ang code. Pakisubukan muli.",
+"otpIdImagesRequired": "Kailangan ang lahat ng larawan ng ID (harap, likod, selfie na may ID).",
+"otpInvalidDate": "Hindi wastong format ng petsa. Pakisuriin ang iyong petsa ng kapanganakan at mag-rehistro muli.",
+"otpVerificationFailed": "Nabigong i-verify. Pakisubukan muli.",
+"otpValidationError": "May error sa validation. Pakisuriin ang iyong impormasyon.",
+"otpServerError": "May nangyaring mali sa aming sistema. Pakisubukan muli mamaya.",
+"otpNetworkError": "Hindi makakonekta. Pakisuriin ang iyong koneksyon at subukan muli.",
+"otpRequestTimeout": "Nag-timeout ang kahilingan. Pakisubukan muli.",
+"otpResendNetworkError": "Hindi makakonekta. Pakisuriin ang iyong koneksyon at subukan muli.",
+"otpResendTimeout": "Nag-timeout ang kahilingan. Pakisubukan muli.",
+"otpResendFailed": "Nabigong muling magpadala ng OTP. Pakisubukan muli.",
 
       // Registration
       personalInfo: 'Personal na Impormasyon',
