@@ -1,10 +1,13 @@
 
 import {
   ClipboardList, CheckCircle, Circle,
-  Users, TreePine, Heart, Droplets,
+  TreePine,  Droplets,
   Lock, ShieldCheck, FileSearch, MessageCircle,
   ClipboardCheck, Headphones,
 } from 'lucide-react-native';
+
+
+import { Users, Leaf, Music, BookOpen, Heart } from 'lucide-react-native';
 
 export const STAT_ITEMS = [
   { tKey: 'stats.submitted',   value: 24, Icon: ClipboardList, dot: '#93C5FD' },
@@ -12,12 +15,6 @@ export const STAT_ITEMS = [
   { tKey: 'stats.resolved',    value: 13, Icon: CheckCircle,   dot: '#6EE7B7' },
 ] as const;
 
-export const UPCOMING_EVENTS = [
-  { id: 1, title: 'Barangay Assembly',    date: 'Mar 15', day: 'Sat', location: 'Covered Court', color: '#2563EB', bg: '#EFF6FF', Icon: Users },
-  { id: 2, title: 'Tree Planting Drive',  date: 'Mar 18', day: 'Tue', location: 'City Park',     color: '#059669', bg: '#ECFDF5', Icon: TreePine },
-  { id: 3, title: 'Free Medical Mission', date: 'Mar 22', day: 'Sat', location: 'Health Center', color: '#DC2626', bg: '#FEF2F2', Icon: Heart },
-  { id: 4, title: 'Water Bill Payment',   date: 'Mar 31', day: 'Mon', location: 'City Hall',     color: '#0891B2', bg: '#F0F9FF', Icon: Droplets },
-] as const;
 
 export const FEATURED_SERVICES = [
   { labelKey: 'fileComplaint',      descKey: 'fileComplaintDesc',      Icon: ClipboardList,  accent: '#60A5FA', glow: 'rgba(96,165,250,0.20)',  badge: 'FAST' },
@@ -30,3 +27,71 @@ export const FEATURED_SERVICES = [
 
 export const PAGE_SIZE = 5;
 export const HEADER_SCROLL_DISTANCE = 80;
+
+
+// constants/home/home.ts  — UPCOMING_EVENTS section
+// Replace or merge this into your existing home constants file.
+// Images use Unsplash for dummy placeholders — swap with real assets later.
+
+export const UPCOMING_EVENTS = [
+  {
+    id: '1',
+    title: 'Barangay Assembly',
+    date: 'MAR 15',
+    day: 'Saturday',
+    location: 'Barangay Hall, Poblacion',
+    color: '#2563EB',
+    bg: '#EFF6FF',
+    Icon: Users,
+    image: 'https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?w=400&q=80',
+    // community meeting / assembly
+  },
+  {
+    id: '2',
+    title: 'Tree Planting Drive',
+    date: 'MAR 18',
+    day: 'Tuesday',
+    location: 'Cabooan Forest Area',
+    color: '#16A34A',
+    bg: '#F0FDF4',
+    Icon: Leaf,
+    image: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=400&q=80',
+    // tree planting / nature
+  },
+  {
+    id: '3',
+    title: 'Marilag Festival',
+    date: 'MAR 22',
+    day: 'Saturday',
+    location: 'Municipal Plaza',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    Icon: Music,
+    image: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=400&q=80',
+    // festival / celebration
+  },
+  {
+    id: '4',
+    title: 'Literacy Program',
+    date: 'MAR 25',
+    day: 'Tuesday',
+    location: 'Santa Maria Central School',
+    color: '#7C3AED',
+    bg: '#F5F3FF',
+    Icon: BookOpen,
+    image: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&q=80',
+    // education / school
+  },
+  {
+    id: '5',
+    title: 'Health & Wellness Fair',
+    date: 'APR 2',
+    day: 'Wednesday',
+    location: 'Rural Health Unit',
+    color: '#DC2626',
+    bg: '#FEF2F2',
+    Icon: Heart,
+    image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=400&q=80',
+    // health / medical
+  },
+];

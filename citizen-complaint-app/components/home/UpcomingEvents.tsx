@@ -1,5 +1,5 @@
 // components/home/UpcomingEventsStrip.tsx
-import { View, Text, Animated, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, Animated, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { useRef, useEffect } from 'react';
 import { CalendarDays, ChevronRight, MapPin, ArrowRight } from 'lucide-react-native';
 import { UPCOMING_EVENTS } from '@/constants/home/home';
@@ -17,7 +17,8 @@ export function UpcomingEventsStrip() {
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateY }] }} className="mb-5">
-      {/* Header */}
+
+      {/* Section header */}
       <View className="px-5 mb-3 flex-row items-center justify-between">
         <View className="flex-row items-center gap-2.5">
           <View className="rounded-xl p-2 bg-blue-50 border border-blue-100">
@@ -32,41 +33,141 @@ export function UpcomingEventsStrip() {
       </View>
 
       {/* Horizontal scroll */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
+      >
         {UPCOMING_EVENTS.map((event) => (
           <TouchableOpacity
             key={event.id}
             activeOpacity={0.82}
             style={{
-              width: 170, backgroundColor: 'white',
-              borderRadius: 18, borderWidth: 1, borderColor: '#E8EFFE',
-              shadowColor: '#2563EB', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.07, shadowRadius: 10, elevation: 3,
+              width: 200,
+              backgroundColor: 'white',
+              borderRadius: 22,
+              borderWidth: 1,
+              borderColor: '#E8EFFE',
+              shadowColor: '#2563EB',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.09,
+              shadowRadius: 12,
+              elevation: 4,
               overflow: 'hidden',
             }}
           >
-            <View style={{ height: 4, backgroundColor: event.color, opacity: 0.7 }} />
-            <View style={{ padding: 14 }}>
-              {/* Date + icon row */}
-              <View className="flex-row items-center gap-2 mb-3">
-                <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: event.bg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: event.color, fontSize: 14, fontWeight: '900' }}>{event.date.split(' ')[1]}</Text>
-                  <Text style={{ color: event.color, fontSize: 9, fontWeight: '700', opacity: 0.7 }}>{event.date.split(' ')[0].toUpperCase()}</Text>
-                </View>
-                <View style={{ flex: 1, height: 42, borderRadius: 12, backgroundColor: event.bg, alignItems: 'center', justifyContent: 'center' }}>
-                  <event.Icon size={18} color={event.color} />
-                </View>
+            {/* Full-width image */}
+            <View style={{ width: '100%', height: 110, position: 'relative' }}>
+              <Image
+                source={{ uri: event.image }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+              {/* Dark gradient overlay */}
+              <View
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: 60,
+                  background: 'transparent',
+                  backgroundColor: 'rgba(0,0,0,0.35)',
+                }}
+              />
+              {/* Date badge overlaid on image */}
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 10,
+                  left: 10,
+                  backgroundColor: 'rgba(255,255,255,0.95)',
+                  borderRadius: 12,
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  alignItems: 'center',
+                  minWidth: 44,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.12,
+                  shadowRadius: 4,
+                  elevation: 3,
+                }}
+              >
+                <Text style={{ color: event.color, fontSize: 16, fontWeight: '900', lineHeight: 18 }}>
+                  {event.date.split(' ')[1]}
+                </Text>
+                <Text style={{ color: event.color, fontSize: 9, fontWeight: '800', letterSpacing: 0.5 }}>
+                  {event.date.split(' ')[0].toUpperCase()}
+                </Text>
               </View>
 
-              <Text style={{ color: '#0F172A', fontSize: 13, fontWeight: '800', lineHeight: 18 }} numberOfLines={2}>{event.title}</Text>
-              <View className="flex-row items-center gap-1 mt-2">
+              {/* Category pill overlaid on image bottom */}
+              <View
+                style={{
+                  position: 'absolute',
+                  bottom: 8,
+                  right: 10,
+                  backgroundColor: event.color,
+                  borderRadius: 20,
+                  paddingHorizontal: 9,
+                  paddingVertical: 3,
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.3 }}>
+                  {event.day}
+                </Text>
+              </View>
+            </View>
+
+            {/* Card body */}
+            <View style={{ padding: 12 }}>
+              <Text
+                style={{ color: '#0F172A', fontSize: 13, fontWeight: '800', lineHeight: 18, marginBottom: 5 }}
+                numberOfLines={2}
+              >
+                {event.title}
+              </Text>
+
+              {/* Location row */}
+              <View className="flex-row items-center gap-1 mb-3">
                 <MapPin size={10} color="#94A3B8" />
-                <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '600' }} numberOfLines={1}>{event.location}</Text>
+                <Text
+                  style={{ color: '#94A3B8', fontSize: 11, fontWeight: '600', flex: 1 }}
+                  numberOfLines={1}
+                >
+                  {event.location}
+                </Text>
               </View>
 
-              {/* Footer */}
-              <View className="flex-row items-center justify-between mt-3 pt-2.5" style={{ borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
-                <Text style={{ color: event.color, fontSize: 10, fontWeight: '700' }}>{event.day}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: event.bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+              {/* Footer CTA */}
+              <View
+                style={{
+                  borderTopWidth: 1,
+                  borderTopColor: '#F1F5F9',
+                  paddingTop: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View className="flex-row items-center gap-1.5">
+                  <event.Icon size={12} color={event.color} />
+                  <Text style={{ color: event.color, fontSize: 10, fontWeight: '700' }}>
+                    Community
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 3,
+                    backgroundColor: event.bg,
+                    borderRadius: 8,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                  }}
+                >
                   <Text style={{ color: event.color, fontSize: 10, fontWeight: '800' }}>Details</Text>
                   <ArrowRight size={9} color={event.color} />
                 </View>

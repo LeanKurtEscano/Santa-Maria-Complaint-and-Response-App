@@ -289,9 +289,7 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
           <Text className="text-[15px] font-bold text-slate-800" numberOfLines={1}>
             {centerName}
           </Text>
-          <Text className="text-[11px] text-slate-400 font-medium">
-            {t('emergency.evacuation.routeModal.subtitle')}
-          </Text>
+          
         </View>
 
         <TouchableOpacity

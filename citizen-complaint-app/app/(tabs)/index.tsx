@@ -20,7 +20,7 @@ import { AnnouncementsList } from '@/components/home/AnnouncementsList';
 import { SectionHeader } from '@/components/home/ui';
 import ChatbotFAB from '@/components/buttons/Chatbotfab';
 import ChatbotModal from '@/components/modals/Chatbot';
-
+import { FeedbackCard } from '@/components/home/FeedbackCard';
 const HEADER_SCROLL_DISTANCE = 80;
 
 export default function HomeScreen() {
@@ -128,6 +128,8 @@ export default function HomeScreen() {
             onRetry={refetch}
           />
         </View>
+
+        <FeedbackCard />
 
       </Animated.ScrollView>
 

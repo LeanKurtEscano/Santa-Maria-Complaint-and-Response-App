@@ -1,0 +1,7 @@
+import { createApiClient } from "../api/createClient";
+import { createApi } from "../api/axiosInstance";
+import { getAccessToken } from "@/utils/general/token";
+
+const IP_URL = process.env.EXPO_PUBLIC_IP_URL;
+
+export const feedbackApiClient = createApiClient(createApi(`${IP_URL}/api/v1/app-feedback`,`${IP_URL}/api/v1/auth`,getAccessToken));

@@ -52,7 +52,35 @@ const resources = {
 "supportCenterDesc": "24/7 assistance",
 "resolutionStatus": "Resolution Status",
 "resolutionStatusDesc": "Transparent process",
-      
+      "feedback": {
+    "card_badge": "Share Feedback",
+    "card_title": "Help us improve",
+    "card_subtitle": "Your thoughts make Santa Maria's app better for everyone.",
+    "card_cta": "Give Feedback",
+    "screen_title": "App Feedback",
+    "hero_title": "Help us improve",
+    "hero_subtitle": "Your feedback helps us build a better experience for everyone in Santa Maria.",
+    "rating_label": "How would you rate the app?",
+    "rating_poor": "Poor",
+    "rating_fair": "Fair",
+    "rating_good": "Good",
+    "rating_very_good": "Very Good",
+    "rating_excellent": "Excellent",
+    "message_label": "Additional comments",
+    "message_optional": "(optional)",
+    "message_placeholder": "Tell us what you think, what's missing, or how we can do better...",
+    "submit_button": "Submit Feedback",
+    "submitting": "Submitting...",
+    "success_title": "Thank you!",
+    "success_message": "Your feedback has been submitted. We appreciate you helping us improve the app.",
+    "success_cta": "Go Back Home",
+    "error_no_rating": "Please select a rating before submitting.",
+    "error_too_many": "Too many submissions. Please wait a minute and try again.",
+    "error_not_found": "User not found. Please log in and try again.",
+    "error_server": "Something went wrong on our end. Please try again later.",
+    "error_no_internet": "No internet connection. Please check your network and try again.",
+    "error_generic": "An unexpected error occurred. Please try again."
+  },
 
       // Registration
       personalInfo: 'Personal Information',
@@ -1121,8 +1149,37 @@ const resources = {
   "passwordStrong": "Malakas",
   "passwordHint": "Walang espasyo. Hindi dapat mas maikli sa 8 karakter.",
   "passwordMaxLength": "Ang password ay hindi dapat hihigit sa 128 karakter."
-}
+},
 
+  "feedback" : {
+     "card_badge": "Magbigay ng Feedback",
+  "card_title": "Tulungan ninyo kaming pagandahin pa",
+  "card_subtitle": "Ang inyong mga mungkahi ay makakatulong para mas gumanda ang app para sa lahat sa Santa Maria.",
+  "card_cta": "Magbigay ng Feedback",
+  "screen_title": "Feedback sa App",
+  "hero_title": "Tulungan ninyo kaming pagandahin pa",
+  "hero_subtitle": "Malaking tulong ang inyong feedback para mapabuti namin ang app para sa lahat sa Santa Maria.",
+  "rating_label": "Paano ninyo ire-rate ang app?",
+  "rating_poor": "Hindi Maganda",
+  "rating_fair": "Ayos Lang",
+  "rating_good": "Maganda",
+  "rating_very_good": "Napakaganda",
+  "rating_excellent": "Napakahusay",
+  "message_label": "Karagdagang komento",
+  "message_optional": "(opsyonal)",
+  "message_placeholder": "Sabihin sa amin kung ano ang inyong naiisip, kung may kulang, o kung paano pa namin mapapabuti ang app...",
+  "submit_button": "I-submit ang Feedback",
+  "submitting": "Isinusumite...",
+  "success_title": "Salamat!",
+  "success_message": "Matagumpay na naisumite ang inyong feedback. Salamat sa pagtulong na mapabuti ang app.",
+  "success_cta": "Bumalik sa Home",
+  "error_no_rating": "Pumili muna ng rating bago i-submit.",
+  "error_too_many": "Masyado nang maraming submissions. Maghintay muna ng isang minuto at subukan ulit.",
+  "error_not_found": "Hindi mahanap ang user. Mag-login ulit at subukan muli.",
+  "error_server": "May nagkaroon ng problema sa server. Subukan ulit mamaya.",
+  "error_no_internet": "Walang internet connection. Pakisuri ang inyong network at subukan ulit.",
+  "error_generic": "May naganap na hindi inaasahang error. Subukan ulit."
+  }
     
 
 
