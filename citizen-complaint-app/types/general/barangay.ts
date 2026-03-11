@@ -14,4 +14,6 @@ export interface Barangay {
   barangay_email: string;
   id: number;
   barangay_account: BarangayAccount;
+  barangay_latitude: number;
+  barangay_longitude: number;
 }

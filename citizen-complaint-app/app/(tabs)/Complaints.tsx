@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { ChevronRight, FileText } from 'lucide-react-native';
 import { useState } from 'react';
 import { Barangay } from '@/types/general/barangay';
+import { getBarangayCoords,DEFAULT_COORDS } from '@/constants/general/barangay';
 
 export default function ComplaintsScreen() {
   const { t } = useTranslation();
@@ -30,12 +31,21 @@ export default function ComplaintsScreen() {
   };
 
   const handleBarangayPress = (barangay: Barangay) => {
+    // Prefer live coords from the API.
+    // If the API hasn't populated them yet, fall back to the constants map,
+    // then fall back to the geographic centre of all barangays.
+    const fallback = getBarangayCoords(barangay.barangay_name) ?? DEFAULT_COORDS;
+    const lat = barangay.barangay_latitude ?? fallback.lat;
+    const lng = barangay.barangay_longitude ?? fallback.lng;
+
     router.push({
       pathname: '/barangay/[id]',
       params: {
         id: barangay.id.toString(),
         barangayName: barangay.barangay_name,
         barangayAccountId: barangay.barangay_account.id.toString(),
+        barangayLat: lat.toString(),
+        barangayLng: lng.toString(),
       },
     });
   };

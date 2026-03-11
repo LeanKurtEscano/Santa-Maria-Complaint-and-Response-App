@@ -1,27 +1,50 @@
-export const barangayList = [
-  { "id": 1, "barangay": "Adia", "user_id": 1001 },
-  { "id": 2, "barangay": "Bagong Pook", "user_id": 1002 },
-  { "id": 3, "barangay": "Bagumbayan", "user_id": 1003 },
-  { "id": 4, "barangay": "Bubukal", "user_id": 1004 },
-  { "id": 5, "barangay": "Cabooan", "user_id": 1005 },
-  { "id": 6, "barangay": "Calangay", "user_id": 1006 },
-  { "id": 7, "barangay": "Cambuja", "user_id": 1007 },
-  { "id": 8, "barangay": "Coralan", "user_id": 1008 },
-  { "id": 9, "barangay": "Cueva", "user_id": 1009 },
-  { "id": 10, "barangay": "Inayapan", "user_id": 1010 },
-  { "id": 11, "barangay": "Jose Laurel, Sr.", "user_id": 1011 },
-  { "id": 12, "barangay": "Kayhakat", "user_id": 1012 },
-  { "id": 13, "barangay": "Macasipac", "user_id": 1013 },
-  { "id": 14, "barangay": "Masinao", "user_id": 1014 },
-  { "id": 15, "barangay": "Mataling-Ting", "user_id": 1015 },
-  { "id": 16, "barangay": "Pao-o", "user_id": 1016 },
-  { "id": 17, "barangay": "Parang Ng Buho", "user_id": 1017 },
-  { "id": 18, "barangay": "Barangay I (Poblacion)", "user_id": 1018 },
-  { "id": 19, "barangay": "Barangay II (Poblacion)", "user_id": 1019 },
-  { "id": 20, "barangay": "Barangay III (Poblacion)", "user_id": 1020 },
-  { "id": 21, "barangay": "Barangay IV (Poblacion)", "user_id": 1021 },
-  { "id": 22, "barangay": "Jose Rizal", "user_id": 1022 },
-  { "id": 23, "barangay": "Santiago", "user_id": 1023 },
-  { "id": 24, "barangay": "Talangka", "user_id": 1024 },
-  { "id": 25, "barangay": "Tungkod", "user_id": 1025 }
-]
+
+
+
+/**
+ * barangay-coordinates.ts
+ *
+ * Static coordinate map for known barangays.
+ * Keys are normalised (trimmed, lowercase) barangay names so lookup is
+ * case-insensitive and whitespace-tolerant.
+ *
+ * Usage:
+ *   import { getBarangayCoords, DEFAULT_COORDS } from '@/constants/barangay-coordinates';
+ *
+ *   const coords = getBarangayCoords(barangayName) ?? DEFAULT_COORDS;
+ */
+
+export interface BarangayCoords {
+  lat: number;
+  lng: number;
+}
+
+// ── Coordinate table ──────────────────────────────────────────────────────────
+// Add new barangays here as the app grows.
+const BARANGAY_COORDS_MAP: Record<string, BarangayCoords> = {
+  'barangay uno':  { lat: 14.4697286, lng: 121.4219659 },
+  'barangay dos':  { lat: 14.4696455, lng: 121.4230174 },
+  'barangay tres': { lat: 14.4715414, lng: 121.4258766 },
+  'bagong pook':   { lat: 14.4719492, lng: 121.4293152 },
+};
+
+// ── Fallback — geographic centre of all four barangays ────────────────────────
+export const DEFAULT_COORDS: BarangayCoords = {
+  lat: 14.4707,
+  lng: 121.4250,
+};
+
+// ── Lookup helper ─────────────────────────────────────────────────────────────
+/**
+ * Returns the coordinates for a given barangay name, or null if not found.
+ * Matching is case-insensitive and trims surrounding whitespace.
+ *
+ * @example
+ * getBarangayCoords('Barangay Uno')  // { lat: 14.4697286, lng: 121.4219659 }
+ * getBarangayCoords('barangay uno')  // same
+ * getBarangayCoords('Unknown')       // null
+ */
+export function getBarangayCoords(name: string): BarangayCoords | null {
+  const key = name.trim().toLowerCase();
+  return BARANGAY_COORDS_MAP[key] ?? null;
+}
