@@ -41,7 +41,7 @@ export function GreetingBanner() {
               <Sun size={13} color="#FCD34D" />
               <Text className='' style={{ color: '#FCD34D', fontSize: 10, fontWeight: '700', letterSpacing: 1 }}>{dateStr.toUpperCase()}</Text>
             </View>
-            <Text className='mb-1' style={{ color: 'white', fontSize: 20, fontWeight: '900', letterSpacing: -0.3 }}>{t(greetingKey)}, {t('home.resident')}!</Text>
+            <Text className='mb-1' style={{ color: 'white', fontSize: 18, fontWeight: '900', letterSpacing: -0.3 }}>{t(greetingKey)}, {t('home.resident')}!</Text>
             <Text style={{ color: '#93C5FD', fontSize: 10, fontWeight: '500', marginTop: 3 }}>{t('home.stay_updated')}</Text>
           </View>
           <View className="rounded-2xl p-3 ml-3 items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>

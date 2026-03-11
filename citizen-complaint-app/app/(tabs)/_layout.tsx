@@ -94,6 +94,27 @@ export default function TabsLayout() {
         />
 
         <Tabs.Screen
+          name="Emergency"
+          options={{
+            title: "Emergency",
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name={focused ? "warning" : "warning-outline"} size={24} color={focused ? '#EF4444' : color} />
+            ),
+            tabBarActiveTintColor: '#EF4444',
+            tabBarLabel: ({ focused }) => (
+              <Text style={{
+                fontSize: 12,
+                fontWeight: '600',
+                color: focused ? '#EF4444' : '#9CA3AF',
+                marginBottom: Platform.OS === 'android' ? 4 : 0,
+              }}>
+                Emergency
+              </Text>
+            ),
+          }}
+        />
+
+        <Tabs.Screen
           name="Profile"
           options={{
             title: "Profile",

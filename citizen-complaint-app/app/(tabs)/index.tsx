@@ -90,14 +90,14 @@ export default function HomeScreen() {
             <QuickAction
               Icon={ClipboardList}
               label={t('quick.complaints')}
-              onPress={() => router.push('/(tabs)/Complaints')}
+              onPress={() => router.push('/complaints/UserComplaints')}
               delay={60}
-              badge="3"
+             
             />
             <QuickAction Icon={CalendarDays}  label={t('quick.events')}     delay={120} />
             <QuickAction Icon={Phone}
   label={t('emergency.title')}   // uses the new "emergency.title" key → "Emergency"
-  onPress={() => router.push('/emergency/emergency')}
+  onPress={() => router.push('/(tabs)/Emergency')}
   delay={180} />
           </View>
         </Animated.View>

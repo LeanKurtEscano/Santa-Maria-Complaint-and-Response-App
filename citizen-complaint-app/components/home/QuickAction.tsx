@@ -23,17 +23,62 @@ export function QuickAction({ Icon, label, onPress, delay = 0, badge }: Props) {
         onPressIn={() => Animated.spring(scalePress, { toValue: 0.88, useNativeDriver: true, damping: 15, stiffness: 300 }).start()}
         onPressOut={() => Animated.spring(scalePress, { toValue: 1,    useNativeDriver: true, damping: 8,  stiffness: 200 }).start()}
         activeOpacity={1}
-        className="items-center"
+        className="items-center gap-2"
       >
-        <View className="w-[54px] h-[54px] rounded-2xl mb-2 bg-blue-50 border border-blue-100 items-center justify-center">
-          <Icon size={22} color="#2563EB" />
-          {badge && (
-            <View className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 items-center justify-center">
-              <Text className="text-white text-[8px] font-black">{badge}</Text>
-            </View>
-          )}
+        {/* Icon container */}
+        <View
+          style={{
+            shadowColor: '#2563EB',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.18,
+            shadowRadius: 8,
+            elevation: 4,
+          }}
+        >
+          <View className="w-[58px] h-[58px] rounded-[18px] bg-blue-600 items-center justify-center">
+            {/* Inner shine */}
+            <View
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '50%',
+                borderTopLeftRadius: 18,
+                borderTopRightRadius: 18,
+                backgroundColor: 'rgba(255,255,255,0.12)',
+              }}
+            />
+            <Icon size={22} color="#fff" />
+
+            {/* Badge */}
+            {badge && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: -5,
+                  right: -5,
+                  minWidth: 18,
+                  height: 18,
+                  borderRadius: 9,
+                  backgroundColor: '#EF4444',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 4,
+                  borderWidth: 2,
+                  borderColor: '#fff',
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 8, fontWeight: '900' }}>{badge}</Text>
+              </View>
+            )}
+          </View>
         </View>
-        <Text className="text-slate-700 text-[11px] font-bold text-center leading-[15px]">{label}</Text>
+
+        {/* Label */}
+        <Text className="text-slate-700 text-[11px] font-bold text-center leading-[15px]">
+          {label}
+        </Text>
       </TouchableOpacity>
     </Animated.View>
   );

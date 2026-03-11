@@ -30,7 +30,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import GeneralToast from '@/components/Toast/GeneralToast';
-
+import { formatName } from '@/utils/general/name';
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
@@ -116,7 +116,7 @@ export default function ProfileScreen() {
                 </View>
               )}
               <Text className="text-xl font-bold text-neutral-900 mt-4">
-                {userData.first_name} {userData.last_name}
+                {formatName(`${userData.first_name} ${userData.last_name}`)}
               </Text>
               <Text className="text-neutral-600 text-sm mt-1">{userData.email}</Text>
             </View>
@@ -240,7 +240,7 @@ export default function ProfileScreen() {
                 </Text>
               </View>
               <Text className="text-base text-neutral-900">
-                {userData.first_name} {userData.last_name}
+                {formatName(`${userData.first_name} ${userData.last_name}`)}
               </Text>
             </View>
 
@@ -323,14 +323,8 @@ export default function ProfileScreen() {
           </Text>
 
           <View className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6">
-            <View className="mb-4">
-              <Text className="text-xs font-medium text-neutral-500 mb-2">
-                {t('profile.accountInfo.role')}
-              </Text>
-              <Text className="text-base text-neutral-900 capitalize">{userData.role}</Text>
-            </View>
-
-            <View className="h-px bg-neutral-200 my-4" />
+            
+            
 
             {userData.created_at && (
               <View>
