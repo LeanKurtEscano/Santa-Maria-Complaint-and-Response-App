@@ -424,6 +424,7 @@ export default function ComplaintFormScreen() {
         setCustomTitle('');
         setMessage('');
         setCapturedLocation(null);
+        router.push('/(tabs)/Complaints');
       }
 
     } catch (error: any) {
