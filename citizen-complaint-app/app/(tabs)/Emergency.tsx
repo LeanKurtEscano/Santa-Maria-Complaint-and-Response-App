@@ -70,19 +70,18 @@ export default function EmergencyScreen() {
   const handleCallPress = (contact: EmergencyContact) => setPendingContact(contact);
 
   const handleConfirmCall = async () => {
-    if (!pendingContact) return;
-    setPendingContact(null);
-    const url = `tel:${pendingContact.phoneNumber}`;
-    const supported = await Linking.canOpenURL(url);
-    if (supported) {
-      await Linking.openURL(url);
-    } else {
-      Alert.alert(
-        t('emergency.dialerUnavailableTitle'),
-        t('emergency.dialerUnavailableMessage'),
-      );
-    }
-  };
+  if (!pendingContact) return;
+  setPendingContact(null);
+  const url = `tel:${pendingContact.phoneNumber}`;
+  try {
+    await Linking.openURL(url);
+  } catch {
+    Alert.alert(
+      t('emergency.dialerUnavailableTitle'),
+      t('emergency.dialerUnavailableMessage'),
+    );
+  }
+};
 
   const handleCancelCall = () => setPendingContact(null);
 
