@@ -4,14 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import {
   Bell, CheckCheck, ChevronRight, FileText,
-  RefreshCw, Megaphone, Info, Building2, ShieldCheck, Wifi, WifiOff,
+  RefreshCw, Megaphone, Info, Building2, ShieldCheck,
 } from 'lucide-react-native';
 import { notificationApiClient } from '@/lib/client/notification';
-import { useCurrentUser } from '@/store/useCurrentUserStore';
 import { useNotificationSSE } from '@/hooks/general/useNotificationSSE';
+import { useNotificationStore } from '@/store/useNotificationStore';
 import { getAccessToken } from '@/utils/general/token';
 import { Notification } from '@/types/general/notification';
-import { SSENotificationData } from '@/types/general/notification';
 
 export function getNotificationMeta(type: string) {
   switch (type) {
@@ -20,13 +19,17 @@ export function getNotificationMeta(type: string) {
     case 'complaint_under_review':
       return { icon: ShieldCheck, accent: '#7C3AED', bg: '#F5F3FF', lightBg: '#FDFCFF', badge: 'Under Review', label: 'Under Review' };
     case 'complaint_update':
+    case 'update':
       return { icon: RefreshCw, accent: '#0891B2', bg: '#ECFEFF', lightBg: '#F8FEFF', badge: 'Update', label: 'Complaint Update' };
     case 'complaint_resolved':
+    case 'success':
       return { icon: CheckCheck, accent: '#16A34A', bg: '#F0FDF4', lightBg: '#F8FFF9', badge: 'Resolved', label: 'Complaint Resolved' };
     case 'new_incident_forwarded_to_lgu':
       return { icon: Building2, accent: '#DC2626', bg: '#FEF2F2', lightBg: '#FFFAFA', badge: 'Forwarded to LGU', label: 'Forwarded to LGU' };
     case 'new_incident_forwarded_to_department':
       return { icon: Megaphone, accent: '#EA580C', bg: '#FFF7ED', lightBg: '#FFFCF8', badge: 'Forwarded to Dept.', label: 'Forwarded to Department' };
+    case 'incident_update':
+      return { icon: Building2, accent: '#DC2626', bg: '#FEF2F2', lightBg: '#FFFAFA', badge: 'Incident Update', label: 'Incident Update' };
     case 'info':
     default:
       return { icon: Info, accent: '#059669', bg: '#ECFDF5', lightBg: '#F8FFFC', badge: 'Info', label: 'Info' };
@@ -42,6 +45,7 @@ function timeAgo(dateStr: string): string {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
 }
+
 function NotificationItem({ item, onPress }: { item: Notification; onPress: () => void }) {
   const meta = getNotificationMeta(item.notification_type);
   const IconComponent = meta.icon;
@@ -102,19 +106,17 @@ function NotificationItem({ item, onPress }: { item: Notification; onPress: () =
 }
 
 export default function NotificationsScreen() {
-  const { userData } = useCurrentUser();
   const token = getAccessToken();
   const router = useRouter();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [sseConnected, setSseConnected] = useState(false);
+
+  const { notifications, unreadCount, setNotifications, markAsRead, markAllAsRead } = useNotificationStore();
 
   const fetchNotifications = useCallback(async () => {
     try {
       const res = await notificationApiClient.get('/');
       setNotifications(res.data);
-      console.log('Fetched notifications:', res.data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -125,57 +127,26 @@ export default function NotificationsScreen() {
 
   useEffect(() => { fetchNotifications(); }, []);
 
-  // Prepend a new notification arriving via SSE into the list
-  const prependNotification = useCallback((data: SSENotificationData, type: string) => {
-    const incoming: Notification = {
-      id: Date.now(),
-      title: data.title ?? type.replace(/_/g, ' '),
-      message: data.message ?? data.description ?? '',
-      user_id: userData?.id,
-      complaint_id: data.complaint_id ?? null,
-      channel: 'sse',
-      notification_type: type,
-      sent_at: new Date().toISOString(),
-      is_read: false,
-    };
-    setNotifications(prev => [incoming, ...prev]);
-  }, [userData?.id]);
-
-  useNotificationSSE({
-    token,
-    onConnected:    () => setSseConnected(true),
-    onDisconnected: () => setSseConnected(false),
-    onNewComplaint:     (data) => prependNotification(data, 'new_complaint'),
-    onComplaintUnderReview: (data) => prependNotification(data, 'complaint_under_review'),
-    onComplaintUpdate:  (data) => prependNotification(data, 'complaint_update'),
-    onComplaintResolved:(data) => prependNotification(data, 'complaint_resolved'),
-    onNewIncidentForwardedToLgu: (data) => prependNotification(data, 'new_incident_forwarded_to_lgu'),
-    onNewIncidentForwardedToDepartment: (data) => prependNotification(data, 'new_incident_forwarded_to_department'),
-    onInfo: (data) => prependNotification(data, 'info'),
-    onAnnouncement: (data) => prependNotification(data, 'announcement'),
-  });
+  useNotificationSSE({ token });
 
   const handleMarkAllRead = async () => {
     try {
       await notificationApiClient.post('/read-all');
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      markAllAsRead();
     } catch (e) { console.error(e); }
   };
 
   const handleMarkRead = async (id: number) => {
     try {
       await notificationApiClient.post(`/${id}/read`);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      markAsRead(id);
     } catch (e) { console.error(e); }
   };
-
-  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Header */}
       <View style={{
         paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16,
         borderBottomWidth: 1, borderBottomColor: '#F1F5F9', backgroundColor: '#FFFFFF',
@@ -185,26 +156,9 @@ export default function NotificationsScreen() {
             <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
               <Bell size={20} color="#2563EB" />
             </View>
-            <View>
-              <Text style={{ fontSize: 20, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 }}>
-                Notifications
-              </Text>
-              {/* SSE connection status 
-              
-              
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                {sseConnected
-                  ? <Wifi size={11} color="#16A34A" />
-                  : <WifiOff size={11} color="#94A3B8" />
-                }
-                <Text style={{ fontSize: 11, color: sseConnected ? '#16A34A' : '#94A3B8', fontWeight: '500' }}>
-                  {sseConnected ? 'Live' : 'Connecting…'}
-                </Text>
-              </View>
-              
-              */}
-              
-            </View>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 }}>
+              Notifications
+            </Text>
           </View>
 
           {unreadCount > 0 && (
@@ -239,27 +193,31 @@ export default function NotificationsScreen() {
           </View>
           <Text style={{ marginTop: 12, color: '#94A3B8', fontWeight: '500' }}>Loading notifications…</Text>
         </View>
-      ) : notifications.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
-          <View style={{ width: 80, height: 80, borderRadius: 24, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-            <Bell size={36} color="#CBD5E1" />
-          </View>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#334155', marginBottom: 6 }}>All caught up!</Text>
-          <Text style={{ fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20 }}>
-            You have no notifications right now. Check back later.
-          </Text>
-        </View>
       ) : (
         <FlatList
           data={notifications}
           keyExtractor={item => item.id.toString()}
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 32 }}
+          contentContainerStyle={{ paddingTop: 16, paddingBottom: 32, flexGrow: 1 }}
+          alwaysBounceVertical
+          bounces
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => { setRefreshing(true); fetchNotifications(); }}
               tintColor="#2563EB"
+              colors={['#2563EB']}
             />
+          }
+          ListEmptyComponent={
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingTop: 80 }}>
+              <View style={{ width: 80, height: 80, borderRadius: 24, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <Bell size={36} color="#CBD5E1" />
+              </View>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#334155', marginBottom: 6 }}>All caught up!</Text>
+              <Text style={{ fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20 }}>
+                You have no notifications right now. Check back later.
+              </Text>
+            </View>
           }
           renderItem={({ item }) => (
             <NotificationItem

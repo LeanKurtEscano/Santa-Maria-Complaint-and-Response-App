@@ -1,37 +1,18 @@
-// hooks/useNotificationSSE.ts
+// hooks/general/useNotificationSSE.ts
+
 import { useEffect, useRef, useCallback } from 'react';
-import { useCurrentUser } from '@/store/useCurrentUserStore';
-
 import EventSource from 'react-native-sse';
-interface SSENotificationData {
-  complaint_id?: number;
-  title?: string;
-  message?: string;
-  description?: string;
-  location_details?: string;
-  barangay_id?: number;
-  category_id?: number;
-  status?: string;
-  created_at?: string;
-  resolved_at?: string | null;
-  [key: string]: any;
-}
+import { useNotificationStore } from '@/store/useNotificationStore';
+import { useCurrentUser } from '@/store/useCurrentUserStore';
+import { SSENotificationData } from '@/constants/general/notification';
 
-interface SSEEvent {
+export interface SSEEvent {
   event: string;
   data: SSENotificationData;
 }
 
 interface UseNotificationSSEOptions {
   onEvent?: (event: SSEEvent) => void;
-  onNewComplaint?: (data: SSENotificationData) => void;
-  onComplaintUnderReview?: (data: SSENotificationData) => void;
-  onComplaintUpdate?: (data: SSENotificationData) => void;
-  onComplaintResolved?: (data: SSENotificationData) => void;
-  onNewIncidentForwardedToLgu?: (data: SSENotificationData) => void;
-  onNewIncidentForwardedToDepartment?: (data: SSENotificationData) => void;
-  onInfo?: (data: SSENotificationData) => void;
-  onAnnouncement?: (data: SSENotificationData) => void;
   onConnected?: () => void;
   onDisconnected?: () => void;
   onError?: (error: Event) => void;
@@ -40,26 +21,26 @@ interface UseNotificationSSEOptions {
   enabled?: boolean;
 }
 
-const EVENT_HANDLERS: Record<string, keyof UseNotificationSSEOptions> = {
-  new_complaint:                      'onNewComplaint',
-  complaint_under_review:             'onComplaintUnderReview',
-  complaint_update:                   'onComplaintUpdate',
-  complaint_resolved:                 'onComplaintResolved',
-  new_incident_forwarded_to_lgu:      'onNewIncidentForwardedToLgu',
-  new_incident_forwarded_to_department: 'onNewIncidentForwardedToDepartment',
-  info:                               'onInfo',
-  announcement:                       'onAnnouncement',
-};
-
 const RECONNECT_DELAY_MS = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
+const SSE_EVENT_NAMES = [
+  'notification',
+  'new_complaint',
+  'complaint_under_review',
+  'complaint_update',
+  'complaint_resolved',
+  'incident_update',
+  'new_incident_forwarded_to_lgu',
+  'new_incident_forwarded_to_department',
+  'info',
+  'announcement',
+] as const;
+
 export function useNotificationSSE(options: UseNotificationSSEOptions = {}) {
+  const { userData } = useCurrentUser();
+  const { prependNotification } = useNotificationStore();
   const {
-    onEvent,
-    onConnected,
-    onDisconnected,
-    onError,
     baseUrl = process.env.EXPO_PUBLIC_API_URL,
     token,
     enabled = true,
@@ -74,18 +55,12 @@ export function useNotificationSSE(options: UseNotificationSSEOptions = {}) {
   const isUnmountedRef = useRef(false);
 
   const handleEvent = useCallback((eventName: string, data: SSENotificationData) => {
-    const sseEvent: SSEEvent = { event: eventName, data };
+    // Auto-prepend to store — covers all event types
+    prependNotification(data, data.notification_type ?? eventName ?? 'info', userData?.id);
 
-    // Fire the generic onEvent handler
-    optionsRef.current.onEvent?.(sseEvent);
-
-    // Fire the specific typed handler
-    const handlerKey = EVENT_HANDLERS[eventName];
-    if (handlerKey) {
-      const handler = optionsRef.current[handlerKey] as ((data: SSENotificationData) => void) | undefined;
-      handler?.(data);
-    }
-  }, []);
+    // Fire generic onEvent for any custom UI handling
+    optionsRef.current.onEvent?.({ event: eventName, data });
+  }, [prependNotification, userData?.id]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -100,16 +75,11 @@ export function useNotificationSSE(options: UseNotificationSSEOptions = {}) {
 
   const connect = useCallback(() => {
     if (isUnmountedRef.current || !enabled || !token) return;
-
     disconnect();
 
-    const url = `${baseUrl}/api/v1/notifications/stream`;
-
-    // EventSource doesn't support custom headers natively,
-  
-    const fullUrl = `${url}?token=${encodeURIComponent(token)}`;
-
-    const es = new EventSource(fullUrl);
+    const es = new EventSource(`${baseUrl}/api/v1/notifications/stream`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     eventSourceRef.current = es;
 
     es.onopen = () => {
@@ -123,31 +93,27 @@ export function useNotificationSSE(options: UseNotificationSSEOptions = {}) {
       es.close();
       eventSourceRef.current = null;
 
-      // Auto-reconnect with backoff
       if (!isUnmountedRef.current && reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttemptsRef.current += 1;
-        const delay = RECONNECT_DELAY_MS * reconnectAttemptsRef.current;
-        reconnectTimeoutRef.current = setTimeout(connect, delay);
+        reconnectTimeoutRef.current = setTimeout(connect, RECONNECT_DELAY_MS * reconnectAttemptsRef.current);
       }
     };
 
-    // Listen for each known event type explicitly
-    Object.keys(EVENT_HANDLERS).forEach((eventName) => {
+    // Listen for all known event types
+    SSE_EVENT_NAMES.forEach((eventName) => {
       es.addEventListener(eventName, (e: MessageEvent) => {
         try {
-          const data: SSENotificationData = JSON.parse(e.data);
-          handleEvent(eventName, data);
+          handleEvent(eventName, JSON.parse(e.data));
         } catch (err) {
           console.error(`[SSE] Failed to parse event "${eventName}":`, err);
         }
       });
     });
 
-    // Fallback: catch any generic "message" events
+    // Fallback for unnamed/generic messages
     es.onmessage = (e: MessageEvent) => {
       try {
-        const data: SSENotificationData = JSON.parse(e.data);
-        handleEvent('message', data);
+        handleEvent('message', JSON.parse(e.data));
       } catch (err) {
         console.error('[SSE] Failed to parse message event:', err);
       }
@@ -157,7 +123,6 @@ export function useNotificationSSE(options: UseNotificationSSEOptions = {}) {
   useEffect(() => {
     isUnmountedRef.current = false;
     if (enabled && token) connect();
-
     return () => {
       isUnmountedRef.current = true;
       disconnect();
