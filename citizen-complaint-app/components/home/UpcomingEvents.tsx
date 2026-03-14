@@ -69,14 +69,25 @@ function EventCard({ event, index, onPress }: { event: EventData; index: number;
               </View>
             </>
           ) : (
-            <View style={{ flex: 1, paddingHorizontal: 16, paddingVertical: 14, justifyContent: 'space-between' }}>
-              <View style={{ alignSelf: 'flex-start', backgroundColor: accent.color, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
-                <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.6 }}>{weekday} · {month} {day}</Text>
+            <View style={{ flex: 1, paddingHorizontal: 16, paddingVertical: 14 }}>
+              {/* Date badge — accent color bg, white text, same square shape as image cards */}
+              <View style={{ position: 'absolute', top: 10, left: 10, backgroundColor: accent.color, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center', minWidth: 46 }}>
+                <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900', lineHeight: 22 }}>{day}</Text>
+                <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>{month}</Text>
               </View>
-              <View>
-                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800', lineHeight: 21 }} numberOfLines={3}>{event.event_name}</Text>
+              {/* Weekday pill bottom-right */}
+              <View style={{ position: 'absolute', bottom: 10, right: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.6 }}>{weekday}</Text>
+              </View>
+              {/* Title + description to the right of the badge */}
+              <View style={{ flex: 1, justifyContent: 'center', paddingLeft: 62, paddingRight: 8, paddingTop: 4, paddingBottom: 4 }}>
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800', lineHeight: 20 }} numberOfLines={3}>
+                  {event.event_name}
+                </Text>
                 {event.description ? (
-                  <Text style={{ color: accent.text, fontSize: 11, fontWeight: '500', lineHeight: 16, marginTop: 4, opacity: 0.85 }} numberOfLines={2}>{event.description}</Text>
+                  <Text style={{ color: accent.text, fontSize: 11, fontWeight: '500', lineHeight: 16, marginTop: 4, opacity: 0.85 }} numberOfLines={2}>
+                    {event.description}
+                  </Text>
                 ) : null}
               </View>
             </View>
