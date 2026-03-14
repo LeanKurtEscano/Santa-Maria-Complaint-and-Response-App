@@ -1,65 +1,63 @@
-// store/useNotificationStore.ts
+import { create } from "zustand";
 
-import { create } from 'zustand';
-import { Notification } from '@/types/general/notification';
-import { SSENotificationData } from '@/constants/general/notification';
+export type NotificationType = "info" | "update" | "success";
 
-interface NotificationStore {
+export interface Notification {
+  id: number;
+  user_id: number;
+  complaint_id?: number;
+  title: string;
+  message: string;
+  notification_type: NotificationType;
+  channel: string;
+  is_read: boolean;
+  sent_at: string;
+}
+
+interface NotificationState {
   notifications: Notification[];
   unreadCount: number;
   setNotifications: (notifications: Notification[]) => void;
-  prependNotification: (data: SSENotificationData, type: string, userId?: number) => void;
-  markAsRead: (id: number) => void;
+  addNotification: (notification: Notification) => void;
+  markAsRead: (notificationId: number) => void;
   markAllAsRead: () => void;
+  incrementUnread: () => void;
 }
 
-export const useNotificationStore = create<NotificationStore>((set) => ({
+export const useNotificationStore = create<NotificationState>((set) => ({
   notifications: [],
   unreadCount: 0,
 
-  
-
   setNotifications: (notifications) =>
-  set((state) => {
-    // Real DB notifications take priority over SSE-prepended ones
-    const merged = [
-      ...notifications,
-      ...state.notifications.filter(
-        n => !notifications.some(db => db.complaint_id === n.complaint_id && db.notification_type === n.notification_type)
-      ),
-    ];
-    return {
-      notifications: merged,
-      unreadCount: merged.filter(n => !n.is_read).length,
-    };
-  }),
-  prependNotification: (data, type, userId) => {
-    const incoming: Notification = {
-      id: Date.now(),
-      title: data.title ?? type.replace(/_/g, ' '),
-      message: data.message ?? data.description ?? '',
-      user_id: userId,
-      complaint_id: data.complaint_id ?? null,
-      channel: 'sse',
-      notification_type: type,
-      sent_at: new Date().toISOString(),
-      is_read: false,
-    };
-    set(state => ({
-      notifications: [incoming, ...state.notifications],
-      unreadCount: state.unreadCount + 1,
-    }));
-  },
+    set({
+      notifications,
+      unreadCount: notifications.filter((n) => !n.is_read).length,
+    }),
 
-  markAsRead: (id) =>
-    set(state => ({
-      notifications: state.notifications.map(n => n.id === id ? { ...n, is_read: true } : n),
-      unreadCount: Math.max(0, state.unreadCount - 1),
+  addNotification: (notification) =>
+    set((state) => ({
+      notifications: [notification, ...state.notifications],
+      unreadCount: state.unreadCount + (notification.is_read ? 0 : 1),
+    })),
+
+  markAsRead: (notificationId) =>
+    set((state) => ({
+      notifications: state.notifications.map((n) =>
+        n.id === notificationId ? { ...n, is_read: true } : n
+      ),
+      unreadCount: Math.max(
+        0,
+        state.unreadCount -
+          (state.notifications.find((n) => n.id === notificationId && !n.is_read) ? 1 : 0)
+      ),
     })),
 
   markAllAsRead: () =>
-    set(state => ({
-      notifications: state.notifications.map(n => ({ ...n, is_read: true })),
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({ ...n, is_read: true })),
       unreadCount: 0,
     })),
+
+  incrementUnread: () =>
+    set((state) => ({ unreadCount: state.unreadCount + 1 })),
 }));

@@ -69,7 +69,7 @@ export default function HomeScreen() {
           location={t('header.location')}
           currentLanguage={currentLanguage}
           onChangeLanguage={() => changeLanguage(currentLanguage === 'en' ? 'tl' : 'en')}
-          onBell={() => {}}
+          onBell={() => router.push('/(tabs)/Notifications')}
         />
 
         {/* ── Quick access card ── */}

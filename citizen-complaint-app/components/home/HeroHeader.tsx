@@ -7,6 +7,36 @@ import { useRef, useEffect } from 'react';
 import { Bell, MapPin, Sparkles, Languages, MessageSquarePlus } from 'lucide-react-native';
 import { StatCard } from './StatCard';
 import { STAT_ITEMS } from '@/constants/home/home';
+import { useNotificationStore } from '@/store/useNotificationStore';
+
+// ── Notification badge ────────────────────────────────────────────────────────
+
+function NotifBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        top: -5,
+        right: -5,
+        backgroundColor: '#EF4444',
+        borderRadius: 99,
+        minWidth: 17,
+        height: 17,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 3,
+        borderWidth: 1.5,
+        borderColor: '#2563EB',
+        zIndex: 10,
+      }}
+    >
+      <Text style={{ color: 'white', fontSize: 9, fontWeight: '800', lineHeight: 11 }}>
+        {count > 99 ? '99+' : count}
+      </Text>
+    </View>
+  );
+}
 
 // ── Sticky mini header (fades in on scroll) ───────────────────────────────────
 
@@ -19,6 +49,8 @@ export function StickyMiniHeader({
   onChangeLanguage: () => void;
   onBell: () => void;
 }) {
+  const { unreadCount } = useNotificationStore();
+
   const opacity    = scrollY.interpolate({ inputRange: [120, 180], outputRange: [0, 1], extrapolate: 'clamp' });
   const translateY = scrollY.interpolate({ inputRange: [120, 180], outputRange: [-20, 0], extrapolate: 'clamp' });
 
@@ -53,16 +85,19 @@ export function StickyMiniHeader({
           </Text>
         </TouchableOpacity>
 
+        {/* Bell with badge */}
         <TouchableOpacity
           onPress={onBell}
           activeOpacity={0.8}
           style={{
+            position: 'relative',
             backgroundColor: 'rgba(255,255,255,0.13)',
             borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
             borderRadius: 12, padding: 7,
           }}
         >
           <Bell size={18} color="white" />
+          <NotifBadge count={unreadCount} />
         </TouchableOpacity>
       </View>
     </Animated.View>
@@ -100,6 +135,8 @@ export function HeroHeader({
   onChangeLanguage: () => void;
   onBell: () => void;
 }) {
+  const { unreadCount } = useNotificationStore();
+
   const DIST = 80;
   const paddingBottom  = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 28], extrapolate: 'clamp' });
   const titleFontSize  = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [30, 22], extrapolate: 'clamp' });
@@ -143,13 +180,20 @@ export function HeroHeader({
             <Languages size={14} color="white" />
             <Text className="text-white text-[12px] font-bold">{currentLanguage === 'en' ? 'EN' : 'TL'}</Text>
           </TouchableOpacity>
+
+          {/* Bell with badge */}
           <TouchableOpacity
             onPress={onBell}
             activeOpacity={0.8}
             className="rounded-2xl p-3"
-            style={{ backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+            style={{
+              position: 'relative',
+              backgroundColor: 'rgba(255,255,255,0.13)',
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+            }}
           >
             <Bell size={22} color="white" />
+            <NotifBadge count={unreadCount} />
           </TouchableOpacity>
         </View>
       </View>
