@@ -1,6 +1,6 @@
 import { notificationApiClient } from "@/lib/client/notification";
 import { getAccessToken } from "@/utils/general/token";
-import { useNotificationStore} from "@/store/useNotificationStore";
+import { useNotificationStore } from "@/store/useNotificationStore";
 import { Notification } from "@/types/general/notification";
 import { TYPE_CONFIG } from "@/constants/general/notification";
 import { useEffect, useRef, useCallback, useState } from "react";
@@ -22,31 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import EventSource from "react-native-sse";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-
-const LOG_TAG = "[Notifications]";
-
-
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const formatTime = (sentAt: string): string => {
-  const date = new Date(sentAt);
-  const now = new Date();
-  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-  if (diff < 60) return "Just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-};
-
-const fetchNotificationsApi = async (): Promise<Notification[]> => {
-  console.log(`${LOG_TAG} fetchNotificationsApi() — calling GET /`);
-  const res = await notificationApiClient.get("/");
-  console.log(
-    `${LOG_TAG} fetchNotificationsApi() — received ${res.data?.length ?? 0} notifications`
-  );
-  return res.data;
-};
+import { formatTime } from "@/utils/date/date";
 
 // ─── Notification Card ────────────────────────────────────────────────────────
 
@@ -64,11 +40,17 @@ const NotificationCard = React.memo(({
   const config = TYPE_CONFIG[item.notification_type] ?? TYPE_CONFIG.info;
   const router = useRouter();
   const { t } = useTranslation();
+  // ── Expandable message state ──
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (!isNew || hasAnimated.current) return;
     hasAnimated.current = true;
-    Animated.timing(fadeAnim, { toValue: 1, duration: 320, useNativeDriver: true }).start();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 320,
+      useNativeDriver: true,
+    }).start();
   }, [isNew]);
 
   const handlePress = () => {
@@ -78,8 +60,29 @@ const NotificationCard = React.memo(({
     }
   };
 
+  const message = t(config.messageKey, { title: item.title });
+  const [isTruncatable, setIsTruncatable] = useState(false);
+
   return (
     <Animated.View style={{ opacity: fadeAnim }}>
+      {/*
+        Hidden sizer: renders the full message off-screen so onTextLayout reports
+        the REAL line count (not the clamped count from numberOfLines).
+        Once isTruncatable is determined we stop rendering it.
+      */}
+      {!isTruncatable && (
+        <Text
+          style={{ position: "absolute", opacity: 0, fontSize: 13, lineHeight: 18 }}
+          onTextLayout={(e) => {
+            if (e.nativeEvent.lines.length > 1) {
+              setIsTruncatable(true);
+            }
+          }}
+        >
+          {message} 
+        </Text>
+      )}
+
       <TouchableOpacity
         onPress={handlePress}
         activeOpacity={item.complaint_id ? 0.7 : 1}
@@ -128,20 +131,35 @@ const NotificationCard = React.memo(({
             </Text>
           </View>
 
+          {/* Title */}
           <Text
             className={`text-sm font-semibold leading-5 ${
               item.is_read ? "text-slate-500" : "text-slate-900"
             }`}
           >
-            {t(config.titleKey, { title: item.title })}
+            {t(config.titleKey)}
           </Text>
 
+          {/* Message — expandable */}
           <Text
             className="text-[13px] text-slate-500 leading-[18px]"
-            numberOfLines={2}
+            numberOfLines={expanded ? undefined : 2}
           >
-            {t(config.messageKey, { title: item.title })}
+            {message}
           </Text>
+
+          {/* View more / View less toggle */}
+          {isTruncatable && (
+            <TouchableOpacity
+              onPress={() => setExpanded((prev) => !prev)}
+              activeOpacity={0.6}
+              className="self-start mt-0.5"
+            >
+              <Text className="text-[12px] text-blue-500 font-semibold">
+                {expanded ? "View less" : "View more"}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {!item.is_read && (
             <TouchableOpacity
@@ -170,7 +188,9 @@ const EmptyState = () => {
       <View className="w-20 h-20 rounded-full bg-blue-50 items-center justify-center mb-2">
         <Ionicons name="notifications-off-outline" size={38} color="#93C5FD" />
       </View>
-      <Text className="text-lg font-bold text-slate-900">{t("notifications.emptyTitle")}</Text>
+      <Text className="text-lg font-bold text-slate-900">
+        {t("notifications.emptyTitle")}
+      </Text>
       <Text className="text-sm text-slate-400 text-center px-10 leading-5">
         {t("notifications.emptySubtitle")}
       </Text>
@@ -184,27 +204,51 @@ const Notifications = () => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const LOG_TAG = "[Notifications]";
   const { setNotifications, markAsRead, markAllAsRead, unreadCount } =
     useNotificationStore();
 
   const [markingAll, setMarkingAll] = useState(false);
   const [sseStatus, setSseStatus] = useState<SSEStatus>("connecting");
   const [newIds, setNewIds] = useState<Set<number>>(new Set());
+  // ── Track whether the user manually triggered a pull-to-refresh ──
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const prevIdsRef = useRef<Set<number>>(new Set());
   const eventSourceRef = useRef<any>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // ── useQuery — single source of truth ───────────────────────────────────
+  // ── Fetch ────────────────────────────────────────────────────────────────
 
-  const { data: notifications = [], isLoading, refetch, isRefetching } = useQuery({
+  const fetchNotificationsApi = async (): Promise<Notification[]> => {
+    console.log(`${LOG_TAG} fetchNotificationsApi() — calling GET /`);
+    const res = await notificationApiClient.get("/");
+    console.log(
+      `${LOG_TAG} fetchNotificationsApi() — received ${res.data?.length ?? 0} notifications`
+    );
+    return res.data;
+  };
+
+  const {
+    data: notifications = [],
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["notifications"],
     queryFn: fetchNotificationsApi,
+    // Background refetch every 30s — but we suppress its loading indicator
+    // by never letting isRefetching drive the UI (we use isManualRefreshing instead)
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
     staleTime: 10_000,
+    // Keep previous data so the list never flickers/jumps during background refetch
+    placeholderData: (prev) => prev,
+    // Notify observers only when data actually changes — prevents list re-renders
+    // caused solely by metadata updates (isFetching, dataUpdatedAt, etc.)
+    notifyOnChangeProps: ["data", "error"],
   });
 
-  // Sync query data → zustand store + detect newly arrived IDs for animation
+  // ── Sync query data → zustand store + detect new IDs for animation ───────
+
   useEffect(() => {
     if (!notifications.length) return;
 
@@ -215,8 +259,6 @@ const Notifications = () => {
 
     const incoming = new Set(notifications.map((n) => n.id));
 
-    // ✅ Fix: skip animation on the very first fetch (prevIds is empty)
-    // Only animate IDs that arrive after the initial load
     if (prevIdsRef.current.size > 0) {
       const arrived = notifications
         .filter((n) => !prevIdsRef.current.has(n.id))
@@ -242,15 +284,23 @@ const Notifications = () => {
     }
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.5, duration: 900, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulseAnim, {
+          toValue: 1.5,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
       ])
     );
     pulse.start();
     return () => pulse.stop();
   }, [sseStatus]);
 
-  // ── SSE — only triggers refetch, never writes fake data ──────────────────
+  // ── SSE ──────────────────────────────────────────────────────────────────
 
   const connectSSE = useCallback(async () => {
     console.log(`${LOG_TAG} connectSSE() — initializing`);
@@ -274,14 +324,14 @@ const Notifications = () => {
     const url = `${baseURL}/stream?token=${encodeURIComponent(token)}`;
     console.log(`${LOG_TAG} connectSSE() — connecting to: ${url}`);
 
-    // ✅ Fix: instantiate EventSource before using it
     const es = new EventSource(url);
 
     const handleEvent = (eventType: string) => () => {
       console.log(
-        `${LOG_TAG} SSE event="${eventType}" received — invalidating query to refetch real data`
+        `${LOG_TAG} SSE event="${eventType}" received — invalidating query`
       );
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      // Invalidate silently — no loading spinner shown to the user
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     };
 
     es.addEventListener("info", handleEvent("info"));
@@ -322,18 +372,18 @@ const Notifications = () => {
 
   // ── Mark single as read ──────────────────────────────────────────────────
 
-  const handleMarkRead = async (id: number) => {
+  const handleMarkRead = useCallback(async (id: number) => {
     console.log(`${LOG_TAG} handleMarkRead() — id=${id}`);
     try {
       markAsRead(id);
       await notificationApiClient.post(`/${id}/read`);
       console.log(`${LOG_TAG} handleMarkRead() — API success for id=${id}`);
-      queryClient.invalidateQueries({ queryKey:  ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     } catch (err) {
       console.error(`${LOG_TAG} handleMarkRead() — API error for id=${id}:`, err);
-      queryClient.invalidateQueries({ queryKey:  ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     }
-  };
+  }, [markAsRead, queryClient]);
 
   // ── Mark all as read ─────────────────────────────────────────────────────
 
@@ -348,21 +398,36 @@ const Notifications = () => {
       markAllAsRead();
       await notificationApiClient.post("/read-all");
       console.log(`${LOG_TAG} handleMarkAllRead() — API success`);
-      queryClient.invalidateQueries({ queryKey:  ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     } catch (err) {
       console.error(`${LOG_TAG} handleMarkAllRead() — API error:`, err);
-      queryClient.invalidateQueries({ queryKey:  ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     } finally {
       setMarkingAll(false);
     }
   };
 
-  // ── Pull to refresh ──────────────────────────────────────────────────────
+  // ── Pull to refresh — only this shows the spinner ───────────────────────
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(async () => {
     console.log(`${LOG_TAG} onRefresh() — triggered`);
-    refetch();
-  };
+    setIsManualRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  }, [refetch]);
+
+  // ── Render item ──────────────────────────────────────────────────────────
+
+  const renderItem = useCallback(({ item }: { item: Notification }) => (
+    <NotificationCard
+      item={item}
+      onMarkRead={handleMarkRead}
+      isNew={newIds.has(item.id)}
+    />
+  ), [handleMarkRead, newIds]);
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -371,14 +436,12 @@ const Notifications = () => {
       {/* ── Header ── */}
       <View className="bg-white px-5 pt-4 pb-3 border-b border-slate-100">
         <View className="flex-row items-center justify-between">
-          {/* Left */}
           <View className="gap-1">
             <Text className="text-2xl font-bold text-slate-900 tracking-tight">
               Notifications
             </Text>
           </View>
 
-          {/* Right */}
           <View className="flex-row items-center gap-2.5">
             {unreadCount > 0 && (
               <View className="bg-blue-500 rounded-full min-w-[24px] h-6 items-center justify-center px-1.5">
@@ -423,6 +486,7 @@ const Notifications = () => {
 
       {/* ── Body ── */}
       {isLoading ? (
+        // Only shown on the very first load (no cached data yet)
         <View className="flex-1 items-center justify-center gap-3">
           <ActivityIndicator size="large" color="#3B82F6" />
           <Text className="text-sm text-slate-400 font-medium">
@@ -433,13 +497,7 @@ const Notifications = () => {
         <FlatList
           data={notifications}
           keyExtractor={(item) => String(item.id)}
-          renderItem={useCallback(({ item }: { item: Notification }) => (
-            <NotificationCard
-              item={item}
-              onMarkRead={handleMarkRead}
-              isNew={newIds.has(item.id)}
-            />
-          ), [handleMarkRead, newIds])}
+          renderItem={renderItem}
           ListEmptyComponent={<EmptyState />}
           contentContainerStyle={[
             { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 },
@@ -448,7 +506,8 @@ const Notifications = () => {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={isRefetching}
+              // Only spin when the USER explicitly pulls down — never on background refetches
+              refreshing={isManualRefreshing}
               onRefresh={onRefresh}
               tintColor="#3B82F6"
               colors={["#3B82F6"]}

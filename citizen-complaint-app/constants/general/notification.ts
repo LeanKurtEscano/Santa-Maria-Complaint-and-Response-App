@@ -1,8 +1,6 @@
 import { NotificationType } from "@/types/general/notification";
 import { Ionicons } from "@expo/vector-icons";
 
-
-
 export interface SSENotificationData {
   complaint_id?: number;
   title?: string;
@@ -27,10 +25,6 @@ export interface SSENotificationData {
   [key: string]: any;
 }
 
-
-
-
-
 export const TYPE_CONFIG: Record<
   NotificationType,
   {
@@ -45,7 +39,6 @@ export const TYPE_CONFIG: Record<
     messageKey: string;
   }
 > = {
-  // General types
   info: {
     icon: "information-circle",
     iconColor: "#3B82F6",
@@ -53,9 +46,9 @@ export const TYPE_CONFIG: Record<
     badgeTextClass: "text-blue-500",
     iconBgClass: "bg-blue-50",
     dotClass: "bg-blue-500",
-    labelKey: "notifications.typeInfo",
-    titleKey: "notifications.titleInfo",
-    messageKey: "notifications.messageInfo",
+    labelKey: "notifications.type.info",
+    titleKey: "notifications.title.info",
+    messageKey: "notifications.message.info",
   },
   update: {
     icon: "refresh-circle",
@@ -64,9 +57,9 @@ export const TYPE_CONFIG: Record<
     badgeTextClass: "text-sky-500",
     iconBgClass: "bg-sky-50",
     dotClass: "bg-sky-500",
-    labelKey: "notifications.typeUpdate",
-    titleKey: "notifications.titleUpdate",
-    messageKey: "notifications.messageUpdate",
+    labelKey: "notifications.type.update",
+    titleKey: "notifications.title.update",
+    messageKey: "notifications.message.update",
   },
   success: {
     icon: "checkmark-circle",
@@ -75,11 +68,10 @@ export const TYPE_CONFIG: Record<
     badgeTextClass: "text-emerald-500",
     iconBgClass: "bg-emerald-50",
     dotClass: "bg-emerald-500",
-    labelKey: "notifications.typeSuccess",
-    titleKey: "notifications.titleSuccess",
-    messageKey: "notifications.messageSuccess",
+    labelKey: "notifications.type.success",
+    titleKey: "notifications.title.success",
+    messageKey: "notifications.message.success",
   },
-  // Complaint-specific types
   complaint_resolved: {
     icon: "checkmark-done-circle",
     iconColor: "#10B981",
@@ -87,9 +79,9 @@ export const TYPE_CONFIG: Record<
     badgeTextClass: "text-emerald-600",
     iconBgClass: "bg-emerald-50",
     dotClass: "bg-emerald-500",
-    labelKey: "notifications.typeResolved",
-    titleKey: "notifications.titleResolved",
-    messageKey: "notifications.messageResolved",
+    labelKey: "notifications.type.complaint_resolved",
+    titleKey: "notifications.title.complaint_resolved",
+    messageKey: "notifications.message.complaint_resolved",
   },
   complaint_under_review: {
     icon: "eye-outline",
@@ -98,9 +90,9 @@ export const TYPE_CONFIG: Record<
     badgeTextClass: "text-amber-600",
     iconBgClass: "bg-amber-50",
     dotClass: "bg-amber-500",
-    labelKey: "notifications.typeUnderReview",
-    titleKey: "notifications.titleUnderReview",
-    messageKey: "notifications.messageUnderReview",
+    labelKey: "notifications.type.complaint_under_review",
+    titleKey: "notifications.title.complaint_under_review",
+    messageKey: "notifications.message.complaint_under_review",
   },
   complaint_update: {
     icon: "arrow-forward-circle",
@@ -109,9 +101,9 @@ export const TYPE_CONFIG: Record<
     badgeTextClass: "text-violet-600",
     iconBgClass: "bg-violet-50",
     dotClass: "bg-violet-500",
-    labelKey: "notifications.typeForwarded",
-    titleKey: "notifications.titleForwarded",
-    messageKey: "notifications.messageForwarded",
+    labelKey: "notifications.type.complaint_update",
+    titleKey: "notifications.title.complaint_update",
+    messageKey: "notifications.message.complaint_update",
   },
   existing_incident: {
     icon: "git-merge-outline",
@@ -120,8 +112,8 @@ export const TYPE_CONFIG: Record<
     badgeTextClass: "text-slate-500",
     iconBgClass: "bg-slate-100",
     dotClass: "bg-slate-400",
-    labelKey: "notifications.typeExistingIncident",
-    titleKey: "notifications.titleExistingIncident",
-    messageKey: "notifications.messageExistingIncident",
+    labelKey: "notifications.type.existing_incident",
+    titleKey: "notifications.title.existing_incident",
+    messageKey: "notifications.message.existing_incident",
   },
 };
