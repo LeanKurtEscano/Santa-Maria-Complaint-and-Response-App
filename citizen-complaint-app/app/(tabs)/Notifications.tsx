@@ -1,7 +1,10 @@
 import { notificationApiClient } from "@/lib/client/notification";
 import { getAccessToken } from "@/utils/general/token";
-import { useNotificationStore, NotificationType } from "@/store/useNotificationStore";
+import { useNotificationStore} from "@/store/useNotificationStore";
+import { Notification } from "@/types/general/notification";
+import { TYPE_CONFIG } from "@/constants/general/notification";
 import { useEffect, useRef, useCallback, useState } from "react";
+import { SSEStatus } from "@/types/general/notification";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   View,
@@ -18,65 +21,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import EventSource from "react-native-sse";
 import { useRouter } from "expo-router";
-// ─── Constants ────────────────────────────────────────────────────────────────
+import { useTranslation } from "react-i18next";
 
 const LOG_TAG = "[Notifications]";
-const QUERY_KEY = ["notifications"];
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface Notification {
-  id: number;
-  user_id: number;
-  complaint_id?: number;
-  title: string;
-  message: string;
-  notification_type: NotificationType;
-  channel: string;
-  is_read: boolean;
-  sent_at: string;
-}
-
-type SSEStatus = "connecting" | "connected" | "disconnected";
-
-// ─── Type config ──────────────────────────────────────────────────────────────
-
-const TYPE_CONFIG: Record<
-  NotificationType,
-  {
-    icon: keyof typeof Ionicons.glyphMap;
-    iconColor: string;
-    badgeClass: string;
-    badgeTextClass: string;
-    iconBgClass: string;
-    dotClass: string;
-  }
-> = {
-  info: {
-    icon: "information-circle",
-    iconColor: "#3B82F6",
-    badgeClass: "bg-blue-50 border border-blue-100",
-    badgeTextClass: "text-blue-500",
-    iconBgClass: "bg-blue-50",
-    dotClass: "bg-blue-500",
-  },
-  update: {
-    icon: "refresh-circle",
-    iconColor: "#0EA5E9",
-    badgeClass: "bg-sky-50 border border-sky-100",
-    badgeTextClass: "text-sky-500",
-    iconBgClass: "bg-sky-50",
-    dotClass: "bg-sky-500",
-  },
-  success: {
-    icon: "checkmark-circle",
-    iconColor: "#10B981",
-    badgeClass: "bg-emerald-50 border border-emerald-100",
-    badgeTextClass: "text-emerald-500",
-    iconBgClass: "bg-emerald-50",
-    dotClass: "bg-emerald-500",
-  },
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -114,6 +63,7 @@ const NotificationCard = React.memo(({
   const fadeAnim = useRef(new Animated.Value(isNew ? 0 : 1)).current;
   const config = TYPE_CONFIG[item.notification_type] ?? TYPE_CONFIG.info;
   const router = useRouter();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!isNew || hasAnimated.current) return;
@@ -170,7 +120,7 @@ const NotificationCard = React.memo(({
               <Text
                 className={`text-[10px] font-bold uppercase tracking-wider ${config.badgeTextClass}`}
               >
-                {item.notification_type}
+                {t(config.labelKey)}
               </Text>
             </View>
             <Text className="text-[11px] text-slate-400 font-medium">
@@ -183,14 +133,14 @@ const NotificationCard = React.memo(({
               item.is_read ? "text-slate-500" : "text-slate-900"
             }`}
           >
-            {item.title}
+            {t(config.titleKey, { title: item.title })}
           </Text>
 
           <Text
             className="text-[13px] text-slate-500 leading-[18px]"
             numberOfLines={2}
           >
-            {item.message}
+            {t(config.messageKey, { title: item.title })}
           </Text>
 
           {!item.is_read && (
@@ -213,23 +163,27 @@ const NotificationCard = React.memo(({
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
-const EmptyState = () => (
-  <View className="flex-1 items-center justify-center pt-20 gap-3">
-    <View className="w-20 h-20 rounded-full bg-blue-50 items-center justify-center mb-2">
-      <Ionicons name="notifications-off-outline" size={38} color="#93C5FD" />
+const EmptyState = () => {
+  const { t } = useTranslation();
+  return (
+    <View className="flex-1 items-center justify-center pt-20 gap-3">
+      <View className="w-20 h-20 rounded-full bg-blue-50 items-center justify-center mb-2">
+        <Ionicons name="notifications-off-outline" size={38} color="#93C5FD" />
+      </View>
+      <Text className="text-lg font-bold text-slate-900">{t("notifications.emptyTitle")}</Text>
+      <Text className="text-sm text-slate-400 text-center px-10 leading-5">
+        {t("notifications.emptySubtitle")}
+      </Text>
     </View>
-    <Text className="text-lg font-bold text-slate-900">All caught up!</Text>
-    <Text className="text-sm text-slate-400 text-center px-10 leading-5">
-      No notifications yet. We'll let you know when something happens.
-    </Text>
-  </View>
-);
+  );
+};
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 const Notifications = () => {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const { setNotifications, markAsRead, markAllAsRead, unreadCount } =
     useNotificationStore();
 
@@ -243,7 +197,7 @@ const Notifications = () => {
   // ── useQuery — single source of truth ───────────────────────────────────
 
   const { data: notifications = [], isLoading, refetch, isRefetching } = useQuery({
-    queryKey: QUERY_KEY,
+    queryKey: ["notifications"],
     queryFn: fetchNotificationsApi,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
@@ -334,6 +288,10 @@ const Notifications = () => {
     es.addEventListener("update", handleEvent("update"));
     es.addEventListener("success", handleEvent("success"));
     es.addEventListener("message", handleEvent("message"));
+    es.addEventListener("complaint_resolved", handleEvent("complaint_resolved"));
+    es.addEventListener("complaint_under_review", handleEvent("complaint_under_review"));
+    es.addEventListener("complaint_update", handleEvent("complaint_update"));
+    es.addEventListener("existing_incident", handleEvent("existing_incident"));
 
     es.onopen = () => {
       console.log(`${LOG_TAG} connectSSE() — connection opened ✓`);
@@ -370,10 +328,10 @@ const Notifications = () => {
       markAsRead(id);
       await notificationApiClient.post(`/${id}/read`);
       console.log(`${LOG_TAG} handleMarkRead() — API success for id=${id}`);
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey:  ["notifications"] });
     } catch (err) {
       console.error(`${LOG_TAG} handleMarkRead() — API error for id=${id}:`, err);
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey:  ["notifications"] });
     }
   };
 
@@ -390,10 +348,10 @@ const Notifications = () => {
       markAllAsRead();
       await notificationApiClient.post("/read-all");
       console.log(`${LOG_TAG} handleMarkAllRead() — API success`);
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey:  ["notifications"] });
     } catch (err) {
       console.error(`${LOG_TAG} handleMarkAllRead() — API error:`, err);
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey:  ["notifications"] });
     } finally {
       setMarkingAll(false);
     }

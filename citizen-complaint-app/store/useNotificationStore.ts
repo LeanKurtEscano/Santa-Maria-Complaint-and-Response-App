@@ -1,18 +1,8 @@
 import { create } from "zustand";
+import { Notification } from "@/types/general/notification";
 
-export type NotificationType = "info" | "update" | "success";
 
-export interface Notification {
-  id: number;
-  user_id: number;
-  complaint_id?: number;
-  title: string;
-  message: string;
-  notification_type: NotificationType;
-  channel: string;
-  is_read: boolean;
-  sent_at: string;
-}
+
 
 interface NotificationState {
   notifications: Notification[];

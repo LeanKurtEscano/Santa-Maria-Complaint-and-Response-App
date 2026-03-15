@@ -608,6 +608,32 @@ const resources = {
   "passwordHint": "No spaces allowed. Must be at least 8 characters.",
   "passwordMaxLength": "Password must not exceed 128 characters."
 },
+
+"notifications": {
+    "emptyTitle": "All caught up!",
+    "emptySubtitle": "No notifications yet. We'll let you know when something happens.",
+    "typeInfo": "Info",
+    "typeUpdate": "Update",
+    "typeSuccess": "Success",
+    "typeResolved": "Resolved",
+    "typeUnderReview": "Under Review",
+    "typeForwarded": "Forwarded",
+    "typeExistingIncident": "Existing Incident",
+    "titleInfo": "Information",
+    "titleUpdate": "Complaint Update",
+    "titleSuccess": "Success",
+    "titleResolved": "Complaint Resolved",
+    "titleUnderReview": "Complaint Under Review",
+    "titleForwarded": "Complaint Forwarded to Department",
+    "titleExistingIncident": "Already Part of an Incident",
+    "messageInfo": "You have a new notification.",
+    "messageUpdate": "Your complaint has been updated.",
+    "messageSuccess": "Your request was completed successfully.",
+    "messageResolved": "Your complaint '{{title}}' has been resolved.",
+    "messageUnderReview": "Your complaint '{{title}}' is now under review.",
+    "messageForwarded": "Your complaint has been forwarded to the department for further processing.",
+    "messageExistingIncident": "Your complaint is already part of an existing incident. Similar complaints have already been submitted for this incident."
+  }
     
 
 
@@ -1179,6 +1205,32 @@ const resources = {
   "error_server": "May nagkaroon ng problema sa server. Subukan ulit mamaya.",
   "error_no_internet": "Walang internet connection. Pakisuri ang inyong network at subukan ulit.",
   "error_generic": "May naganap na hindi inaasahang error. Subukan ulit."
+  },
+
+   "notifications": {
+    "emptyTitle": "Wala kang bagong abiso!",
+    "emptySubtitle": "Walang mga abiso pa. Aabisuhan ka namin kapag may nangyari.",
+    "typeInfo": "Impormasyon",
+    "typeUpdate": "Update",
+    "typeSuccess": "Matagumpay",
+    "typeResolved": "Nalutas na",
+    "typeUnderReview": "Sinusuri",
+    "typeForwarded": "Ipinasa sa Departamento",
+    "typeExistingIncident": "Kasalukuyang Insidente",
+    "titleInfo": "Impormasyon",
+    "titleUpdate": "Update sa Reklamo",
+    "titleSuccess": "Matagumpay",
+    "titleResolved": "Nalutas na ang Reklamo",
+    "titleUnderReview": "Reklamo ay Sinusuri",
+    "titleForwarded": "Reklamo ay Ipinasa sa Departamento",
+    "titleExistingIncident": "Bahagi na ng Kasalukuyang Insidente",
+    "messageInfo": "Mayroon kang bagong abiso.",
+    "messageUpdate": "Na-update na ang iyong reklamo.",
+    "messageSuccess": "Matagumpay na nakumpleto ang iyong kahilingan.",
+    "messageResolved": "Ang iyong reklamo na '{{title}}' ay nalutas na.",
+    "messageUnderReview": "Ang iyong reklamo na '{{title}}' ay kasalukuyang sinusuri.",
+    "messageForwarded": "Ang iyong reklamo ay ipinasa na sa departamento para sa karagdagang pagproseso.",
+    "messageExistingIncident": "Ang iyong reklamo ay bahagi na ng isang kasalukuyang insidente. Katulad na mga reklamo ay naisumite na para sa insidenteng ito."
   }
     
 
