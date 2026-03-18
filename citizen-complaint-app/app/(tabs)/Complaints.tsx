@@ -35,8 +35,8 @@ export default function ComplaintsScreen() {
     // If the API hasn't populated them yet, fall back to the constants map,
     // then fall back to the geographic centre of all barangays.
     const fallback = getBarangayCoords(barangay.barangay_name) ?? DEFAULT_COORDS;
-    const lat = barangay.barangay_latitude ?? fallback.lat;
-    const lng = barangay.barangay_longitude ?? fallback.lng;
+    const lat = barangay.latitude ?? fallback.lat;
+    const lng = barangay.longitude ?? fallback.lng;
 
     router.push({
       pathname: '/barangay/[id]',
