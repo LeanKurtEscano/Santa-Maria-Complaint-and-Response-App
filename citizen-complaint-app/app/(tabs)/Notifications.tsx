@@ -23,7 +23,7 @@ import EventSource from "react-native-sse";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { formatTime } from "@/utils/date/date";
-
+import { refreshAccessToken } from "@/utils/general/token";
 // ─── Notification Card ────────────────────────────────────────────────────────
 
 const NotificationCard = React.memo(({
@@ -321,10 +321,14 @@ const Notifications = () => {
     console.log(`${LOG_TAG} connectSSE() — token retrieved ✓`);
 
     const baseURL = `${process.env.EXPO_PUBLIC_IP_URL}/api/v1/notifications`;
-    const url = `${baseURL}/stream?token=${encodeURIComponent(token)}`;
+    const url = `${baseURL}/stream`;
     console.log(`${LOG_TAG} connectSSE() — connecting to: ${url}`);
 
-    const es = new EventSource(url);
+    const es = new EventSource(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
     const handleEvent = (eventType: string) => () => {
       console.log(
@@ -348,13 +352,37 @@ const Notifications = () => {
       setSseStatus("connected");
     };
 
-    es.onerror = (err: any) => {
-      console.error(`${LOG_TAG} connectSSE() — error:`, err);
-      setSseStatus("disconnected");
-      es.close();
-      console.log(`${LOG_TAG} connectSSE() — retrying in 5s...`);
-      setTimeout(connectSSE, 5000);
-    };
+    
+
+  es.onerror = async (err: any) => {
+  console.error(`${LOG_TAG} connectSSE() — error:`, err);
+  setSseStatus("disconnected");
+  es.close();
+  eventSourceRef.current = null;
+
+  // Check if it's a 401
+  const is401 = err?.status === 401 || err?.xhrStatus === 401;
+
+  if (is401) {
+    console.log(`${LOG_TAG} SSE 401 — attempting token refresh...`);
+    const newToken = await refreshAccessToken();
+
+    if (!newToken) {
+      console.warn(`${LOG_TAG} Refresh failed — forcing logout`);
+      // Force logout same way your axios interceptor does
+      const { useCurrentUser } = await import('@/store/useCurrentUserStore');
+      useCurrentUser.getState().clearUser();
+      return; // Don't retry
+    }
+
+    console.log(`${LOG_TAG} Token refreshed ✓ — reconnecting SSE`);
+    setTimeout(connectSSE, 500); // Reconnect with fresh token
+  } else {
+    // Non-401 error — retry as before
+    console.log(`${LOG_TAG} connectSSE() — retrying in 5s...`);
+    setTimeout(connectSSE, 5000);
+  }
+};
 
     eventSourceRef.current = es;
     console.log(`${LOG_TAG} connectSSE() — registered ✓`);
