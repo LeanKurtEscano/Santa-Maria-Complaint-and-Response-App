@@ -162,17 +162,19 @@ const NotificationCard = React.memo(({
           )}
 
           {!item.is_read && (
-            <TouchableOpacity
-              className="self-start flex-row items-center gap-1 mt-1.5 px-2.5 py-1 rounded-full bg-white border border-blue-200"
-              onPress={() => onMarkRead(item.id)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="checkmark" size={11} color="#3B82F6" />
-              <Text className="text-[11px] text-blue-500 font-semibold">
-                Mark as read
-              </Text>
-            </TouchableOpacity>
-          )}
+  <View className="flex-row justify-end mt-1.5">
+    <TouchableOpacity
+      className="flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-blue-200"
+      onPress={() => onMarkRead(item.id)}
+      activeOpacity={0.7}
+    >
+      <Ionicons name="checkmark" size={11} color="#3B82F6" />
+      <Text className="text-[11px] text-blue-500 font-semibold">
+        Mark as read
+      </Text>
+    </TouchableOpacity>
+  </View>
+)}
         </View>
       </TouchableOpacity>
     </Animated.View>
