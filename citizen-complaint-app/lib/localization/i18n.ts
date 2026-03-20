@@ -424,40 +424,83 @@ const resources = {
         }
       },
 
+      
+
       "complaintDetail": {
-        "header": {
-          "back": "Back"
-        },
-        "loading": "Fetching complaint details...",
-        "error": {
-          "title": "Unable to Retrieve Complaint Details",
-          "message": "Failed to fetch complaint details"
-        },
-        "hero": {
-          "complaintId": "Complaint #{{id}}"
-        },
-        "timeline": {
-          "sectionTitle": "Progress",
-          "rejected": {
-            "title": "Complaint Rejected",
-            "description": "This complaint has been reviewed and rejected."
-          }
-        },
-        "details": {
-          "sectionTitle": "Details",
-          "dateFiled": "Date Filed",
-          "dateFiled_value": "{{date}} at {{time}}",
-          "barangay": "Barangay",
-          "barangay_value": "{{name}} — {{address}}",
-          "locationDetails": "Location Details",
-          "assignedDepartment": "Assigned Department",
-          "priorityLevel": "Priority Level",
-          "sector": "Sector"
-        },
-        "barangayContact": {
-          "sectionTitle": "Contact the Barangay"
-        }
+  "header": {
+    "back": "Back"
+  },
+  "loading": "Fetching complaint details...",
+  "error": {
+    "title": "Unable to Retrieve Complaint Details",
+    "message": "Failed to fetch complaint details"
+  },
+  "hero": {
+    "complaintId": "Complaint #{{id}}"
+  },
+  "timeline": {
+    "sectionTitle": "Progress",
+    "rejected": {
+      "title": "Complaint Rejected",
+      "description": "This complaint has been reviewed and rejected."
+    },
+    // ── ADDED ──
+    "badge": {
+      "current": "In Progress",
+      "done": "Done"
+    },
+    "groups": {
+      "barangay": "Barangay",
+      "lgu": "LGU",
+      "department": "Department"
+    },
+    "stages": {
+      "submitted": {
+        "label": "Submitted",
+        "sublabel": "Complaint received"
       },
+      "reviewed_by_barangay": {
+        "label": "Reviewed",
+        "sublabel": "Under barangay review"
+      },
+      "resolved_by_barangay": {
+        "label": "Resolved",
+        "sublabel": "Resolved by barangay"
+      },
+      "forwarded_to_lgu": {
+        "label": "Forwarded to LGU",
+        "sublabel": "Escalated to local government"
+      },
+      "forwarded_to_department": {
+        "label": "Forwarded to Department",
+        "sublabel": "Assigned to a department"
+      },
+      "reviewed_by_department": {
+        "label": "Under Review",
+        "sublabel": "Department is reviewing"
+      },
+      "resolved_by_department": {
+        "label": "Resolved",
+        "sublabel": "Resolved by department"
+      }
+    }
+    // ── END ADDED ──
+  },
+  "details": {
+    "sectionTitle": "Details",
+    "dateFiled": "Date Filed",
+    "dateFiled_value": "{{date}} at {{time}}",
+    "barangay": "Barangay",
+    "barangay_value": "{{name}} — {{address}}",
+    "locationDetails": "Location Details",
+    "assignedDepartment": "Assigned Department",
+    "priorityLevel": "Priority Level",
+    "sector": "Sector"
+  },
+  "barangayContact": {
+    "sectionTitle": "Contact the Barangay"
+  }
+},
       "header": {
         "municipality": "Municipality of",
         "city": "Santa Maria",
@@ -955,40 +998,81 @@ const resources = {
           "screenTitle": "Hindi Ma-retrieve ang mga Barangay"
         }
       },
-      "complaintDetail": {
-        "header": {
-          "back": "Bumalik"
-        },
-        "loading": "Kinukuha ang detalye ng reklamo...",
-        "error": {
-          "title": "Hindi Makuha ang Detalye ng Reklamo",
-          "message": "Nabigo sa pagkuha ng detalye ng reklamo"
-        },
-        "hero": {
-          "complaintId": "Reklamo #{{id}}"
-        },
-        "timeline": {
-          "sectionTitle": "Progreso",
-          "rejected": {
-            "title": "Tinanggihan ang Reklamo",
-            "description": "Ang reklamong ito ay nasuri at tinanggihan."
-          }
-        },
-        "details": {
-          "sectionTitle": "Mga Detalye",
-          "dateFiled": "Petsa ng Pagsumite",
-          "dateFiled_value": "{{date}} nang {{time}}",
-          "barangay": "Barangay",
-          "barangay_value": "{{name}} — {{address}}",
-          "locationDetails": "Mga Detalye ng Lokasyon",
-          "assignedDepartment": "Itinalagang Departamento",
-          "priorityLevel": "Antas ng Priyoridad",
-          "sector": "Sektor"
-        },
-        "barangayContact": {
-          "sectionTitle": "Makipag-ugnayan sa Barangay"
-        }
+   
+   
+   "complaintDetail": {
+  "header": {
+    "back": "Bumalik"
+  },
+  "loading": "Kinukuha ang detalye ng reklamo...",
+  "error": {
+    "title": "Hindi Makuha ang Detalye ng Reklamo",
+    "message": "Nabigo sa pagkuha ng detalye ng reklamo"
+  },
+  "hero": {
+    "complaintId": "Reklamo #{{id}}"
+  },
+  "timeline": {
+    "sectionTitle": "Progreso",
+    "rejected": {
+      "title": "Tinanggihan ang Reklamo",
+      "description": "Ang reklamong ito ay nasuri at tinanggihan."
+    },
+    "badge": {
+      "current": "Isinasagawa",
+      "done": "Tapos Na"
+    },
+    "groups": {
+      "barangay": "Barangay",
+      "lgu": "LGU",
+      "department": "Departamento"
+    },
+    "stages": {
+      "submitted": {
+        "label": "Naisumite",
+        "sublabel": "Natanggap ang reklamo"
       },
+      "reviewed_by_barangay": {
+        "label": "Nasuri",
+        "sublabel": "Sinusuri ng barangay"
+      },
+      "resolved_by_barangay": {
+        "label": "Nalutas",
+        "sublabel": "Nalutas ng barangay"
+      },
+      "forwarded_to_lgu": {
+        "label": "Ipinasa sa LGU",
+        "sublabel": "Isinulong sa lokal na pamahalaan"
+      },
+      "forwarded_to_department": {
+        "label": "Ipinasa sa Departamento",
+        "sublabel": "Itinalaga sa isang departamento"
+      },
+      "reviewed_by_department": {
+        "label": "Isinasaalang-alang",
+        "sublabel": "Sinusuri ng departamento"
+      },
+      "resolved_by_department": {
+        "label": "Nalutas",
+        "sublabel": "Nalutas ng departamento"
+      }
+    }
+  },
+  "details": {
+    "sectionTitle": "Mga Detalye",
+    "dateFiled": "Petsa ng Pagsumite",
+    "dateFiled_value": "{{date}} nang {{time}}",
+    "barangay": "Barangay",
+    "barangay_value": "{{name}} — {{address}}",
+    "locationDetails": "Mga Detalye ng Lokasyon",
+    "assignedDepartment": "Itinalagang Departamento",
+    "priorityLevel": "Antas ng Priyoridad",
+    "sector": "Sektor"
+  },
+  "barangayContact": {
+    "sectionTitle": "Makipag-ugnayan sa Barangay"
+  }
+}   ,
       "complaint_form": {
         "screen_title": "Maghain ng Reklamo",
         "title_label": "Kategorya ng Reklamo",
@@ -1242,7 +1326,10 @@ const resources = {
     "complaint_update": "Ang iyong reklamo ay ipinasa na sa departamento para sa karagdagang pagproseso.",
     "info": "Ang iyong reklamo ay bahagi na ng isang kasalukuyang insidente. Katulad na mga reklamo ay naisumite na para sa insidenteng ito."
   }
-}
+}, 
+
+
+
 
 
     },
