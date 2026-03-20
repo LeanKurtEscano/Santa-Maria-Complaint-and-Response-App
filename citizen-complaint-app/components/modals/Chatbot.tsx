@@ -1,14 +1,5 @@
 /**
  * ChatbotModal — Full-screen FAQ Chatbot for Santa Maria, Laguna.
- *
- * KEYBOARD FIX:
- *  - KeyboardAvoidingView uses behavior="padding" on BOTH platforms
- *  - Input bar is rendered OUTSIDE the FlatList, inside the KAV flex container
- *  - keyboardVerticalOffset accounts for the status bar height on Android
- *  - useSafeAreaInsets handles notch / home indicator padding manually
- *  - This guarantees the input bar is always fully visible above the keyboard
- *
- * Stack: React Native + NativeWind + react-native-safe-area-context
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -33,9 +24,11 @@ import {
   HelpCircle,
   Send,
   Sparkles,
+  Square,
   User,
   Zap,
 } from 'lucide-react-native';
+import { chatbotApiClient } from '@/lib/client/chatbot';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
@@ -48,9 +41,8 @@ interface Message {
   role: Role;
   text: string;
   timestamp: Date;
+  streaming?: boolean;
 }
-
-// ─── FAQ Suggestions ──────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
   '📋 Paano mag-file ng reklamo?',
@@ -73,9 +65,10 @@ const uid = () => String(++_id);
 
 function getFaqReply(input: string): string {
   const l = input.toLowerCase();
-
-  if ((l.includes('reklamo') || l.includes('complaint')) &&
-      (l.includes('file') || l.includes('paano') || l.includes('submit') || l.includes('isumite'))) {
+  if (
+    (l.includes('reklamo') || l.includes('complaint')) &&
+    (l.includes('file') || l.includes('paano') || l.includes('submit') || l.includes('isumite'))
+  ) {
     return '📋 Para mag-file ng reklamo sa Santa Maria:\n\n1️⃣ Buksan ang "Mga Reklamo" tab sa ibaba\n2️⃣ I-tap ang "Magsumite ng Reklamo"\n3️⃣ Piliin ang kategorya ng iyong reklamo\n4️⃣ Isulat ang detalye — maging tiyak at malinaw\n5️⃣ Mag-attach ng larawan/dokumento kung mayroon\n6️⃣ I-tap ang Submit\n\nTatanggap ka ng notification kapag may update. ✅';
   }
   if (l.includes('status') || (l.includes('reklamo') && (l.includes('track') || l.includes('ano na') || l.includes('update')))) {
@@ -133,7 +126,7 @@ function TypingDots() {
         Animated.sequence([
           Animated.delay(delay),
           Animated.timing(dot, { toValue: -5, duration: 280, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-          Animated.timing(dot, { toValue: 0,  duration: 280, easing: Easing.in(Easing.quad),  useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: 280, easing: Easing.in(Easing.quad), useNativeDriver: true }),
           Animated.delay(500),
         ])
       );
@@ -159,31 +152,75 @@ function TypingDots() {
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({ msg, showAvatar, isLast }: { msg: Message; showAvatar: boolean; isLast: boolean }) {
+function MessageBubble({
+  msg,
+  showAvatar,
+  isLast,
+}: {
+  msg: Message;
+  showAvatar: boolean;
+  isLast: boolean;
+}) {
   const isUser = msg.role === 'user';
   const slideAnim = useRef(new Animated.Value(isUser ? 18 : -18)).current;
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
+
+  const [displayedText, setDisplayedText] = useState(msg.streaming ? '' : msg.text);
+  const streamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [cursorVisible, setCursorVisible] = useState(true);
+
+  // Character-by-character streaming effect
+  useEffect(() => {
+    if (!msg.streaming) {
+      setDisplayedText(msg.text);
+      return;
+    }
+    let i = 0;
+    const tick = () => {
+      i++;
+      setDisplayedText(msg.text.slice(0, i));
+      if (i < msg.text.length) {
+        const ch = msg.text[i - 1];
+        const delay = /[.!?\n]/.test(ch) ? 40 : /[,:]/.test(ch) ? 25 : 12;
+        streamRef.current = setTimeout(tick, delay);
+      }
+    };
+    streamRef.current = setTimeout(tick, 10);
+    return () => { if (streamRef.current) clearTimeout(streamRef.current); };
+  }, [msg.text, msg.streaming]);
+
+  // Blinking cursor while streaming
+  useEffect(() => {
+    if (!msg.streaming) return;
+    const blink = setInterval(() => setCursorVisible((v) => !v), 500);
+    return () => clearInterval(blink);
+  }, [msg.streaming]);
 
   useEffect(() => {
     Animated.parallel([
       Animated.spring(slideAnim, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 160, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 160, useNativeDriver: true }),
       Animated.spring(scaleAnim, { toValue: 1, tension: 70, friction: 10, useNativeDriver: true }),
     ]).start();
   }, []);
+
+  const textToShow = msg.streaming
+    ? displayedText + (cursorVisible ? '▍' : ' ')
+    : displayedText;
 
   return (
     <Animated.View
       style={{ opacity: fadeAnim, transform: [{ translateX: slideAnim }, { scale: scaleAnim }] }}
       className={`flex-row items-end px-4 ${isUser ? 'justify-end' : 'justify-start'} ${isLast ? 'mb-3' : 'mb-[3px]'}`}
     >
-      {/* Bot avatar slot */}
       {!isUser && (
         <View className="w-8 h-8 shrink-0 mr-2 mb-0.5">
           {showAvatar ? (
-            <View className="w-8 h-8 rounded-full bg-gradient-to-br items-center justify-center"
-              style={{ backgroundColor: '#2563EB' }}>
+            <View
+              className="w-8 h-8 rounded-full items-center justify-center"
+              style={{ backgroundColor: '#2563EB' }}
+            >
               <Bot size={15} color="white" />
             </View>
           ) : null}
@@ -230,17 +267,16 @@ function MessageBubble({ msg, showAvatar, isLast }: { msg: Message; showAvatar: 
               fontWeight: '400',
             }}
           >
-            {msg.text}
+            {textToShow}
           </Text>
         </View>
-        {isLast && (
+        {isLast && !msg.streaming && (
           <Text className="text-[10px] text-slate-400 mt-1 mx-0.5">
             {formatTime(msg.timestamp)}
           </Text>
         )}
       </View>
 
-      {/* User avatar */}
       {isUser && (
         <View
           className="w-8 h-8 rounded-full items-center justify-center mb-0.5 ml-2 shrink-0"
@@ -281,10 +317,7 @@ function DateSeparator() {
   return (
     <View className="flex-row items-center px-8 my-4 gap-3">
       <View className="flex-1 h-px" style={{ backgroundColor: '#E2E8F0' }} />
-      <View
-        className="px-3 py-1 rounded-full"
-        style={{ backgroundColor: '#F1F5F9' }}
-      >
+      <View className="px-3 py-1 rounded-full" style={{ backgroundColor: '#F1F5F9' }}>
         <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '500' }}>Ngayon</Text>
       </View>
       <View className="flex-1 h-px" style={{ backgroundColor: '#E2E8F0' }} />
@@ -298,11 +331,7 @@ function BotInfo() {
   return (
     <View
       className="mx-4 mb-4 mt-2 rounded-2xl p-4 flex-row items-center gap-3"
-      style={{
-        backgroundColor: '#EFF6FF',
-        borderWidth: 1,
-        borderColor: '#BFDBFE',
-      }}
+      style={{ backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' }}
     >
       <View
         className="w-10 h-10 rounded-full items-center justify-center"
@@ -332,30 +361,34 @@ interface ChatbotModalProps {
 export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const insets = useSafeAreaInsets();
 
-  const [messages, setMessages] = useState<Message[]>([
+  const INITIAL_MESSAGES: Message[] = [
     {
       id: uid(),
       role: 'bot',
       text: 'Kamusta! Ako si SantaBot 👋\n\nAng iyong FAQ assistant para sa Munisipalidad ng Santa Maria, Laguna.\n\nAno ang maipaglilingkod ko sa iyo?',
       timestamp: new Date(),
+      streaming: false,
     },
-  ]);
-  const [input, setInput]       = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  ];
+
+  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);      // waiting for API / local reply
+  const [isStreaming, setIsStreaming] = useState(false); // bot bubble animating text
   const [showSuggestions, setShowSuggestions] = useState(true);
 
-  const listRef   = useRef<FlatList>(null);
+  const listRef = useRef<FlatList>(null);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const inputRef  = useRef<TextInput>(null);
+  const inputRef = useRef<TextInput>(null);
+
+  // Abort controller ref — cancelled when user hits Stop
+  const abortRef = useRef<AbortController | null>(null);
+  // Timeout ref for the streaming finish timer
+  const streamFinishRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (visible) {
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 50,
-        friction: 10,
-        useNativeDriver: true,
-      }).start();
+      Animated.spring(slideAnim, { toValue: 0, tension: 50, friction: 10, useNativeDriver: true }).start();
     } else {
       Animated.timing(slideAnim, {
         toValue: SCREEN_HEIGHT,
@@ -366,74 +399,120 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     }
   }, [visible]);
 
+  // ─── Cancel — stop typing dots OR stop streaming animation ───────────────
+  const handleCancel = useCallback(() => {
+    // Abort in-flight API request
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    // Clear streaming finish timer
+    if (streamFinishRef.current) {
+      clearTimeout(streamFinishRef.current);
+      streamFinishRef.current = null;
+    }
+    // Stop typing indicator
+    setIsTyping(false);
+    // Immediately finalize any streaming bubble
+    setIsStreaming(false);
+    setMessages((prev) =>
+      prev.map((m) => (m.streaming ? { ...m, streaming: false } : m))
+    );
+  }, []);
+
+  // ─── Send ─────────────────────────────────────────────────────────────────
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, isSuggestion = false) => {
       const trimmed = text.trim();
-      if (!trimmed || isTyping) return;
+      if (!trimmed) return;
+
+      // If already busy, cancel current response first then proceed
+      if (isTyping || isStreaming) {
+        handleCancel();
+      }
 
       setInput('');
       setShowSuggestions(false);
 
-      const userMsg: Message = { id: uid(), role: 'user', text: trimmed, timestamp: new Date() };
+      const userMsg: Message = {
+        id: uid(),
+        role: 'user',
+        text: trimmed,
+        timestamp: new Date(),
+        streaming: false,
+      };
       setMessages((prev) => [...prev, userMsg]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
 
       setIsTyping(true);
-      await new Promise((r) => setTimeout(r, 600 + Math.random() * 600));
-      const reply = getFaqReply(trimmed);
-      setIsTyping(false);
 
-      const botMsg: Message = { id: uid(), role: 'bot', text: reply, timestamp: new Date() };
+      let reply: string;
+
+      if (isSuggestion) {
+        // Local FAQ — no network call
+        await new Promise((r) => setTimeout(r, 400 + Math.random() * 300));
+        reply = getFaqReply(trimmed);
+      } else {
+        // RAG backend with abort support
+        try {
+          abortRef.current = new AbortController();
+          const response = await chatbotApiClient.post(
+            '/ask',
+            { question: trimmed },
+            { signal: abortRef.current.signal }
+          );
+          reply = response.data.answer;
+        } catch (err: any) {
+          if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
+            // User cancelled — remove the user message optimistically and stop
+            setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+            setIsTyping(false);
+            return;
+          }
+          reply =
+            'Pasensya na, may problema sa koneksyon. Subukan ulit o pumili mula sa mga mungkahi sa itaas. 🙏';
+        } finally {
+          abortRef.current = null;
+        }
+      }
+
+      setIsTyping(false);
+      setIsStreaming(true);
+
+      const botId = uid();
+      const botMsg: Message = {
+        id: botId,
+        role: 'bot',
+        text: reply,
+        timestamp: new Date(),
+        streaming: true,
+      };
       setMessages((prev) => [...prev, botMsg]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+
+      // Flip streaming off after animation completes
+      const estimatedDuration = reply.length * 13;
+      streamFinishRef.current = setTimeout(() => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === botId ? { ...m, streaming: false } : m))
+        );
+        setIsStreaming(false);
+        streamFinishRef.current = null;
+      }, estimatedDuration);
     },
-    [isTyping]
+    [isTyping, isStreaming, handleCancel]
   );
 
-  // The keyboard offset must include the status bar on Android
-  // so the KAV knows how much space to push up
+  const isBusy = isTyping || isStreaming;
   const kavOffset = Platform.OS === 'android' ? STATUS_BAR_HEIGHT : insets.top;
 
   return (
-    <Modal
-      visible={visible}
-      transparent={false}
-      animationType="none"
-      onRequestClose={onClose}
-    >
-      {/*
-        KEYBOARD LAYOUT STRATEGY:
-        ┌─────────────────────────┐  ← paddingTop: insets.top (status bar safe)
-        │        HEADER           │
-        ├─────────────────────────┤
-        │                         │
-        │     MESSAGES (flex:1)   │  ← scrollable, fills remaining space
-        │                         │
-        ├─────────────────────────┤
-        │    SUGGESTIONS (opt)    │
-        ├─────────────────────────┤
-        │      INPUT BAR          │  ← fixed at bottom, INSIDE the KAV
-        └─────────────────────────┘  ← paddingBottom: insets.bottom (home bar safe)
+    <Modal visible={visible} transparent={false} animationType="none" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+        <Animated.View style={{ flex: 1, transform: [{ translateY: slideAnim }] }}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={kavOffset}>
 
-        KeyboardAvoidingView wraps everything from header down.
-        behavior="padding" on both platforms adds padding at the bottom equal
-        to the keyboard height, which pushes the input bar up perfectly.
-        keyboardVerticalOffset = status bar height so the calculation is correct.
-      */}
-      <View
-        style={{ flex: 1, backgroundColor: '#F8FAFC' }}
-      >
-        {/* Animate the entire screen content sliding up */}
-        <Animated.View
-          style={{ flex: 1, transform: [{ translateY: slideAnim }] }}
-        >
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior="padding"
-            keyboardVerticalOffset={kavOffset}
-          >
-
-            {/* ── Header (inside KAV so it moves with keyboard — keeps layout stable) ── */}
+            {/* ── Header ── */}
             <View
               style={{
                 paddingTop: insets.top,
@@ -447,90 +526,42 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                 elevation: 4,
               }}
             >
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 8,
-                  paddingVertical: 10,
-                  gap: 8,
-                }}
-              >
-                {/* Back */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, gap: 8 }}>
                 <TouchableOpacity
                   onPress={onClose}
                   activeOpacity={0.7}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
+                  style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}
                 >
                   <ArrowLeft size={22} color="#1E293B" />
                 </TouchableOpacity>
 
-                {/* Avatar */}
                 <View style={{ position: 'relative', marginRight: 4 }}>
-                  <View
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 21,
-                      backgroundColor: '#2563EB',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
+                  <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center' }}>
                     <Bot size={20} color="white" />
                   </View>
-                  <View
-                    style={{
-                      position: 'absolute',
-                      bottom: 1,
-                      right: 1,
-                      width: 11,
-                      height: 11,
-                      borderRadius: 6,
-                      backgroundColor: '#22C55E',
-                      borderWidth: 2,
-                      borderColor: '#FFFFFF',
-                    }}
-                  />
+                  <View style={{ position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 6, backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#FFFFFF' }} />
                 </View>
 
-                {/* Name & subtitle */}
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
-                      SantaBot
-                    </Text>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>SantaBot</Text>
                     <Sparkles size={12} color="#3B82F6" />
                   </View>
-                  <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500', marginTop: 1 }}>
-                    FAQ · Santa Maria, Laguna
+                  <Text style={{ fontSize: 11, color: isBusy ? '#3B82F6' : '#64748B', fontWeight: '500', marginTop: 1 }}>
+                    {isBusy ? 'Nagsusulat...' : 'FAQ · Santa Maria, Laguna'}
                   </Text>
                 </View>
 
-                {/* Help */}
                 <TouchableOpacity
                   activeOpacity={0.7}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: '#F8FAFC',
-                  }}
+                  style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}
                 >
                   <HelpCircle size={20} color="#94A3B8" />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* ── Messages list ── */}
+            {/* ── Messages ── */}
             <FlatList
               ref={listRef}
               data={messages}
@@ -539,57 +570,20 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               contentContainerStyle={{ paddingTop: 8, paddingBottom: 12 }}
               showsVerticalScrollIndicator={false}
               onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-              ListHeaderComponent={
-                <>
-                  <DateSeparator />
-                  <BotInfo />
-                </>
-              }
+              ListHeaderComponent={<><DateSeparator /><BotInfo /></>}
               renderItem={({ item, index }) => {
                 const next = messages[index + 1];
                 const isLast = !next || next.role !== item.role;
                 const showAvatar = item.role === 'bot' && isLast;
-                return (
-                  <MessageBubble
-                    msg={item}
-                    showAvatar={showAvatar}
-                    isLast={isLast}
-                  />
-                );
+                return <MessageBubble msg={item} showAvatar={showAvatar} isLast={isLast} />;
               }}
               ListFooterComponent={
                 isTyping ? (
-                  <Animated.View
-                    style={{ flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, marginTop: 4, marginBottom: 4 }}
-                  >
-                    <View
-                      style={{
-                        width: 32, height: 32,
-                        borderRadius: 16,
-                        backgroundColor: '#2563EB',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginRight: 8,
-                        marginBottom: 2,
-                      }}
-                    >
+                  <Animated.View style={{ flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, marginTop: 4, marginBottom: 4 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', marginRight: 8, marginBottom: 2 }}>
                       <Bot size={14} color="white" />
                     </View>
-                    <View
-                      style={{
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: 20,
-                        borderBottomLeftRadius: 5,
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        borderWidth: 1,
-                        borderColor: '#F1F5F9',
-                        shadowColor: '#94a3b8',
-                        shadowOpacity: 0.1,
-                        shadowRadius: 4,
-                        elevation: 1,
-                      }}
-                    >
+                    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 20, borderBottomLeftRadius: 5, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#94a3b8', shadowOpacity: 0.1, shadowRadius: 4, elevation: 1 }}>
                       <TypingDots />
                     </View>
                   </Animated.View>
@@ -597,28 +591,10 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               }
             />
 
-            {/* ── Suggestion chips ── */}
+            {/* ── Suggestions ── */}
             {showSuggestions && (
-              <View
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  borderTopWidth: 1,
-                  borderTopColor: '#F1F5F9',
-                  paddingTop: 12,
-                  paddingBottom: 10,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 10,
-                    color: '#94A3B8',
-                    fontWeight: '700',
-                    letterSpacing: 1.2,
-                    textTransform: 'uppercase',
-                    paddingHorizontal: 16,
-                    marginBottom: 8,
-                  }}
-                >
+              <View style={{ backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12, paddingBottom: 10 }}>
+                <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 8 }}>
                   Mga Madalas na Tanong
                 </Text>
                 <FlatList
@@ -628,18 +604,13 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingHorizontal: 16 }}
                   renderItem={({ item }) => (
-                    <SuggestionChip text={item} onPress={() => sendMessage(item)} />
+                    <SuggestionChip text={item} onPress={() => sendMessage(item, true)} />
                   )}
                 />
               </View>
             )}
 
             {/* ── Input bar ── */}
-            {/*
-              This is INSIDE KeyboardAvoidingView and BELOW the FlatList.
-              When keyboard appears, KAV adds padding equal to keyboard height,
-              which pushes this bar up by exactly that amount — always fully visible.
-            */}
             <View
               style={{
                 backgroundColor: '#FFFFFF',
@@ -653,7 +624,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                 gap: 8,
               }}
             >
-              {/* Text input pill */}
               <View
                 style={{
                   flex: 1,
@@ -665,14 +635,14 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                   alignItems: 'flex-end',
                   minHeight: 44,
                   borderWidth: 1.5,
-                  borderColor: '#E2E8F0',
+                  borderColor: isBusy ? '#BFDBFE' : '#E2E8F0',
                 }}
               >
                 <TextInput
                   ref={inputRef}
                   value={input}
                   onChangeText={setInput}
-                  placeholder="Magtanong tungkol sa Santa Maria..."
+                  placeholder={isBusy ? 'Naghihintay sa sagot...' : 'Magtanong tungkol sa Santa Maria...'}
                   placeholderTextColor="#94A3B8"
                   multiline
                   maxLength={500}
@@ -689,31 +659,47 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                 />
               </View>
 
-              {/* Send button */}
-              <TouchableOpacity
-                onPress={() => sendMessage(input)}
-                disabled={!input.trim() || isTyping}
-                activeOpacity={0.8}
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: input.trim() && !isTyping ? '#2563EB' : '#E2E8F0',
-                  shadowColor: input.trim() && !isTyping ? '#1d4ed8' : 'transparent',
-                  shadowOpacity: 0.35,
-                  shadowRadius: 8,
-                  shadowOffset: { width: 0, height: 3 },
-                  elevation: input.trim() && !isTyping ? 4 : 0,
-                }}
-              >
-                <Send
-                  size={18}
-                  color={input.trim() && !isTyping ? '#FFFFFF' : '#94A3B8'}
-                  style={{ marginLeft: 2 }}
-                />
-              </TouchableOpacity>
+              {/* Stop button — shown while busy */}
+              {isBusy ? (
+                <TouchableOpacity
+                  onPress={handleCancel}
+                  activeOpacity={0.8}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#FEE2E2',
+                    borderWidth: 1.5,
+                    borderColor: '#FECACA',
+                  }}
+                >
+                  <Square size={16} color="#EF4444" fill="#EF4444" />
+                </TouchableOpacity>
+              ) : (
+                /* Send button */
+                <TouchableOpacity
+                  onPress={() => sendMessage(input)}
+                  disabled={!input.trim()}
+                  activeOpacity={0.8}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: input.trim() ? '#2563EB' : '#E2E8F0',
+                    shadowColor: input.trim() ? '#1d4ed8' : 'transparent',
+                    shadowOpacity: 0.35,
+                    shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 3 },
+                    elevation: input.trim() ? 4 : 0,
+                  }}
+                >
+                  <Send size={18} color={input.trim() ? '#FFFFFF' : '#94A3B8'} style={{ marginLeft: 2 }} />
+                </TouchableOpacity>
+              )}
             </View>
 
           </KeyboardAvoidingView>
