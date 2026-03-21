@@ -40,6 +40,7 @@ export default function ComplaintFormScreen() {
 
   // ── Route params ────────────────────────────────────────────────────────────
   const barangayName     = (params.barangayName as string) || 'Barangay';
+  console.log('Received route params:', params)
   const barangayId       = params.id as string;
   const barangayAccountId = params.barangayAccountId as string;
 

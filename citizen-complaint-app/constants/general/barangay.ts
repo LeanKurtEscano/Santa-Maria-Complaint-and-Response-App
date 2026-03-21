@@ -22,17 +22,25 @@ export interface BarangayCoords {
 
 const BARANGAY_COORDS_MAP: Record<string, BarangayCoords> = {
   // Poblacion (aliases included)
-  'barangay uno': { lat: 14.4697286, lng: 121.4219659 },
+'barangay uno': { lat: 14.4697286, lng: 121.4219659 },
   'poblacion uno': { lat: 14.4697286, lng: 121.4219659 },
+  'barangay i (pob)': { lat: 14.4697286, lng: 121.4219659 },   // ← ADD
+  'barangay i': { lat: 14.4697286, lng: 121.4219659 },          // ← ADD
 
   'barangay dos': { lat: 14.4696455, lng: 121.4230174 },
   'poblacion dos': { lat: 14.4696455, lng: 121.4230174 },
+  'barangay ii (pob)': { lat: 14.4696455, lng: 121.4230174 },  // ← ADD
+  'barangay ii': { lat: 14.4696455, lng: 121.4230174 },         // ← ADD
 
   'barangay tres': { lat: 14.4715414, lng: 121.4258766 },
   'poblacion tres': { lat: 14.4715414, lng: 121.4258766 },
+  'barangay iii (pob)': { lat: 14.4715414, lng: 121.4258766 }, // ← ADD
+  'barangay iii': { lat: 14.4715414, lng: 121.4258766 },        // ← ADD
 
   'barangay cuatro': { lat: 14.46988, lng: 121.42532 },
   'poblacion cuatro': { lat: 14.46988, lng: 121.42532 },
+  'barangay iv (pob)': { lat: 14.46988, lng: 121.42532 },      // ← ADD
+  'barangay iv': { lat: 14.46988, lng: 121.42532 },         
 
   // Main barangays
   'adia': { lat: 14.48775, lng: 121.43651 },
