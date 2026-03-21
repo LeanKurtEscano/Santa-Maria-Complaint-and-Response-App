@@ -94,7 +94,7 @@ export default function HomeScreen() {
               delay={60}
              
             />
-            <QuickAction Icon={CalendarDays}  label={t('quick.events')}     delay={120} />
+            <QuickAction Icon={CalendarDays}  label={t('quick.events')}   onPress={() => router.push("/event/events")}  delay={120} />
             <QuickAction Icon={Phone}
   label={t('emergency.title')}   // uses the new "emergency.title" key → "Emergency"
   onPress={() => router.push('/(tabs)/Emergency')}

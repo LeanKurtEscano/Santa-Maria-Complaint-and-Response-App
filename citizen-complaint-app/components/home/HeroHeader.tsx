@@ -1,13 +1,23 @@
 // components/home/HeroHeader.tsx
 // Contains: StickyMiniHeader, ParallaxBlob, HeroHeader, BottomCTA
 import {
-  View, Text, Animated, TouchableOpacity, Platform, StatusBar,
+  View, Text, Animated, TouchableOpacity, Platform, StatusBar, ActivityIndicator,
 } from 'react-native';
 import { useRef, useEffect } from 'react';
-import { Bell, MapPin, Sparkles, Languages, MessageSquarePlus } from 'lucide-react-native';
+import { useQuery } from '@tanstack/react-query';
+import { Bell, MapPin, Sparkles, Languages, MessageSquarePlus, RefreshCw } from 'lucide-react-native';
 import { StatCard } from './StatCard';
 import { STAT_ITEMS } from '@/constants/home/home';
 import { useNotificationStore } from '@/store/useNotificationStore';
+import { complaintApiClient } from '@/lib/client/complaint';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface MyStats {
+  total_complaints: number;
+  resolved_complaints: number;
+  pending_complaints: number;
+}
 
 // ── Notification badge ────────────────────────────────────────────────────────
 
@@ -123,6 +133,58 @@ export function ParallaxBlob({ scrollY, size, top, right, left, speed = 0.3, opa
   );
 }
 
+// ── Stats section sub-components ──────────────────────────────────────────────
+
+function StatsLoading() {
+  return (
+    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', height: 56 }}>
+      <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
+      <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600' }}>
+        Loading stats…
+      </Text>
+    </View>
+  );
+}
+
+function StatsError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 56 }}>
+      <Text style={{ color: '#FCA5A5', fontSize: 12, fontWeight: '600', flex: 1 }}>
+        Failed to load stats.
+      </Text>
+      <TouchableOpacity
+        onPress={onRetry}
+        activeOpacity={0.8}
+        style={{
+          flexDirection: 'row', alignItems: 'center', gap: 5,
+          backgroundColor: 'rgba(255,255,255,0.15)',
+          borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)',
+          borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6,
+        }}
+      >
+        <RefreshCw size={12} color="white" />
+        <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>Retry</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function StatsContent({ data }: { data: MyStats }) {
+  const statItems = [
+    { ...STAT_ITEMS[0], tKey: 'Total',    value: data.total_complaints    },
+    { ...STAT_ITEMS[1], tKey: 'Resolved', value: data.resolved_complaints },
+    { ...STAT_ITEMS[2], tKey: 'Pending',  value: data.pending_complaints  },
+  ];
+
+  return (
+    <View style={{ flexDirection: 'row', gap: 10 }}>
+      {statItems.map(s => (
+        <StatCard key={s.tKey} label={s.tKey} value={s.value} Icon={s.Icon} dot={s.dot} />
+      ))}
+    </View>
+  );
+}
+
 // ── Hero header (full blue section) ──────────────────────────────────────────
 
 export function HeroHeader({
@@ -136,6 +198,16 @@ export function HeroHeader({
   onBell: () => void;
 }) {
   const { unreadCount } = useNotificationStore();
+
+  const { data, isLoading, isError, refetch } = useQuery<MyStats>({
+    queryKey: ['my-stats'],
+    queryFn: async () => {
+      const res = await complaintApiClient.get('/my-stats');
+      return res.data;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes — matches backend cache TTL
+    retry: 2,
+  });
 
   const DIST = 80;
   const paddingBottom  = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 28], extrapolate: 'clamp' });
@@ -201,11 +273,9 @@ export function HeroHeader({
       {/* Stats */}
       <Animated.View style={{ opacity: statsOpacity, transform: [{ translateY: statsTY }] }}>
         <Text className="text-blue-200 text-[10px] font-bold uppercase tracking-widest mb-3">My Complaint Stats</Text>
-        <View className="flex-row gap-2.5">
-          {STAT_ITEMS.map(s => (
-            <StatCard key={s.tKey} label={s.tKey} value={s.value} Icon={s.Icon} dot={s.dot} />
-          ))}
-        </View>
+        {isLoading && <StatsLoading />}
+        {isError   && <StatsError onRetry={refetch} />}
+        {data      && <StatsContent data={data} />}
       </Animated.View>
     </Animated.View>
   );
