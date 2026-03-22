@@ -375,7 +375,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);      // waiting for API / local reply
   const [isStreaming, setIsStreaming] = useState(false); // bot bubble animating text
-  const [showSuggestions, setShowSuggestions] = useState(true);
+  // const [showSuggestions, setShowSuggestions] = useState(true);
 
   const listRef = useRef<FlatList>(null);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -432,7 +432,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
       }
 
       setInput('');
-      setShowSuggestions(false);
+      // setShowSuggestions(false);
 
       const userMsg: Message = {
         id: uid(),
@@ -592,7 +592,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
             />
 
             {/* ── Suggestions ── */}
-            {showSuggestions && (
+            {/* {showSuggestions && (
               <View style={{ backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12, paddingBottom: 10 }}>
                 <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 8 }}>
                   Mga Madalas na Tanong
@@ -610,7 +610,26 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               </View>
             )}
 
+
+
             {/* ── Input bar ── */}
+
+               <View style={{ backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12, paddingBottom: 10 }}>
+                <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 8 }}>
+                  Mga Madalas na Tanong
+                </Text>
+                <FlatList
+                  data={SUGGESTIONS}
+                  keyExtractor={(s) => s}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 16 }}
+                  renderItem={({ item }) => (
+                    <SuggestionChip text={item} onPress={() => sendMessage(item, true)} />
+                  )}
+                />
+              </View>
+
             <View
               style={{
                 backgroundColor: '#FFFFFF',
