@@ -29,91 +29,19 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { chatbotApiClient } from '@/lib/client/chatbot';
-
+import { getFaqReply } from '@/utils/general/chat';
+import { SUGGESTIONS } from '@/constants/general/chat';
+import { Role, Message } from '@/types/general/chat';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
-type Role = 'user' | 'bot';
-interface Message {
-  id: string;
-  role: Role;
-  text: string;
-  timestamp: Date;
-  streaming?: boolean;
-}
-
-const SUGGESTIONS = [
-  '📋 Paano mag-file ng reklamo?',
-  '🔍 Status ng aking reklamo',
-  '📄 Barangay clearance',
-  '🏛️ Mga serbisyo ng munisipyo',
-  '⏰ Oras ng opisina',
-  '📞 Mga contact numbers',
-];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const formatTime = (d: Date) =>
   d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
 
 let _id = 0;
 const uid = () => String(++_id);
-
-// ─── FAQ knowledge base ───────────────────────────────────────────────────────
-
-function getFaqReply(input: string): string {
-  const l = input.toLowerCase();
-  if (
-    (l.includes('reklamo') || l.includes('complaint')) &&
-    (l.includes('file') || l.includes('paano') || l.includes('submit') || l.includes('isumite'))
-  ) {
-    return '📋 Para mag-file ng reklamo sa Santa Maria:\n\n1️⃣ Buksan ang "Mga Reklamo" tab sa ibaba\n2️⃣ I-tap ang "Magsumite ng Reklamo"\n3️⃣ Piliin ang kategorya ng iyong reklamo\n4️⃣ Isulat ang detalye — maging tiyak at malinaw\n5️⃣ Mag-attach ng larawan/dokumento kung mayroon\n6️⃣ I-tap ang Submit\n\nTatanggap ka ng notification kapag may update. ✅';
-  }
-  if (l.includes('status') || (l.includes('reklamo') && (l.includes('track') || l.includes('ano na') || l.includes('update')))) {
-    return '🔍 Makikita ang status ng iyong reklamo sa "Mga Reklamo" tab.\n\nMga estado:\n🔵 Isinumite — natanggap na\n🟡 Sa Proseso — isinasaalang-alang\n🟢 Nalutas — naresolba na\n🔴 Tinanggihan — may kulang na info\n\nMatanggap ka ng push notification sa bawat pagbabago. 📲';
-  }
-  if (l.includes('clearance') || l.includes('barangay clearance')) {
-    return '🏘️ Para makakuha ng Barangay Clearance:\n\n📍 Pumunta sa iyong barangay hall\n🕗 8:00 AM – 5:00 PM, Lunes–Biyernes\n\n📄 Mga kailangan:\n• Valid ID (kahit isa)\n• Proof of residency (kung bago)\n\n💵 Bayad: ₱50–₱100\n⏱️ Oras ng pagproseso: 15–30 minuto\n\n💡 Tip: Pumunta nang maaga para maiwasan ang pila!';
-  }
-  if (l.includes('dokumento') || l.includes('cedula') || l.includes('certificate') || l.includes('permit') || l.includes('sertipiko')) {
-    return '📄 Mga dokumento sa Santa Maria:\n\n• Barangay Clearance → barangay hall\n• Cedula (CTC) → munisipyo\n• Business Permit → BPLO\n• Certificate of Residency → barangay hall\n• Building Permit → Engineering Office\n• Birth/Death/Marriage → Civil Registry\n\n📍 Munisipyo: Magsaysay Ave., Santa Maria\n🕗 8AM–5PM, Lunes–Biyernes';
-  }
-  if (l.includes('oras') || l.includes('schedule') || l.includes('bukas') || l.includes('open')) {
-    return '🕗 Oras ng Munisipalidad ng Santa Maria:\n\n📅 Lunes – Biyernes: 8:00 AM – 5:00 PM\n❌ Sarado: Sabado, Linggo, at pista opisyal\n\nMga 24/7 na serbisyo:\n🚨 Emergency hotlines\n🌊 MDRRMO (disaster response)\n\nPara sa espesyal na schedule, makipag-ugnayan sa opisina. 📞';
-  }
-  if (l.includes('contact') || l.includes('hotline') || l.includes('numero') || l.includes('telepono') || l.includes('makausap')) {
-    return '📞 Mga contact ng Santa Maria, Laguna:\n\n🏛️ Munisipyo → "Hotlines" tab sa app\n🚒 BFP (Fire) → 911\n👮 PNP (Pulisya) → 911\n🌊 MDRRMO → 24/7 hotline\n🏥 RHU → sa loob ng munisipyo\n\nPara sa kumpletong listahan, buksan ang "Hotlines" tab. 📱';
-  }
-  if (l.includes('serbisyo') || l.includes('services') || l.includes('available')) {
-    return '🏛️ Mga serbisyo ng Munisipalidad ng Santa Maria:\n\n📋 Pagsasampa ng reklamo\n📄 Mga dokumento at permit\n💊 Pangunahing kalusugan (RHU)\n🌊 Disaster response (MDRRMO)\n🏗️ Engineering at imprastraktura\n📚 Social welfare (MSWDO)\n💼 Business permit at licensing\n🌿 Agricultural support (MAO)\n👶 Day care at programa para kabataan';
-  }
-  if (l.includes('opisyal') || l.includes('mayor') || l.includes('kapitan') || l.includes('gobyerno')) {
-    return '🏛️ Ang Santa Maria ay pinamumunuan ng:\n\n• Municipal Mayor — pinakamataas na opisyal\n• Vice Mayor — namumuno sa Sangguniang Bayan\n• Mga Konsehal — gumagawa ng batas\n• Mga Kapitan — namumuno sa bawat barangay\n\nPara sa listahan ng opisyal, bisitahin ang opisyal na website ng Santa Maria o makipag-ugnayan sa munisipyo. 📢';
-  }
-  if (l.includes('saan') || l.includes('address') || l.includes('lokasyon') || l.includes('location')) {
-    return '📍 Munisipalidad ng Santa Maria\nMagsaysay Ave., Santa Maria, Laguna\n\n🗺️ Matatagpuan sa hilagang bahagi ng Laguna\n\nMga barangay ng Santa Maria:\nAmuyong, Bagong Bayan, Bubukal, Calios, Duhat, Ibabang Iyam, Ilayang Iyam, Kanluran, Labasan, Malinao, Malinta, Muzon, Palayan, Pulong Buhangin, Sto. Cristo, Talangka, at iba pa.\n\n🗺️ I-search sa Google Maps: "Santa Maria Municipal Hall, Laguna"';
-  }
-  if (l.includes('baha') || l.includes('bagyo') || l.includes('sakuna') || l.includes('emergency') || l.includes('lindol')) {
-    return '🚨 Para sa mga emergency sa Santa Maria:\n\n☎️ MDRRMO — available 24/7\n☎️ 911 — para sa agarang tulong\n\nKung may babala ng bagyo o baha:\n• Huwag lumabas kung hindi kinakailangan\n• Ihanda ang emergency kit\n• Sundan ang instruksyon ng barangay\n• Iulat ang delikadong sitwasyon sa MDRRMO\n\n⚠️ Para sa agarang tulong: 911';
-  }
-  if (l.includes('kalusugan') || l.includes('health') || l.includes('rhu') || l.includes('doktor') || l.includes('bakuna')) {
-    return '🏥 Serbisyong pangkalusugan sa Santa Maria:\n\nRural Health Unit (RHU)\n📍 Sa loob ng munisipyo\n🕗 8AM–5PM, Lunes–Biyernes\n\nMga serbisyo:\n💉 Bakuna (immunization)\n🤰 Prenatal at maternal care\n👶 Child health services\n💊 Free basic medicines\n🩺 Medical consultation\n\n🚑 Emergency: pumunta sa pinakamalapit na ospital o 911';
-  }
-  if (l.includes('bayad') || l.includes('magkano') || l.includes('libre') || l.includes('fee')) {
-    return '💰 Impormasyon sa bayad:\n\n🆓 LIBRE:\n• Pagsasampa ng reklamo\n• Basic health consultation\n• Bakuna para sa bata\n• Social welfare assistance\n\n💵 MAY BAYAD:\n• Barangay Clearance: ₱50–₱100\n• Cedula: nakabatay sa kita\n• Business Permit: nakabatay sa negosyo\n• Building Permit: nakabatay sa proyekto\n\nPara sa eksaktong halaga, makipag-ugnayan sa opisina. 📞';
-  }
-  if (l.includes('hello') || l.includes('hi') || l.includes('kumusta') || l.includes('magandang') || l === 'hey') {
-    return 'Kamusta! 😊 Narito ako para sagutin ang iyong mga tanong tungkol sa:\n\n📋 Reklamo\n📄 Mga dokumento\n🏛️ Mga serbisyo\n📞 Contact numbers\n🗺️ Lokasyon ng Santa Maria\n\nAno ang maipaglilingkod ko sa iyo?';
-  }
-  if (l.includes('salamat') || l.includes('thank')) {
-    return 'Walang anuman! 🙏 Lagi kaming handa para tumulong. Kung mayroon pang ibang katanungan, huwag mag-atubiling magtanong. Mabuhay ang Santa Maria! 🇵🇭';
-  }
-  return 'Pasensya na, hindi ko pa ganap na naiintindihan ang iyong tanong. 😔\n\nNarito ako para sa mga tanong tungkol sa:\n• Pagsasampa ng reklamo\n• Mga dokumento at permit\n• Mga serbisyo ng munisipyo\n• Oras ng opisina at contact\n• Lokasyon ng Santa Maria\n\nSubukan mong i-rephrase ang iyong tanong, o piliin mula sa mga mungkahi sa itaas. 👆';
-}
-
-// ─── Typing dots ──────────────────────────────────────────────────────────────
 
 function TypingDots() {
   const d0 = useRef(new Animated.Value(0)).current;
@@ -149,8 +77,6 @@ function TypingDots() {
     </View>
   );
 }
-
-// ─── Message bubble ───────────────────────────────────────────────────────────
 
 function MessageBubble({
   msg,
@@ -232,31 +158,31 @@ function MessageBubble({
           style={
             isUser
               ? {
-                  backgroundColor: '#2563EB',
-                  borderRadius: 20,
-                  borderBottomRightRadius: 5,
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  shadowColor: '#1d4ed8',
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  shadowOffset: { width: 0, height: 3 },
-                  elevation: 4,
-                }
+                backgroundColor: '#2563EB',
+                borderRadius: 20,
+                borderBottomRightRadius: 5,
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                shadowColor: '#1d4ed8',
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                shadowOffset: { width: 0, height: 3 },
+                elevation: 4,
+              }
               : {
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: 20,
-                  borderBottomLeftRadius: 5,
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  borderWidth: 1,
-                  borderColor: '#F1F5F9',
-                  shadowColor: '#94a3b8',
-                  shadowOpacity: 0.12,
-                  shadowRadius: 6,
-                  shadowOffset: { width: 0, height: 2 },
-                  elevation: 2,
-                }
+                backgroundColor: '#FFFFFF',
+                borderRadius: 20,
+                borderBottomLeftRadius: 5,
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderWidth: 1,
+                borderColor: '#F1F5F9',
+                shadowColor: '#94a3b8',
+                shadowOpacity: 0.12,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 2,
+              }
           }
         >
           <Text
@@ -291,26 +217,27 @@ function MessageBubble({
 
 // ─── Suggestion chip ──────────────────────────────────────────────────────────
 
-function SuggestionChip({ text, onPress }: { text: string; onPress: () => void }) {
+function SuggestionChip({ text, onPress, disabled }: { text: string; onPress: () => void; disabled?: boolean }) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      activeOpacity={0.72}
+      activeOpacity={disabled ? 1 : 0.72}
+      disabled={disabled}
       style={{
         borderWidth: 1.5,
-        borderColor: '#BFDBFE',
-        backgroundColor: '#EFF6FF',
+        borderColor: disabled ? '#E2E8F0' : '#BFDBFE',
+        backgroundColor: disabled ? '#F8FAFC' : '#EFF6FF',
         borderRadius: 20,
         paddingHorizontal: 14,
         paddingVertical: 8,
         marginRight: 8,
+        opacity: disabled ? 0.5 : 1,
       }}
     >
-      <Text style={{ color: '#2563EB', fontSize: 12, fontWeight: '600' }}>{text}</Text>
+      <Text style={{ color: disabled ? '#94A3B8' : '#2563EB', fontSize: 12, fontWeight: '600' }}>{text}</Text>
     </TouchableOpacity>
   );
 }
-
 // ─── Date separator ───────────────────────────────────────────────────────────
 
 function DateSeparator() {
@@ -358,18 +285,21 @@ interface ChatbotModalProps {
   onClose: () => void;
 }
 
+// ✅ Use a fixed constant ID — never changes across reloads
+const INITIAL_MESSAGES: Message[] = [
+  {
+    id: 'bot-welcome',   
+    role: 'bot',
+    text: 'Kamusta! Ako si SantaBot 👋\n\nAng iyong FAQ assistant para sa Munisipalidad ng Santa Maria, Laguna.\n\nAno ang maipaglilingkod ko sa iyo?',
+    timestamp: new Date(),
+    streaming: false,
+  },
+];
+
+
 export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const insets = useSafeAreaInsets();
 
-  const INITIAL_MESSAGES: Message[] = [
-    {
-      id: uid(),
-      role: 'bot',
-      text: 'Kamusta! Ako si SantaBot 👋\n\nAng iyong FAQ assistant para sa Munisipalidad ng Santa Maria, Laguna.\n\nAno ang maipaglilingkod ko sa iyo?',
-      timestamp: new Date(),
-      streaming: false,
-    },
-  ];
 
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
@@ -548,7 +478,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                     <Sparkles size={12} color="#3B82F6" />
                   </View>
                   <Text style={{ fontSize: 11, color: isBusy ? '#3B82F6' : '#64748B', fontWeight: '500', marginTop: 1 }}>
-                    {isBusy ? 'Nagsusulat...' : 'FAQ · Santa Maria, Laguna'}
+                    {isBusy ? 'Nagtytype...' : 'FAQ · Santa Maria, Laguna'}
                   </Text>
                 </View>
 
@@ -614,21 +544,25 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
 
             {/* ── Input bar ── */}
 
-               <View style={{ backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12, paddingBottom: 10 }}>
-                <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 8 }}>
-                  Mga Madalas na Tanong
-                </Text>
-                <FlatList
-                  data={SUGGESTIONS}
-                  keyExtractor={(s) => s}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: 16 }}
-                  renderItem={({ item }) => (
-                    <SuggestionChip text={item} onPress={() => sendMessage(item, true)} />
-                  )}
-                />
-              </View>
+            <View style={{ backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12, paddingBottom: 10 }}>
+              <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 8 }}>
+                Mga Madalas na Tanong
+              </Text>
+              <FlatList
+                data={SUGGESTIONS}
+                keyExtractor={(s) => s}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16 }}
+                renderItem={({ item }) => (
+                  <SuggestionChip
+                    text={item}
+                    onPress={() => sendMessage(item, true)}
+                    disabled={isBusy}  // 👈 add this
+                  />
+                )}
+              />
+            </View>
 
             <View
               style={{
