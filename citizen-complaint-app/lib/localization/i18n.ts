@@ -393,7 +393,7 @@ const resources = {
           "back": "Bumalik"
         },
         "search": {
-          "placeholder": "Maghanap ng reklamo..."
+          "placeholder": "Search Barangay..."
         },
         "filter": {
           "label": "Salain",
@@ -983,6 +983,9 @@ const resources = {
         "header": {
           "title": "Mag-file ng Reklamo",
           "subtitle": "Pumili ng barangay para isumite ang iyong reklamo"
+        },
+        "search": {
+          "placeholder": "Maghanap ng barangay..."
         },
         "buttons": {
           "viewMyComplaints": "Tingnan ang Aking mga Reklamo"

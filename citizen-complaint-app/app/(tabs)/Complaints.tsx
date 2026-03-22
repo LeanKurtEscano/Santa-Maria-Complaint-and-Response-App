@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, TextInput, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { barangayApiClient } from '@/lib/client/barangay';
@@ -6,15 +6,18 @@ import { handleApiError } from '@/utils/general/errorHandler';
 import { ErrorScreen } from '@/screen/general/ErrorScreen';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { ChevronRight, FileText } from 'lucide-react-native';
-import { useState } from 'react';
+import { ChevronRight, FileText, Search, X } from 'lucide-react-native';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { Barangay } from '@/types/general/barangay';
-import { getBarangayCoords,DEFAULT_COORDS } from '@/constants/general/barangay';
+import { getBarangayCoords, DEFAULT_COORDS } from '@/constants/general/barangay';
 
 export default function ComplaintsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchInputRef = useRef<TextInput>(null);
 
   const { data, isPending, error, refetch } = useQuery({
     queryKey: ['barangays'],
@@ -24,16 +27,34 @@ export default function ComplaintsScreen() {
     },
   });
 
+  const filteredData = useMemo(() => {
+    if (!data) return [];
+    const query = searchQuery.trim().toLowerCase();
+    const filtered = query
+      ? data.filter(
+          (barangay) =>
+            barangay.barangay_name.toLowerCase().includes(query) ||
+            barangay.barangay_address?.toLowerCase().includes(query) ||
+            barangay.barangay_contact_number?.toLowerCase().includes(query)
+        )
+      : data;
+    return [...filtered].sort((a, b) =>
+      a.barangay_name.localeCompare(b.barangay_name)
+    );
+  }, [data, searchQuery]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await refetch();
     setRefreshing(false);
   };
 
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    Keyboard.dismiss();
+  }, []);
+
   const handleBarangayPress = (barangay: Barangay) => {
-    // Prefer live coords from the API.
-    // If the API hasn't populated them yet, fall back to the constants map,
-    // then fall back to the geographic centre of all barangays.
     const fallback = getBarangayCoords(barangay.barangay_name) ?? DEFAULT_COORDS;
     const lat = barangay.latitude ?? fallback.lat;
     const lng = barangay.longitude ?? fallback.lng;
@@ -96,6 +117,10 @@ export default function ComplaintsScreen() {
     </TouchableOpacity>
   );
 
+  const isSearchActive = searchQuery.trim().length > 0;
+  const resultCount = filteredData.length;
+  const totalCount = data?.length ?? 0;
+
   return (
     <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
       {/* Header */}
@@ -128,6 +153,51 @@ export default function ComplaintsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Search Bar */}
+      <View className="px-4 pt-3 pb-2">
+        <View
+          className="flex-row items-center bg-white rounded-2xl border px-4"
+          style={{
+            borderColor: isSearchFocused ? '#3B82F6' : '#D1D5DB',
+            borderWidth: isSearchFocused ? 2 : 1.5,
+            shadowColor: isSearchFocused ? '#3B82F6' : '#000',
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: isSearchFocused ? 0.18 : 0.07,
+            shadowRadius: isSearchFocused ? 10 : 6,
+            elevation: isSearchFocused ? 5 : 2,
+          }}
+        >
+          <Search
+            size={22}
+            color={isSearchFocused ? '#3B82F6' : '#6B7280'}
+            style={{ marginRight: 10 }}
+          />
+          <TextInput
+            ref={searchInputRef}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
+            placeholder={t('complaintsScreen.search.placeholder', { defaultValue: 'Search barangays…' })}
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="search"
+            clearButtonMode="never"
+            autoCorrect={false}
+            autoCapitalize="words"
+            style={{ flex: 1, paddingVertical: 14, fontSize: 16, color: '#111827' }}
+          />
+          {isSearchFocused && (
+            <TouchableOpacity
+              onPress={handleClearSearch}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              className="ml-2 bg-gray-200 rounded-full p-1.5"
+            >
+              <X size={14} color="#6B7280" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       {/* Barangay List */}
       {isPending ? (
         <View className="flex-1 items-center justify-center">
@@ -138,17 +208,30 @@ export default function ComplaintsScreen() {
         </View>
       ) : (
         <View className="flex-1">
-          <View className="px-4 pt-4 pb-2">
+          {/* Section Label + Result Count */}
+          <View className="px-4 pt-3 pb-2 flex-row items-center justify-between">
             <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
               {t('complaintsScreen.list.sectionLabel')}
             </Text>
+            {isSearchActive ? (
+              <Text className="text-xs text-blue-600 font-medium">
+                {resultCount} of {totalCount} results
+              </Text>
+            ) : (
+              <Text className="text-xs text-gray-400 font-medium">
+                {totalCount} barangays
+              </Text>
+            )}
           </View>
+
           <FlatList
-            data={data}
+            data={filteredData}
             renderItem={renderBarangayItem}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={{ paddingBottom: 16, paddingTop: 8 }}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -160,10 +243,30 @@ export default function ComplaintsScreen() {
               />
             }
             ListEmptyComponent={
-              <View className="items-center justify-center py-12">
-                <Text className="text-gray-500 text-center">
-                  {t('complaintsScreen.list.empty')}
-                </Text>
+              <View className="items-center justify-center py-12 px-8">
+                {isSearchActive ? (
+                  <>
+                    <View className="bg-gray-100 rounded-full p-4 mb-3">
+                      <Search size={28} color="#9CA3AF" />
+                    </View>
+                    <Text className="text-gray-700 font-semibold text-base text-center mb-1">
+                      No barangays found
+                    </Text>
+                    <Text className="text-gray-400 text-sm text-center">
+                      No results for "{searchQuery}". Try a different name or address.
+                    </Text>
+                    <TouchableOpacity
+                      onPress={handleClearSearch}
+                      className="mt-4 border border-blue-500 rounded-lg px-5 py-2"
+                    >
+                      <Text className="text-blue-600 text-sm font-medium">Clear search</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <Text className="text-gray-500 text-center">
+                    {t('complaintsScreen.list.empty')}
+                  </Text>
+                )}
               </View>
             }
           />
