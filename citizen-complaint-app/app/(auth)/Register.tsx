@@ -332,7 +332,13 @@ export default function RegisterScreen({ navigation }: any) {
       router.replace({ pathname: '/(auth)/Otp', params: { email: data.email } });
     } catch (error: any) {
       if (error?.response?.status === 400) {
-        setError('email', { type: 'server', message: error?.response?.data?.detail || 'Email already registered' });
+        const detail = error?.response?.data?.detail || '';
+
+        if (detail.toLowerCase().includes('phone')) {
+          setError('phoneNumber', { type: 'server', message: detail || 'Phone number already registered' });
+        } else {
+          setError('email', { type: 'server', message: detail || 'Email already registered' });
+        }
         setStep(2);
       } else if (error?.code === 'ECONNABORTED' || error?.code === 'ERR_NETWORK' || error?.message === 'Network Error' || error?.message?.includes('Network request failed')) {
         setNetworkError('Network error. Please check your connection and try again.');
