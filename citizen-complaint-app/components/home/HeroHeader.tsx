@@ -1,10 +1,11 @@
 // components/home/HeroHeader.tsx
 // Contains: StickyMiniHeader, ParallaxBlob, HeroHeader, BottomCTA
 import {
-  View, Text, Animated, TouchableOpacity, Platform, StatusBar, ActivityIndicator,
+  View, Text, Animated, TouchableOpacity, Platform, StatusBar as RNStatusBar, ActivityIndicator,
 } from 'react-native';
 import { useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, MapPin, Sparkles, Languages, MessageSquarePlus, RefreshCw } from 'lucide-react-native';
 import { StatCard } from './StatCard';
 import { STAT_ITEMS } from '@/constants/home/home';
@@ -60,6 +61,7 @@ export function StickyMiniHeader({
   onBell: () => void;
 }) {
   const { unreadCount } = useNotificationStore();
+  const insets = useSafeAreaInsets();
 
   const opacity    = scrollY.interpolate({ inputRange: [120, 180], outputRange: [0, 1], extrapolate: 'clamp' });
   const translateY = scrollY.interpolate({ inputRange: [120, 180], outputRange: [-20, 0], extrapolate: 'clamp' });
@@ -70,7 +72,7 @@ export function StickyMiniHeader({
         position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
         opacity, transform: [{ translateY }],
         backgroundColor: '#2563EB',
-        paddingTop: Platform.OS === 'ios' ? 54 : (StatusBar.currentHeight ?? 24) + 8,
+        paddingTop: insets.top + 10,
         paddingBottom: 14, paddingHorizontal: 20,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         shadowColor: '#1D4ED8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 10,
@@ -95,7 +97,6 @@ export function StickyMiniHeader({
           </Text>
         </TouchableOpacity>
 
-        {/* Bell with badge */}
         <TouchableOpacity
           onPress={onBell}
           activeOpacity={0.8}
@@ -198,6 +199,7 @@ export function HeroHeader({
   onBell: () => void;
 }) {
   const { unreadCount } = useNotificationStore();
+  const insets = useSafeAreaInsets();
 
   const { data, isLoading, isError, refetch } = useQuery<MyStats>({
     queryKey: ['my-stats'],
@@ -205,17 +207,21 @@ export function HeroHeader({
       const res = await complaintApiClient.get('/my-stats');
       return res.data;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes — matches backend cache TTL
+    staleTime: 1000 * 60 * 5,
     retry: 2,
   });
 
   const DIST = 80;
-  const paddingBottom  = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 28], extrapolate: 'clamp' });
-  const titleFontSize  = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [30, 22], extrapolate: 'clamp' });
-  const subOpacity     = scrollY.interpolate({ inputRange: [0, 60],   outputRange: [1, 0],   extrapolate: 'clamp' });
-  const statsOpacity   = scrollY.interpolate({ inputRange: [40, 100], outputRange: [1, 0],   extrapolate: 'clamp' });
-  const statsTY        = scrollY.interpolate({ inputRange: [0, 100],  outputRange: [0, -20], extrapolate: 'clamp' });
-  const paddingTop     = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [20, 10], extrapolate: 'clamp' });
+  const paddingBottom = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 28], extrapolate: 'clamp' });
+  const titleFontSize = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [30, 22], extrapolate: 'clamp' });
+  const subOpacity    = scrollY.interpolate({ inputRange: [0, 60],   outputRange: [1, 0],   extrapolate: 'clamp' });
+  const statsOpacity  = scrollY.interpolate({ inputRange: [40, 100], outputRange: [1, 0],   extrapolate: 'clamp' });
+  const statsTY       = scrollY.interpolate({ inputRange: [0, 100],  outputRange: [0, -20], extrapolate: 'clamp' });
+  const paddingTop    = scrollY.interpolate({
+    inputRange: [0, DIST],
+    outputRange: [20 + insets.top, 10 + insets.top],
+    extrapolate: 'clamp',
+  });
 
   return (
     <Animated.View
@@ -253,7 +259,6 @@ export function HeroHeader({
             <Text className="text-white text-[12px] font-bold">{currentLanguage === 'en' ? 'EN' : 'TL'}</Text>
           </TouchableOpacity>
 
-          {/* Bell with badge */}
           <TouchableOpacity
             onPress={onBell}
             activeOpacity={0.8}

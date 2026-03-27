@@ -83,7 +83,7 @@ export default function LoginScreen({ navigation }: any) {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-white">
+        <SafeAreaView className="flex-1">
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 className="flex-1"

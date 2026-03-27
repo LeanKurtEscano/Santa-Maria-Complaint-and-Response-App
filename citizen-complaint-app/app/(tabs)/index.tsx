@@ -43,7 +43,7 @@ export default function HomeScreen() {
   });
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-slate-50" edges={["bottom"]} >
 
       <StickyMiniHeader scrollY={scrollY} title={t('header.city')} currentLanguage={currentLanguage} onChangeLanguage={() => changeLanguage(currentLanguage === 'en' ? 'tl' : 'en')} />
 
