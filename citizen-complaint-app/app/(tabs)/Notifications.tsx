@@ -40,7 +40,6 @@ const NotificationCard = React.memo(({
   const config = TYPE_CONFIG[item.notification_type] ?? TYPE_CONFIG.info;
   const router = useRouter();
   const { t } = useTranslation();
-  // ── Expandable message state ──
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -65,11 +64,6 @@ const NotificationCard = React.memo(({
 
   return (
     <Animated.View style={{ opacity: fadeAnim }}>
-      {/*
-        Hidden sizer: renders the full message off-screen so onTextLayout reports
-        the REAL line count (not the clamped count from numberOfLines).
-        Once isTruncatable is determined we stop rendering it.
-      */}
       {!isTruncatable && (
         <Text
           style={{ position: "absolute", opacity: 0, fontSize: 13, lineHeight: 18 }}
@@ -79,7 +73,7 @@ const NotificationCard = React.memo(({
             }
           }}
         >
-          {message} 
+          {message}
         </Text>
       )}
 
@@ -99,7 +93,7 @@ const NotificationCard = React.memo(({
                 shadowOpacity: 0.07,
                 shadowRadius: 8,
               }
-            : { elevation: 2 }
+            : isNew ? undefined : { elevation: 2 }  // ← no shadow on Android for new notifications
         }
       >
         {/* Unread dot */}
@@ -162,25 +156,24 @@ const NotificationCard = React.memo(({
           )}
 
           {!item.is_read && (
-  <View className="flex-row justify-end mt-1.5">
-    <TouchableOpacity
-      className="flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-blue-200"
-      onPress={() => onMarkRead(item.id)}
-      activeOpacity={0.7}
-    >
-      <Ionicons name="checkmark" size={11} color="#3B82F6" />
-      <Text className="text-[11px] text-blue-500 font-semibold">
-        Mark as read
-      </Text>
-    </TouchableOpacity>
-  </View>
-)}
+            <View className="flex-row justify-end mt-1.5">
+              <TouchableOpacity
+                className="flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-blue-200"
+                onPress={() => onMarkRead(item.id)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="checkmark" size={11} color="#3B82F6" />
+                <Text className="text-[11px] text-blue-500 font-semibold">
+                  Mark as read
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     </Animated.View>
   );
 });
-
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
 const EmptyState = () => {

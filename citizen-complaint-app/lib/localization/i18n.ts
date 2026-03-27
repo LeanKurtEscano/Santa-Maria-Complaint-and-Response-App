@@ -677,7 +677,7 @@ const resources = {
   "message": {
  
     "update": "Your complaint has been updated.",
-    "success": "Your request was completed successfully.",
+    "success":"Your complaint '{{title}}' has been successfully resolved.",
     "complaint_resolved": "Your complaint '{{title}}' has been resolved.",
     "complaint_under_review": "Your complaint '{{title}}' is now under review.",
     "complaint_update": "Your complaint has been forwarded to the department for further processing.",
@@ -1300,8 +1300,8 @@ const resources = {
   },
 
 "notifications": {
-  "emptyTitle": "Wala kang bagong abiso!",
-  "emptySubtitle": "Walang mga abiso pa. Aabisuhan ka namin kapag may nangyari.",
+  "emptyTitle": "Wala kang bagong notification!",
+  "emptySubtitle": "Walang mga notification pa. Inonotify ka namin kapag may nangyari.",
   "type": {
   
     "update": "Update",
@@ -1323,7 +1323,7 @@ const resources = {
   "message": {
    
     "update": "Na-update na ang iyong reklamo.",
-    "success": "Matagumpay na nakumpleto ang iyong kahilingan.",
+    "success": "Ang iyong reklamo '{{title}}' ay matagumpay na naresolva.",
     "complaint_resolved": "Ang iyong reklamo na '{{title}}' ay nalutas na.",
     "complaint_under_review": "Ang iyong reklamo na '{{title}}' ay kasalukuyang sinusuri.",
     "complaint_update": "Ang iyong reklamo ay ipinasa na sa departamento para sa karagdagang pagproseso.",
