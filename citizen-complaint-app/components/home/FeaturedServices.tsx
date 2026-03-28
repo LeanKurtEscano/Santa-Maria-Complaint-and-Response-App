@@ -1,9 +1,9 @@
-// components/home/FeaturedServicesGrid.tsx
 import { View, Text, Animated, TouchableOpacity, Dimensions } from 'react-native';
 import { useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ShieldCheck, Lock, BadgeCheck, Zap, MessageCircle, ChevronRight } from 'lucide-react-native';
+import { ShieldCheck, BadgeCheck, Zap, ChevronRight } from 'lucide-react-native';
 import { FEATURED_SERVICES } from '@/constants/home/home';
+import { THEME } from '@/constants/theme';
 
 const { width: W } = Dimensions.get('window');
 const CARD_W = (W - 40 - 32 - 10) / 2;
@@ -13,10 +13,10 @@ function NavyCard({ children, style }: { children: React.ReactNode; style?: obje
     <View
       className="rounded-2xl overflow-hidden"
       style={{
-        backgroundColor: '#1E3A8A',
+        backgroundColor: THEME.primaryDark,
         borderWidth: 1,
-        borderColor: '#1D4ED8',
-        shadowColor: '#1D4ED8',
+        borderColor: THEME.primary,
+        shadowColor: THEME.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.18,
         shadowRadius: 12,
@@ -24,7 +24,7 @@ function NavyCard({ children, style }: { children: React.ReactNode; style?: obje
         ...style,
       }}
     >
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: '#60A5FA', opacity: 0.6 }} />
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: THEME.primaryLight, opacity: 0.6 }} />
       {[...Array(7)].map((_, i) => (
         <View key={i} style={{ position: 'absolute', left: i * 65 - 10, top: -20, width: 1, height: '200%', backgroundColor: 'rgba(255,255,255,0.04)', transform: [{ rotate: '20deg' }] }} />
       ))}
@@ -56,7 +56,6 @@ export function FeaturedServicesGrid() {
   return (
     <Animated.View style={{ opacity, transform: [{ translateY }] }} className="mx-5 mb-5">
       <NavyCard>
-        {/* Header */}
         <View className="p-4 flex-row items-center justify-between">
           <View className="flex-row items-center gap-2.5">
             <GlassBox>
@@ -66,14 +65,13 @@ export function FeaturedServicesGrid() {
               <Text style={{ color: 'white', fontSize: 20, fontWeight: '900', letterSpacing: -0.3 }}>
                 {t('complaintServices')}
               </Text>
-              <Text style={{ color: '#93C5FD', fontSize: 12, fontWeight: '500', marginTop: 2 }}>
+              <Text style={{ color: THEME.primaryLight, fontSize: 12, fontWeight: '500', marginTop: 2 }}>
                 {t('secureTransparentFast')}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Trust badges row */}
         <View
           className="flex-row px-4 pb-4 gap-2"
           style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.10)', paddingTop: 12 }}
@@ -89,7 +87,6 @@ export function FeaturedServicesGrid() {
           ))}
         </View>
 
-        {/* Service cards grid */}
         <View className="px-4 pb-4 gap-2.5">
           {[0, 2, 4].map(start => (
             <View key={start} className="flex-row gap-2.5">
@@ -121,21 +118,18 @@ function ServiceCard({ service }: { service: typeof FEATURED_SERVICES[number] })
           borderRadius: 16,
           padding: 14,
           overflow: 'hidden',
-          flex: 1,                          // 👈 fill available height
-          justifyContent: 'space-between',  // 👈 push divider to bottom
+          flex: 1,
+          justifyContent: 'space-between',
         }}
       >
-        {/* Soft glow blob */}
         <View style={{ position: 'absolute', top: -12, left: -12, width: 64, height: 64, borderRadius: 32, backgroundColor: service.glow }} />
 
-        {/* Badge */}
         {service.badge && (
           <View style={{ position: 'absolute', top: 10, right: 10, backgroundColor: service.accent, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
             <Text style={{ color: '#0F172A', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 }}>{service.badge}</Text>
           </View>
         )}
 
-        {/* Top content */}
         <View>
           <GlassBox size={40}>
             <service.Icon size={19} color={service.accent} />
@@ -144,12 +138,11 @@ function ServiceCard({ service }: { service: typeof FEATURED_SERVICES[number] })
           <Text style={{ color: 'white', fontSize: 13, fontWeight: '900', lineHeight: 17, letterSpacing: -0.2, marginTop: 10, marginBottom: 3 }}>
             {t(service.labelKey)}
           </Text>
-          <Text style={{ color: '#93C5FD', fontSize: 10, fontWeight: '600' }} numberOfLines={2}>
+          <Text style={{ color: THEME.primaryLight, fontSize: 10, fontWeight: '600' }} numberOfLines={2}>
             {t(service.descKey)}
           </Text>
         </View>
 
-        {/* Bottom divider + arrow — always pinned to bottom */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10 }}>
           <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.10)' }} />
           <ChevronRight size={11} color={service.accent} />

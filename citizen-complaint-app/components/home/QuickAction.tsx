@@ -1,6 +1,6 @@
-// components/home/QuickAction.tsx
 import { View, Text, Animated, TouchableOpacity } from 'react-native';
 import { useRef, useEffect } from 'react';
+import { THEME } from '@/constants/theme';
 
 type Props = { Icon: any; label: string; onPress?: () => void; delay?: number; badge?: string };
 
@@ -25,18 +25,16 @@ export function QuickAction({ Icon, label, onPress, delay = 0, badge }: Props) {
         activeOpacity={1}
         className="items-center gap-2"
       >
-        {/* Icon container */}
         <View
           style={{
-            shadowColor: '#2563EB',
+            shadowColor: THEME.primary,
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.18,
             shadowRadius: 8,
             elevation: 4,
           }}
         >
-          <View className="w-[58px] h-[58px] rounded-[18px] bg-blue-600 items-center justify-center">
-            {/* Inner shine */}
+          <View className="w-[58px] h-[58px] rounded-[18px] bg-primary-600 items-center justify-center">
             <View
               style={{
                 position: 'absolute',
@@ -51,7 +49,6 @@ export function QuickAction({ Icon, label, onPress, delay = 0, badge }: Props) {
             />
             <Icon size={22} color="#fff" />
 
-            {/* Badge */}
             {badge && (
               <View
                 style={{
@@ -75,7 +72,6 @@ export function QuickAction({ Icon, label, onPress, delay = 0, badge }: Props) {
           </View>
         </View>
 
-        {/* Label */}
         <Text className="text-slate-700 text-[11px] font-bold text-center leading-[15px]">
           {label}
         </Text>

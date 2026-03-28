@@ -26,7 +26,7 @@ import { eventApiClient } from '@/lib/client/event';
 import { EventData } from '@/types/general/home';
 import ErrorScreen from '@/screen/general/ErrorScreen';
 import { handleApiError } from '@/utils/general/errorHandler';
-
+import { ActivityIndicator } from 'react-native';
 
 const HEADER_SCROLL_DISTANCE = 80;
 
@@ -141,6 +141,9 @@ export default function HomeScreen() {
       >
         <HeroHeader
           data={stats}
+          isLoading={isLoadingStats}
+          isError={isErrorStats}
+          refetch={refetchStats}
           scrollY={scrollY}
           cityTitle={t('header.city')}
           municipality={t('header.municipality')}

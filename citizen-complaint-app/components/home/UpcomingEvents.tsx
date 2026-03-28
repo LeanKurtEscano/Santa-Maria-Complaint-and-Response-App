@@ -1,11 +1,9 @@
-// components/home/UpcomingEventsStrip.tsx
 import { View, Text, Animated, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useRef, useEffect, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, ChevronRight, MapPin, ArrowRight, Clock, RefreshCw, WifiOff } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { eventApiClient } from '@/lib/client/event';
+import { THEME } from '@/constants/theme';
 
 const CARD_WIDTH = 260;
 const CARD_GAP   = 14;
@@ -31,13 +29,12 @@ function getThumbnail(media: EventMedia[]): string | null {
 }
 
 const ACCENTS = [
-  { color: '#1D4ED8', dark: '#1E3A8A', text: '#DBEAFE' },
+  { color: THEME.primary,     dark: THEME.primaryDark, text: THEME.primaryMuted },
   { color: '#0E7490', dark: '#164E63', text: '#CFFAFE' },
   { color: '#6D28D9', dark: '#3B0764', text: '#EDE9FE' },
   { color: '#047857', dark: '#064E3B', text: '#D1FAE5' },
 ];
 
-// ── Event card ────────────────────────────────────────────────────────────────
 function EventCard({ event, index, onPress }: { event: EventData; index: number; onPress: () => void }) {
   const accent    = ACCENTS[index % ACCENTS.length];
   const { month, day, weekday, time } = formatEventDate(event.date);
@@ -54,7 +51,6 @@ function EventCard({ event, index, onPress }: { event: EventData; index: number;
         activeOpacity={1} onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}
         style={{ backgroundColor: '#fff', borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: '#E2E8F0', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 14, elevation: 6 }}
       >
-        {/* Top — fixed 150px */}
         <View style={{ width: '100%', height: 150, backgroundColor: accent.dark }}>
           {hasMedia ? (
             <>
@@ -70,16 +66,13 @@ function EventCard({ event, index, onPress }: { event: EventData; index: number;
             </>
           ) : (
             <View style={{ flex: 1, paddingHorizontal: 16, paddingVertical: 14 }}>
-              {/* Date badge — accent color bg, white text, same square shape as image cards */}
               <View style={{ position: 'absolute', top: 10, left: 10, backgroundColor: accent.color, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center', minWidth: 46 }}>
                 <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900', lineHeight: 22 }}>{day}</Text>
                 <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>{month}</Text>
               </View>
-              {/* Weekday pill bottom-right */}
               <View style={{ position: 'absolute', bottom: 10, right: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
                 <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.6 }}>{weekday}</Text>
               </View>
-              {/* Title + description to the right of the badge */}
               <View style={{ flex: 1, justifyContent: 'center', paddingLeft: 62, paddingRight: 8, paddingTop: 4, paddingBottom: 4 }}>
                 <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800', lineHeight: 20 }} numberOfLines={3}>
                   {event.event_name}
@@ -94,7 +87,6 @@ function EventCard({ event, index, onPress }: { event: EventData; index: number;
           )}
         </View>
 
-        {/* Body — fixed 100px */}
         <View style={{ height: 100, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, justifyContent: 'space-between', backgroundColor: '#fff' }}>
           <Text style={{ color: '#0F172A', fontSize: 13, fontWeight: '700', lineHeight: 18, opacity: hasMedia ? 1 : 0 }} numberOfLines={1}>
             {event.event_name}
@@ -124,18 +116,16 @@ function EventCard({ event, index, onPress }: { event: EventData; index: number;
   );
 }
 
-// ── Dot indicator ─────────────────────────────────────────────────────────────
 function DotIndicator({ count, active }: { count: number; active: number }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 14 }}>
       {Array.from({ length: count }).map((_, i) => (
-        <View key={i} style={{ width: i === active ? 20 : 6, height: 6, borderRadius: 3, backgroundColor: i === active ? '#1D4ED8' : '#CBD5E1' }} />
+        <View key={i} style={{ width: i === active ? 20 : 6, height: 6, borderRadius: 3, backgroundColor: i === active ? THEME.primary : '#CBD5E1' }} />
       ))}
     </View>
   );
 }
 
-// ── Error state ───────────────────────────────────────────────────────────────
 function StripError({ onRetry }: { onRetry: () => void }) {
   return (
     <View style={{ height: 120, marginHorizontal: 20, borderRadius: 16, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
@@ -152,8 +142,7 @@ function StripError({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-// ── Main strip ────────────────────────────────────────────────────────────────
-export function UpcomingEventsStrip( {data:events, isLoading, isError, refetch}: {data?: EventData[]; isLoading: boolean; isError: boolean; refetch: () => void} ) {
+export function UpcomingEventsStrip({ data: events = [], isLoading, isError, refetch }: { data?: EventData[]; isLoading: boolean; isError: boolean; refetch: () => void }) {
   const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -163,7 +152,6 @@ export function UpcomingEventsStrip( {data:events, isLoading, isError, refetch}:
   const currentIndex = useRef(0);
   const opacity      = useRef(new Animated.Value(0)).current;
   const translateY   = useRef(new Animated.Value(20)).current;
-
 
   useEffect(() => {
     Animated.parallel([
@@ -198,24 +186,22 @@ export function UpcomingEventsStrip( {data:events, isLoading, isError, refetch}:
 
   return (
     <Animated.View style={{ marginBottom: 20, opacity, transform: [{ translateY }] }}>
-      {/* Header */}
       <View style={{ paddingHorizontal: 20, marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ backgroundColor: '#1E3A8A', borderRadius: 12, padding: 8 }}>
+          <View style={{ backgroundColor: THEME.primaryDark, borderRadius: 12, padding: 8 }}>
             <CalendarDays size={16} color="#fff" />
           </View>
           <Text style={{ color: '#0F172A', fontSize: 16, fontWeight: '800' }}>Upcoming Events</Text>
         </View>
         <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/event/events')} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: '#1D4ED8' }}>See All</Text>
-          <ChevronRight size={13} color="#1D4ED8" />
+          <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.primary }}>See All</Text>
+          <ChevronRight size={13} color={THEME.primary} />
         </TouchableOpacity>
       </View>
 
-      {/* States */}
       {isLoading ? (
         <View style={{ height: 260, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-          <ActivityIndicator color="#1D4ED8" />
+          <ActivityIndicator color={THEME.primary} />
           <Text style={{ color: '#64748B', fontSize: 13 }}>Loading events…</Text>
         </View>
       ) : isError ? (

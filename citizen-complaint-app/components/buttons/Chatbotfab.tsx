@@ -1,25 +1,7 @@
-/**
- * ChatbotFAB — Floating Action Button for the chatbot modal.
- *
- * Stack: React Native + NativeWind (Tailwind className)
- *
- * Usage:
- *   const [open, setOpen] = useState(false);
- *
- *   <ChatbotFAB onPress={() => setOpen(true)} />
- *   <ChatbotModal visible={open} onClose={() => setOpen(false)} />
- *
- * Props:
- *   onPress      — opens the chatbot (wire to ChatbotModal visible state)
- *   badgeCount   — red badge number (0 = hidden)
- *   showLabel    — toggle the animated "Tanong?" label pill
- *   bottomOffset — distance from bottom of screen (default: 108)
- *   rightOffset  — distance from right edge (default: 20)
- */
-
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, TouchableOpacity, View, Text } from 'react-native';
 import { Bot } from 'lucide-react-native';
+import { THEME } from '@/constants/theme';
 
 interface ChatbotFABProps {
   onPress: () => void;
@@ -36,71 +18,36 @@ export default function ChatbotFAB({
   bottomOffset = 108,
   rightOffset = 20,
 }: ChatbotFABProps) {
-  // Mount pop-in
-  const mountAnim   = useRef(new Animated.Value(0)).current;
-
-  // Two independent ripple rings
-  const ripple1     = useRef(new Animated.Value(0)).current;
-  const ripple2     = useRef(new Animated.Value(0)).current;
-
-  // Label slide-in from right
-  const labelSlide  = useRef(new Animated.Value(16)).current;
+  const mountAnim    = useRef(new Animated.Value(0)).current;
+  const ripple1      = useRef(new Animated.Value(0)).current;
+  const ripple2      = useRef(new Animated.Value(0)).current;
+  const labelSlide   = useRef(new Animated.Value(16)).current;
   const labelOpacity = useRef(new Animated.Value(0)).current;
+  const pressScale   = useRef(new Animated.Value(1)).current;
+  const iconSway     = useRef(new Animated.Value(0)).current;
 
-  // Press squeeze
-  const pressScale  = useRef(new Animated.Value(1)).current;
-
-  // Icon sway
-  const iconSway    = useRef(new Animated.Value(0)).current;
-
-  // ── Mount pop-in ──────────────────────────────────────────────────────────
   useEffect(() => {
-    Animated.spring(mountAnim, {
-      toValue: 1,
-      tension: 50,
-      friction: 6,
-      useNativeDriver: true,
-    }).start();
+    Animated.spring(mountAnim, { toValue: 1, tension: 50, friction: 6, useNativeDriver: true }).start();
   }, []);
 
-  // ── Label slide-in (200ms after mount) ───────────────────────────────────
   useEffect(() => {
     if (!showLabel) return;
     const timeout = setTimeout(() => {
       Animated.parallel([
-        Animated.spring(labelSlide, {
-          toValue: 0,
-          tension: 60,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-        Animated.timing(labelOpacity, {
-          toValue: 1,
-          duration: 260,
-          useNativeDriver: true,
-        }),
+        Animated.spring(labelSlide,   { toValue: 0, tension: 60, friction: 8, useNativeDriver: true }),
+        Animated.timing(labelOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
       ]).start();
     }, 320);
     return () => clearTimeout(timeout);
   }, [showLabel]);
 
-  // ── Ripple pulse (runs always, staggered) ─────────────────────────────────
   useEffect(() => {
     const createRipple = (anim: Animated.Value, delay: number) =>
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(anim, {
-            toValue: 1,
-            duration: 1600,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(anim, {
-            toValue: 0,
-            duration: 0,
-            useNativeDriver: true,
-          }),
+          Animated.timing(anim, { toValue: 1, duration: 1600, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
         ])
       );
 
@@ -111,7 +58,6 @@ export default function ChatbotFAB({
     return () => { r1.stop(); r2.stop(); };
   }, []);
 
-  // ── Icon idle sway ────────────────────────────────────────────────────────
   useEffect(() => {
     const sway = Animated.loop(
       Animated.sequence([
@@ -125,27 +71,20 @@ export default function ChatbotFAB({
     return () => sway.stop();
   }, []);
 
-  // ── Press handler ─────────────────────────────────────────────────────────
   const handlePress = () => {
     Animated.sequence([
       Animated.timing(pressScale, { toValue: 0.84, duration: 80, useNativeDriver: true }),
-      Animated.spring(pressScale,  { toValue: 1, tension: 90, friction: 5, useNativeDriver: true }),
+      Animated.spring(pressScale, { toValue: 1, tension: 90, friction: 5, useNativeDriver: true }),
     ]).start();
     onPress();
   };
 
-  // ── Ripple interpolations ─────────────────────────────────────────────────
   const makeRippleStyle = (anim: Animated.Value) => ({
-    transform: [{
-      scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.85] }),
-    }],
+    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.85] }) }],
     opacity: anim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0.5, 0.25, 0] }),
   });
 
-  const iconRotate = iconSway.interpolate({
-    inputRange: [-1, 1],
-    outputRange: ['-8deg', '8deg'],
-  });
+  const iconRotate = iconSway.interpolate({ inputRange: [-1, 1], outputRange: ['-8deg', '8deg'] });
 
   return (
     <Animated.View
@@ -159,55 +98,49 @@ export default function ChatbotFAB({
     >
       <View className="flex-row items-center gap-3">
 
-        {/* ── "Tanong?" label pill ── */}
         {showLabel && (
-          <Animated.View
-            style={{
-              transform: [{ translateX: labelSlide }],
-              opacity: labelOpacity,
-            }}
-          >
-            <View className="bg-white rounded-2xl px-4 py-2 border border-blue-100 shadow shadow-blue-100">
+          <Animated.View style={{ transform: [{ translateX: labelSlide }], opacity: labelOpacity }}>
+            <View
+              style={{
+                backgroundColor: 'white',
+                borderRadius: 16,
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderWidth: 1,
+                borderColor: THEME.primary + '33',
+              }}
+            >
               <View className="flex-row items-center gap-1.5">
-                {/* Blinking dot */}
                 <BlinkDot />
-                <Text className="text-blue-700 text-sm font-bold tracking-wide">
+                <Text style={{ color: THEME.primaryDark, fontSize: 14, fontWeight: '700', letterSpacing: 0.5 }}>
                   Tanong?
                 </Text>
               </View>
             </View>
-            {/* Small arrow pointing right toward FAB */}
             <View
-              className="absolute right-[-6px] top-1/2 w-3 h-3 bg-white border-r border-t border-blue-100 rotate-45"
-              style={{ marginTop: -6 }}
+              className="absolute right-[-6px] top-1/2 w-3 h-3 bg-white rotate-45"
+              style={{ marginTop: -6, borderRightWidth: 1, borderTopWidth: 1, borderColor: THEME.primary + '33' }}
             />
           </Animated.View>
         )}
 
-        {/* ── FAB with ripple rings ── */}
         <View className="items-center justify-center">
-          {/* Ripple ring 1 */}
           <Animated.View
-            className="absolute w-14 h-14 rounded-full bg-blue-500"
-            style={makeRippleStyle(ripple1)}
+            style={[{ position: 'absolute', width: 56, height: 56, borderRadius: 28, backgroundColor: THEME.primary }, makeRippleStyle(ripple1)]}
           />
-          {/* Ripple ring 2 */}
           <Animated.View
-            className="absolute w-14 h-14 rounded-full bg-blue-400"
-            style={makeRippleStyle(ripple2)}
+            style={[{ position: 'absolute', width: 56, height: 56, borderRadius: 28, backgroundColor: THEME.primaryLight }, makeRippleStyle(ripple2)]}
           />
 
           <TouchableOpacity
             onPress={handlePress}
             activeOpacity={1}
-            className="w-14 h-14 rounded-full bg-blue-600 items-center justify-center"
+            style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: THEME.primary, alignItems: 'center', justifyContent: 'center' }}
           >
-            {/* Animated bot icon */}
             <Animated.View style={{ transform: [{ rotate: iconRotate }] }}>
               <Bot size={26} color="white" />
             </Animated.View>
 
-            {/* Badge */}
             {badgeCount > 0 && (
               <View className="absolute -top-1 -right-1 bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1 border-2 border-white">
                 <Text className="text-white text-[9px] font-extrabold leading-none">
@@ -222,8 +155,6 @@ export default function ChatbotFAB({
     </Animated.View>
   );
 }
-
-// ── Blinking dot indicator ─────────────────────────────────────────────────────
 
 function BlinkDot() {
   const blink = useRef(new Animated.Value(1)).current;

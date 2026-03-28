@@ -1,20 +1,19 @@
-// components/home/ui.tsx
-// Shared primitives: Tag, Avatar, DateChip, SectionHeader
 import { View, Text, TouchableOpacity } from 'react-native';
 import { CalendarDays, ChevronRight } from 'lucide-react-native';
+import { THEME } from '@/constants/theme';
 
 export function Tag({ label }: { label: string }) {
   return (
-    <View className="self-start rounded-full bg-blue-50 border border-blue-100 px-3 py-1">
-      <Text className="text-blue-600 text-[10px] font-bold tracking-wider uppercase">{label}</Text>
+    <View style={{ alignSelf: 'flex-start', borderRadius: 99, backgroundColor: THEME.primaryMuted, borderWidth: 1, borderColor: THEME.primary + '33', paddingHorizontal: 12, paddingVertical: 4 }}>
+      <Text style={{ color: THEME.primary, fontSize: 10, fontWeight: '700', letterSpacing: 1 }}>{label.toUpperCase()}</Text>
     </View>
   );
 }
 
 export function Avatar({ name }: { name: string }) {
   return (
-    <View className="w-7 h-7 rounded-full bg-blue-100 items-center justify-center">
-      <Text className="text-blue-600 text-[11px] font-bold">{name[0]?.toUpperCase() ?? 'L'}</Text>
+    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: THEME.primaryMuted, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: THEME.primary, fontSize: 11, fontWeight: '700' }}>{name[0]?.toUpperCase() ?? 'L'}</Text>
     </View>
   );
 }
@@ -34,15 +33,15 @@ export function SectionHeader({ Icon, title, actionLabel, onAction }: {
   return (
     <View className="flex-row items-center justify-between mb-4">
       <View className="flex-row items-center gap-2.5">
-        <View className="rounded-xl p-2 bg-blue-50 border border-blue-100">
-          <Icon size={16} color="#2563EB" />
+        <View style={{ borderRadius: 12, padding: 8, backgroundColor: THEME.primaryMuted, borderWidth: 1, borderColor: THEME.primary + '33' }}>
+          <Icon size={16} color={THEME.primary} />
         </View>
         <Text className="text-slate-900 text-base font-extrabold">{title}</Text>
       </View>
       {actionLabel && (
         <TouchableOpacity onPress={onAction} activeOpacity={0.7} className="flex-row items-center gap-0.5">
-          <Text className="text-[13px] font-bold text-blue-600">{actionLabel}</Text>
-          <ChevronRight size={13} color="#2563EB" />
+          <Text style={{ color: THEME.primary, fontSize: 13, fontWeight: '700' }}>{actionLabel}</Text>
+          <ChevronRight size={13} color={THEME.primary} />
         </TouchableOpacity>
       )}
     </View>

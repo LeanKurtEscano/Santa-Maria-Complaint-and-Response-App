@@ -7,14 +7,13 @@ module.exports = {
     extend: {
       colors: {
         // Primary Colors - Main brand color (Blue)
-        primary: {
-          50: '#EFF6FF',
-          100: '#DBEAFE',
-          500: '#3B82F6',
-          600: '#2563EB',
-          700: '#1D4ED8',
+       primary: {
+          50:  '#F0FDF4',  // was success-50
+          100: '#DCFCE7',
+          500: '#22C55E',  // was success-500
+          600: '#16A34A',  // was success-600
+          700: '#15803D',
         },
-        // Neutral Colors - Grays for text and borders
         neutral: {
           50: '#F9FAFB',
           100: '#F3F4F6',

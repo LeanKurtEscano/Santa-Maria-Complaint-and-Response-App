@@ -12,7 +12,7 @@ import { STAT_ITEMS } from '@/constants/home/home';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { complaintApiClient } from '@/lib/client/complaint';
 import { MyStats } from '@/types/general/home';
-
+import { THEME } from '@/constants/theme';
 
 function NotifBadge({ count }: { count: number }) {
   if (count === 0) return null;
@@ -30,7 +30,7 @@ function NotifBadge({ count }: { count: number }) {
         justifyContent: 'center',
         paddingHorizontal: 3,
         borderWidth: 1.5,
-        borderColor: '#2563EB',
+        borderColor: THEME.primary,
         zIndex: 10,
       }}
     >
@@ -61,11 +61,12 @@ export function StickyMiniHeader({
       style={{
         position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
         opacity, transform: [{ translateY }],
-        backgroundColor: '#2563EB',
+        backgroundColor: THEME.primary,
         paddingTop: insets.top + 10,
         paddingBottom: 14, paddingHorizontal: 20,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        shadowColor: '#1D4ED8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 10,
+        shadowColor: THEME.primaryDark, shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25, shadowRadius: 12, elevation: 10,
       }}
     >
       <Text style={{ color: 'white', fontSize: 17, fontWeight: '800' }}>{title}</Text>
@@ -105,8 +106,6 @@ export function StickyMiniHeader({
   );
 }
 
-// ── Parallax blob ─────────────────────────────────────────────────────────────
-
 export function ParallaxBlob({ scrollY, size, top, right, left, speed = 0.3, opacity = 0.05 }: {
   scrollY: Animated.Value; size: number; top: number; right?: number; left?: number; speed?: number; opacity?: number;
 }) {
@@ -123,8 +122,6 @@ export function ParallaxBlob({ scrollY, size, top, right, left, speed = 0.3, opa
     />
   );
 }
-
-// ── Stats section sub-components ──────────────────────────────────────────────
 
 function StatsLoading() {
   return (
@@ -176,14 +173,15 @@ function StatsContent({ data }: { data: MyStats }) {
   );
 }
 
-// ── Hero header (full blue section) ──────────────────────────────────────────
-
 export function HeroHeader({
-  data,
+  data, isLoading, isError, refetch,
   scrollY, cityTitle, municipality, location,
   currentLanguage, onChangeLanguage, onBell,
 }: {
-  data: MyStats
+  data: MyStats,
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => void;
   scrollY: Animated.Value;
   cityTitle: string; municipality: string; location: string;
   currentLanguage: string;
@@ -207,26 +205,25 @@ export function HeroHeader({
 
   return (
     <Animated.View
-      className="px-5 bg-blue-600 overflow-hidden"
+      className="px-5 bg-primary-600 overflow-hidden"
       style={{ paddingTop, paddingBottom }}
     >
       <ParallaxBlob scrollY={scrollY} size={200} top={-50} right={-50} speed={0.25} opacity={0.05} />
       <ParallaxBlob scrollY={scrollY} size={160} top={60}  left={-30}  speed={0.4}  opacity={0.04} />
       <ParallaxBlob scrollY={scrollY} size={80}  top={60}  right={70}  speed={0.15} opacity={0.04} />
 
-      {/* Top row */}
       <View className="flex-row items-start justify-between mb-7">
         <View className="flex-1">
           <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1.5 mb-1">
-            <Sparkles size={10} color="#93C5FD" />
-            <Text className="text-blue-200 text-[11px] font-bold tracking-widest uppercase">{municipality}</Text>
+            <Sparkles size={10} color={THEME.primaryLight} />
+            <Text className="text-white text-[11px] font-bold tracking-widest uppercase">{municipality}</Text>
           </Animated.View>
           <Animated.Text className="text-white font-black leading-8" style={{ fontSize: titleFontSize }}>
             {cityTitle}
           </Animated.Text>
           <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1 mt-1">
-            <MapPin size={11} color="#93C5FD" />
-            <Text className="text-blue-200 text-[12px] font-medium">{location}</Text>
+            <MapPin size={11} color={THEME.primaryLight} />
+            <Text className="text-white text-[12px] font-medium">{location}</Text>
           </Animated.View>
         </View>
 
@@ -257,9 +254,8 @@ export function HeroHeader({
         </View>
       </View>
 
-      {/* Stats */}
       <Animated.View style={{ opacity: statsOpacity, transform: [{ translateY: statsTY }] }}>
-        <Text className="text-blue-200 text-[10px] font-bold uppercase tracking-widest mb-3">My Complaint Stats</Text>
+        <Text className="text-white text-[10px] font-bold uppercase tracking-widest mb-3">My Complaint Stats</Text>
         {isLoading && <StatsLoading />}
         {isError   && <StatsError onRetry={refetch} />}
         {data      && <StatsContent data={data} />}
@@ -267,8 +263,6 @@ export function HeroHeader({
     </Animated.View>
   );
 }
-
-// ── Bottom CTA ────────────────────────────────────────────────────────────────
 
 export function BottomCTA({ onPress, label }: { onPress: () => void; label: string }) {
   const mountY     = useRef(new Animated.Value(80)).current;
@@ -301,8 +295,10 @@ export function BottomCTA({ onPress, label }: { onPress: () => void; label: stri
           style={{
             transform: [{ scale: scalePress }],
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-            paddingVertical: 16, borderRadius: 16, backgroundColor: '#2563EB',
-            shadowColor: '#1D4ED8', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 14, elevation: 10,
+            paddingVertical: 16, borderRadius: 16,
+            backgroundColor: THEME.primary,
+            shadowColor: THEME.primaryDark, shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.35, shadowRadius: 14, elevation: 10,
           }}
         >
           <MessageSquarePlus size={20} color="white" />
