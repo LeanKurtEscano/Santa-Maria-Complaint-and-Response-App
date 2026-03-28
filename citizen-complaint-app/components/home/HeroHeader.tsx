@@ -11,16 +11,8 @@ import { StatCard } from './StatCard';
 import { STAT_ITEMS } from '@/constants/home/home';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { complaintApiClient } from '@/lib/client/complaint';
+import { MyStats } from '@/types/general/home';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface MyStats {
-  total_complaints: number;
-  resolved_complaints: number;
-  pending_complaints: number;
-}
-
-// ── Notification badge ────────────────────────────────────────────────────────
 
 function NotifBadge({ count }: { count: number }) {
   if (count === 0) return null;
@@ -48,8 +40,6 @@ function NotifBadge({ count }: { count: number }) {
     </View>
   );
 }
-
-// ── Sticky mini header (fades in on scroll) ───────────────────────────────────
 
 export function StickyMiniHeader({
   scrollY, title, currentLanguage, onChangeLanguage, onBell,
@@ -189,9 +179,11 @@ function StatsContent({ data }: { data: MyStats }) {
 // ── Hero header (full blue section) ──────────────────────────────────────────
 
 export function HeroHeader({
+  data,
   scrollY, cityTitle, municipality, location,
   currentLanguage, onChangeLanguage, onBell,
 }: {
+  data: MyStats
   scrollY: Animated.Value;
   cityTitle: string; municipality: string; location: string;
   currentLanguage: string;
@@ -200,16 +192,6 @@ export function HeroHeader({
 }) {
   const { unreadCount } = useNotificationStore();
   const insets = useSafeAreaInsets();
-
-  const { data, isLoading, isError, refetch } = useQuery<MyStats>({
-    queryKey: ['my-stats'],
-    queryFn: async () => {
-      const res = await complaintApiClient.get('/my-stats');
-      return res.data;
-    },
-    staleTime: 1000 * 60 * 5,
-    retry: 2,
-  });
 
   const DIST = 80;
   const paddingBottom = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 28], extrapolate: 'clamp' });

@@ -298,7 +298,7 @@ export default function RegisterScreen({ navigation }: any) {
       step2Errors.push({ field: 'confirmPassword', message: t('passwordMismatch') });
     }
 
-    if (!data.barangay) step2Errors.push({ field: 'barangay', message: t('required') });
+   // if (!data.barangay) step2Errors.push({ field: 'barangay', message: t('required') });
 
     if (step2Errors.length > 0) {
       step2Errors.forEach(({ field, message }) => setError(field, { type: 'manual', message }));
@@ -324,7 +324,7 @@ export default function RegisterScreen({ navigation }: any) {
     setIsLoading(true);
     try {
       await saveFormData();
-      const response = await authApiClient.post('/register', { email: data.email });
+      const response = await authApiClient.post('/register', { email: data.email, phone_number:  data.phoneNumber });
       if (!response || !response.data) throw new Error('Invalid response from server');
       await storeRegistrationData(data);
       setSubmittedEmail(data.email);
@@ -841,10 +841,13 @@ export default function RegisterScreen({ navigation }: any) {
       </View>
 
       {/* ── Address Section ── */}
-      <Text className="text-lg font-semibold text-neutral-800 mb-4">{t('addressInfo')}</Text>
+  
 
-      {/* Barangay */}
-      <View className="mb-6">
+      {/* 
+      
+          <Text className="text-lg font-semibold text-neutral-800 mb-4">{t('addressInfo')}</Text>
+
+           <View className="mb-6">
         <Text className="text-sm font-medium text-neutral-700 mb-2">{t('barangay')} *</Text>
         <Controller
           control={control}
@@ -866,6 +869,9 @@ export default function RegisterScreen({ navigation }: any) {
         />
         <ErrorMessage message={errors.barangay?.message} />
       </View>
+      
+      */}
+     
 
       <Modal visible={showBarangayModal} transparent animationType="slide" onRequestClose={() => setShowBarangayModal(false)}>
         <View className="flex-1 justify-end bg-black/50">

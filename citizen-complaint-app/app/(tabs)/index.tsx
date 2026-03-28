@@ -1,4 +1,3 @@
-
 import { View, Text, Animated, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -21,6 +20,14 @@ import { SectionHeader } from '@/components/home/ui';
 import ChatbotFAB from '@/components/buttons/Chatbotfab';
 import ChatbotModal from '@/components/modals/Chatbot';
 import { FeedbackCard } from '@/components/home/FeedbackCard';
+import { complaintApiClient } from '@/lib/client/complaint';
+import { MyStats } from '@/types/general/home';
+import { eventApiClient } from '@/lib/client/event';
+import { EventData } from '@/types/general/home';
+import ErrorScreen from '@/screen/general/ErrorScreen';
+import { handleApiError } from '@/utils/general/errorHandler';
+
+
 const HEADER_SCROLL_DISTANCE = 80;
 
 export default function HomeScreen() {
@@ -30,22 +37,89 @@ export default function HomeScreen() {
   const [chatOpen, setChatOpen] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  const { data, isLoading, isError, refetch, isRefetching } =
-    useQuery<Announcement[]>({
-      queryKey: ['announcements'],
-      queryFn: async () => (await announcementApiClient.get('/')).data,
-    });
+  // ── Queries ──────────────────────────────────────────────────────────────
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    isRefetching,
+  } = useQuery<Announcement[]>({
+    queryKey: ['announcements'],
+    queryFn: async () => (await announcementApiClient.get('/')).data,
+  });
 
+  const {
+    data: stats,
+    isLoading: isLoadingStats,
+    isError: isErrorStats,
+    refetch: refetchStats,
+  } = useQuery<MyStats>({
+    queryKey: ['my-stats'],
+    queryFn: async () => (await complaintApiClient.get('/my-stats')).data,
+    staleTime: 1000 * 60 * 5,
+    retry: 2,
+  });
+
+  const {
+    data: events = [],
+    isLoading: isLoadingEvents,
+    isError: isErrorEvents,
+    refetch: refetchEvents,
+  } = useQuery<EventData[]>({
+    queryKey: ['events'],
+    queryFn: async () => (await eventApiClient.get('/')).data,
+    staleTime: 1000 * 60 * 5,
+    retry: 2,
+  });
+
+  // ── Derived states ────────────────────────────────────────────────────────
+  const isAnyLoading = isLoading || isLoadingStats || isLoadingEvents;
+  const isAnyError   = isError   || isErrorStats   || isErrorEvents;
+
+  const refetchAll = () => {
+    refetch();
+    refetchStats();
+    refetchEvents();
+  };
+
+ 
+  if (isAnyLoading) {
+  return (
+    <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+      <ActivityIndicator size="large" color="#2563EB" />
+    </SafeAreaView>
+  );
+}
+
+  if (isAnyError) {
+    const appError = handleApiError(new Error(t('home.errors.loadFailed')));
+    return (
+      <ErrorScreen
+        type={appError.type}
+        title={t('home.errors.screenTitle')}
+        onRetry={refetchAll}
+      />
+    );
+  }
+
+  // ── Animations ────────────────────────────────────────────────────────────
   const cardMarginTop = scrollY.interpolate({
     inputRange: [0, HEADER_SCROLL_DISTANCE],
     outputRange: [-24, -12],
     extrapolate: 'clamp',
   });
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={["bottom"]} >
+    <SafeAreaView className="flex-1 bg-slate-50" edges={['bottom']}>
 
-      <StickyMiniHeader scrollY={scrollY} title={t('header.city')} currentLanguage={currentLanguage} onChangeLanguage={() => changeLanguage(currentLanguage === 'en' ? 'tl' : 'en')} />
+      <StickyMiniHeader
+        scrollY={scrollY}
+        title={t('header.city')}
+        currentLanguage={currentLanguage}
+        onChangeLanguage={() => changeLanguage(currentLanguage === 'en' ? 'tl' : 'en')}
+      />
 
       <Animated.ScrollView
         className="flex-1"
@@ -57,12 +131,16 @@ export default function HomeScreen() {
           { useNativeDriver: false },
         )}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#2563EB" colors={['#2563EB']} />
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetchAll}          // 👈 refresh all at once
+            tintColor="#2563EB"
+            colors={['#2563EB']}
+          />
         }
       >
-
-        {/* ── Hero ── */}
         <HeroHeader
+          data={stats}
           scrollY={scrollY}
           cityTitle={t('header.city')}
           municipality={t('header.municipality')}
@@ -86,19 +164,19 @@ export default function HomeScreen() {
             {t('quick.heading')}
           </Text>
           <View className="flex-row justify-between">
-           
             <QuickAction
               Icon={ClipboardList}
               label={t('quick.complaints')}
               onPress={() => router.push('/complaints/UserComplaints')}
               delay={60}
-             
             />
-            <QuickAction Icon={CalendarDays}  label={t('quick.events')}   onPress={() => router.push("/event/events")}  delay={120} />
-            <QuickAction Icon={Phone}
-  label={t('emergency.title')}   // uses the new "emergency.title" key → "Emergency"
-  onPress={() => router.push('/(tabs)/Emergency')}
-  delay={180} />
+            <QuickAction Icon={CalendarDays} label={t('quick.events')} onPress={() => router.push('/event/events')} delay={120} />
+            <QuickAction
+              Icon={Phone}
+              label={t('emergency.title')}
+              onPress={() => router.push('/(tabs)/Emergency')}
+              delay={180}
+            />
           </View>
         </Animated.View>
 
@@ -108,7 +186,7 @@ export default function HomeScreen() {
         </View>
 
         {/* ── Upcoming events ── */}
-        <UpcomingEventsStrip />
+        <UpcomingEventsStrip data={events} isLoading={false} isError={false} refetch={refetchEvents} />
 
         {/* ── Featured complaint services ── */}
         <FeaturedServicesGrid />
@@ -123,8 +201,8 @@ export default function HomeScreen() {
           />
           <AnnouncementsList
             data={data}
-            isLoading={isLoading}
-            isError={isError}
+            isLoading={false}
+            isError={false}
             onRetry={refetch}
           />
         </View>

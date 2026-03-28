@@ -24,3 +24,15 @@ export interface Announcement {
   updated_at: string;
   media: MediaItem[];
 }
+
+
+
+export interface MyStats {
+  total_complaints: number;
+  resolved_complaints: number;
+  pending_complaints: number;
+}
+
+
+export interface EventMedia { id: number; media_url: string; media_type: string; uploaded_at: string; }
+export interface EventData  { id: number; event_name: string; description?: string; date: string; location?: string; media: EventMedia[]; }

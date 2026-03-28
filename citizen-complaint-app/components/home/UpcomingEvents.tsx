@@ -153,7 +153,7 @@ function StripError({ onRetry }: { onRetry: () => void }) {
 }
 
 // ── Main strip ────────────────────────────────────────────────────────────────
-export function UpcomingEventsStrip() {
+export function UpcomingEventsStrip( {data:events, isLoading, isError, refetch}: {data?: EventData[]; isLoading: boolean; isError: boolean; refetch: () => void} ) {
   const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -164,15 +164,6 @@ export function UpcomingEventsStrip() {
   const opacity      = useRef(new Animated.Value(0)).current;
   const translateY   = useRef(new Animated.Value(20)).current;
 
-  const { data: events = [], isLoading, isError, refetch } = useQuery<EventData[]>({
-    queryKey: ['events'],
-    queryFn:  async () => {
-      const res = await eventApiClient.get('/');
-      return res.data;
-    },
-    staleTime: 1000 * 60 * 5, // 5 min
-    retry: 2,
-  });
 
   useEffect(() => {
     Animated.parallel([
