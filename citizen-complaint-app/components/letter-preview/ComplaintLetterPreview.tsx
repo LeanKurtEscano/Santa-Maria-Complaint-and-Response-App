@@ -10,6 +10,8 @@ import { ArrowLeft, Send, FileText, Paperclip, Shield, Scale } from 'lucide-reac
 import { useCurrentUser } from '@/store/useCurrentUserStore';
 import { Attachment } from '@/hooks/general/useAttachment';
 import GeneralToast from '../Toast/GeneralToast';
+import { THEME } from '@/constants/theme';
+
 interface ComplaintLetterPreviewProps {
   barangayName: string;
   title: string;
@@ -49,7 +51,6 @@ export default function ComplaintLetterPreview({
   onConfirmSubmit,
   onBack,
   isSubmitting = false,
- 
 }: ComplaintLetterPreviewProps) {
   const { userData } = useCurrentUser();
 
@@ -63,10 +64,10 @@ export default function ComplaintLetterPreview({
   const fullAddress = userData?.full_address || userData?.barangay || 'N/A';
 
   return (
-    <SafeAreaView className="flex-1 bg-blue-950">
+    <SafeAreaView className="flex-1" style={{ backgroundColor: THEME.primary }}>
 
       {/* ── Top Bar ── */}
-      <View className="flex-row items-center justify-between px-4 py-3 bg-blue-950">
+      <View className="flex-row items-center justify-between px-4 py-3" style={{ backgroundColor: THEME.primary }}>
         <TouchableOpacity
           onPress={onBack}
           className="flex-row items-center gap-1.5 py-2 px-3 rounded-lg bg-white"
@@ -89,7 +90,8 @@ export default function ComplaintLetterPreview({
       </View>
 
       <ScrollView
-        className="flex-1 bg-blue-950"
+        className="flex-1"
+        style={{ backgroundColor: THEME.primary }}
         contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
       >
@@ -127,7 +129,6 @@ export default function ComplaintLetterPreview({
               Municipality of Santa Maria
             </Text>
 
-            {/* Thin rule */}
             <View className="w-20 h-px bg-blue-950 my-3" />
 
             <Text
@@ -150,9 +151,8 @@ export default function ComplaintLetterPreview({
             </Text>
           </View>
 
-          {/* ── Icon Row (no emoji) ── */}
+          {/* ── Icon Row ── */}
           <View className="flex-row items-center justify-between mb-5 px-1">
-            {/* Left seal icon */}
             <View className="w-11 h-11 rounded-full border-2 border-blue-950 bg-blue-50 items-center justify-center">
               <Shield size={18} color="#1e3a5f" />
             </View>
@@ -173,7 +173,6 @@ export default function ComplaintLetterPreview({
               </Text>
             </View>
 
-            {/* Right scale icon */}
             <View className="w-11 h-11 rounded-full border-2 border-blue-950 bg-blue-50 items-center justify-center">
               <Scale size={18} color="#1e3a5f" />
             </View>
@@ -371,8 +370,8 @@ export default function ComplaintLetterPreview({
         {/* ── CTA ── */}
         <View className="mt-6 items-center gap-3">
           <Text
-            className="text-xs text-blue-200 italic"
-            style={{ fontFamily: 'serif' }}
+            className="text-xs italic"
+            style={{ fontFamily: 'serif', color: 'rgba(255,255,255,0.7)' }}
           >
             Review the letter carefully before submitting.
           </Text>
@@ -401,8 +400,8 @@ export default function ComplaintLetterPreview({
           {!isSubmitting && (
             <TouchableOpacity onPress={onBack} className="py-1.5">
               <Text
-                className="text-xs text-blue-200"
-                style={{ fontFamily: 'serif' }}
+                className="text-xs"
+                style={{ fontFamily: 'serif', color: 'rgba(255,255,255,0.7)' }}
               >
                 ← Go back and edit
               </Text>
@@ -412,7 +411,6 @@ export default function ComplaintLetterPreview({
 
       </ScrollView>
 
-     
     </SafeAreaView>
   );
 }

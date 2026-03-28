@@ -19,11 +19,11 @@ import { useTranslation } from 'react-i18next';
 import { PRESET_TITLE_KEYS, OTHER_KEY, PresetTitle } from '@/constants/localization/complaint-title-key';
 import { Attachment } from '@/hooks/general/useAttachment';
 import { StepDots } from './StepDots';
+import { THEME } from '@/constants/theme';
 
 interface FormStepProps {
   barangayName: string;
   hasProfileLocation: boolean;
-  // Title
   selectedPreset: PresetTitle | null;
   customTitle: string;
   titleError: string;
@@ -32,11 +32,9 @@ interface FormStepProps {
   onCloseTitlePicker: () => void;
   onSelectPreset: (preset: PresetTitle) => void;
   onChangeCustomTitle: (text: string) => void;
-  // Message
   message: string;
   messageError: string;
   onChangeMessage: (text: string) => void;
-  // Attachments
   attachments: Attachment[];
   isPickingFile: boolean;
   showAttachmentModal: boolean;
@@ -47,7 +45,6 @@ interface FormStepProps {
   onPickDocument: () => void;
   onRemoveAttachment: (id: string) => void;
   formatFileSize: (size: number) => string;
-  // Navigation
   onBack: () => void;
   onNext: () => void;
 }
@@ -86,9 +83,9 @@ export function FormStep({
 
   const getAttachmentIcon = (type: string) => {
     switch (type) {
-      case 'image': return <ImageIcon size={20} color="#3B82F6" />;
-      case 'video': return <Video size={20} color="#3B82F6" />;
-      default: return <FileText size={20} color="#3B82F6" />;
+      case 'image': return <ImageIcon size={20} color={THEME.primary} />;
+      case 'video': return <Video size={20} color={THEME.primary} />;
+      default:      return <FileText size={20} color={THEME.primary} />;
     }
   };
 
@@ -102,7 +99,7 @@ export function FormStep({
         </TouchableOpacity>
         <View className="flex-1">
           <Text className="text-xl font-bold text-gray-900">{t('complaint_form.screen_title')}</Text>
-          <Text className="text-sm text-blue-600 mt-0.5">{barangayName}</Text>
+          <Text className="text-sm mt-0.5" style={{ color: THEME.primary }}>{barangayName}</Text>
         </View>
         <StepDots current={2} />
       </View>
@@ -137,7 +134,7 @@ export function FormStep({
           </Text>
           <TouchableOpacity
             onPress={onOpenTitlePicker}
-            className={`flex-row items-center justify-between bg-white border-2 rounded-2xl px-4 py-4 ${titleError ? 'border-red-400' : 'border-gray-200'}`}
+            className={`flex-row items-center justify-between bg-white rounded-2xl px-4 py-4 border-2 ${titleError ? 'border-red-400' : 'border-gray-200'}`}
             style={{ shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}
           >
             <Text numberOfLines={1} className={`flex-1 text-base ${selectedPreset ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
@@ -148,8 +145,11 @@ export function FormStep({
 
           {isOtherSelected && (
             <View className="mt-3">
-              <View className={`flex-row items-center bg-white border-2 rounded-2xl px-4 py-3.5 ${titleError ? 'border-red-400' : 'border-blue-400'}`}>
-                <PenLine size={18} color="#3B82F6" />
+              <View
+                className={`flex-row items-center bg-white border-2 rounded-2xl px-4 py-3.5 ${titleError ? 'border-red-400' : ''}`}
+                style={!titleError ? { borderColor: THEME.primary } : undefined}
+              >
+                <PenLine size={18} color={THEME.primary} />
                 <TextInput
                   value={customTitle}
                   onChangeText={onChangeCustomTitle}
@@ -161,7 +161,9 @@ export function FormStep({
                 />
                 <Text className="text-xs text-gray-400 ml-2">{customTitle.length}/100</Text>
               </View>
-              <Text className="text-sm text-blue-500 mt-1.5 ml-1">{t('complaint_form.custom_title_hint')}</Text>
+              <Text className="text-sm mt-1.5 ml-1" style={{ color: THEME.primary }}>
+                {t('complaint_form.custom_title_hint')}
+              </Text>
             </View>
           )}
 
@@ -214,7 +216,7 @@ export function FormStep({
 
           {attachments.map((attachment) => (
             <View key={attachment.id} className="bg-white border border-gray-200 rounded-2xl p-4 mb-2.5 flex-row items-center">
-              <View className="bg-blue-50 p-2.5 rounded-xl mr-3">
+              <View className="p-2.5 rounded-xl mr-3" style={{ backgroundColor: `${THEME.primary}15` }}>
                 {getAttachmentIcon(attachment.type)}
               </View>
               <View className="flex-1">
@@ -232,12 +234,15 @@ export function FormStep({
           {attachments.length < 3 && (
             <TouchableOpacity
               onPress={onOpenAttachmentModal}
-              className="bg-white border-2 border-dashed border-blue-300 rounded-2xl py-7 items-center justify-center active:bg-blue-50"
+              className="bg-white border-2 border-dashed rounded-2xl py-7 items-center justify-center"
+              style={{ borderColor: `${THEME.primary}60` }}
             >
-              <View className="bg-blue-50 p-3.5 rounded-2xl mb-3">
-                <Upload size={26} color="#3B82F6" />
+              <View className="p-3.5 rounded-2xl mb-3" style={{ backgroundColor: `${THEME.primary}15` }}>
+                <Upload size={26} color={THEME.primary} />
               </View>
-              <Text className="text-blue-600 font-bold text-base">{t('complaint_form.add_attachment')}</Text>
+              <Text className="font-bold text-base" style={{ color: THEME.primary }}>
+                {t('complaint_form.add_attachment')}
+              </Text>
               <Text className="text-gray-400 text-sm mt-1">
                 {t('complaint_form.attachments_count', { count: attachments.length })}
               </Text>
@@ -246,11 +251,18 @@ export function FormStep({
         </View>
 
         {/* ── Info Box ── */}
-        <View className="bg-blue-50 border border-blue-200 rounded-2xl p-5 mb-6 flex-row items-start">
-          <Info size={18} color="#1D4ED8" style={{ marginTop: 1, flexShrink: 0 }} />
+        <View
+          className="rounded-2xl p-5 mb-6 flex-row items-start border"
+          style={{ backgroundColor: `${THEME.primary}10`, borderColor: `${THEME.primary}30` }}
+        >
+          <Info size={18} color={THEME.primary} style={{ marginTop: 1, flexShrink: 0 }} />
           <View className="flex-1 ml-3">
-            <Text className="text-sm font-bold text-blue-900 mb-1">{t('complaint_form.note_title')}</Text>
-            <Text className="text-sm text-blue-800 leading-6">{t('complaint_form.note_body')}</Text>
+            <Text className="text-sm font-bold mb-1" style={{ color: THEME.primary }}>
+              {t('complaint_form.note_title')}
+            </Text>
+            <Text className="text-sm leading-6" style={{ color: THEME.primary }}>
+              {t('complaint_form.note_body')}
+            </Text>
           </View>
         </View>
 
@@ -269,11 +281,17 @@ export function FormStep({
       <View className="bg-white border-t border-gray-100 px-5 py-4">
         <TouchableOpacity
           onPress={onNext}
-          className="py-4 rounded-2xl items-center justify-center bg-blue-600 active:bg-blue-700 flex-row gap-2"
-          style={{ shadowColor: '#2563EB', shadowOpacity: 0.25, shadowRadius: 10, elevation: 4 }}
+          className="py-4 rounded-2xl items-center justify-center flex-row gap-2"
+          style={{
+            backgroundColor: THEME.primary,
+            shadowColor: THEME.primary,
+            shadowOpacity: 0.25,
+            shadowRadius: 10,
+            elevation: 4,
+          }}
         >
-          <Text className="text-white font-bold text-base">Next: Pin Location</Text>
-          <ArrowRight size={18} color="white" />
+          <Text className="font-bold text-base" style={{ color: '#ffffff' }}>Next: Pin Location</Text>
+          <ArrowRight size={18} color="#ffffff" />
         </TouchableOpacity>
       </View>
 
@@ -302,13 +320,17 @@ export function FormStep({
                 return (
                   <TouchableOpacity
                     onPress={() => onSelectPreset(item)}
-                    className={`flex-row items-center py-4 px-4 mb-1.5 rounded-2xl border ${isSelected ? 'bg-blue-50 border-blue-400' : isOther ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-100'}`}
+                    className={`flex-row items-center py-4 px-4 mb-1.5 rounded-2xl border ${isOther ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-100'}`}
+                    style={isSelected ? { backgroundColor: `${THEME.primary}10`, borderColor: THEME.primary } : undefined}
                   >
                     {isOther && <PenLine size={16} color="#6B7280" style={{ marginRight: 8 }} />}
-                    <Text className={`flex-1 text-base ${isSelected ? 'font-bold text-blue-700' : isOther ? 'italic text-gray-500' : 'text-gray-900'}`}>
+                    <Text
+                      className={`flex-1 text-base ${isOther && !isSelected ? 'italic text-gray-500' : 'text-gray-900'}`}
+                      style={isSelected ? { fontWeight: 'bold', color: THEME.primary } : undefined}
+                    >
                       {t(item.key)}
                     </Text>
-                    {isSelected && <Check size={20} color="#3B82F6" />}
+                    {isSelected && <Check size={20} color={THEME.primary} />}
                   </TouchableOpacity>
                 );
               }}
@@ -339,18 +361,26 @@ export function FormStep({
             </View>
             <View className="px-4 py-4">
               {[
-                { onPress: onPickImage,    bg: 'bg-blue-50',   iconBg: 'bg-blue-600',   icon: <ImageIcon size={24} color="white" />, label: t('complaint_form.attachment_photo'),    hint: t('complaint_form.attachment_photo_hint'),    tag: 'JPG, PNG', tagBg: 'bg-blue-600' },
-                { onPress: onPickVideo,    bg: 'bg-purple-50', iconBg: 'bg-purple-600', icon: <Video size={24} color="white" />,     label: t('complaint_form.attachment_video'),    hint: t('complaint_form.attachment_video_hint'),    tag: 'MP4, MOV', tagBg: 'bg-purple-600' },
-                { onPress: onPickDocument, bg: 'bg-green-50',  iconBg: 'bg-green-600',  icon: <FileText size={24} color="white" />,  label: t('complaint_form.attachment_document'), hint: t('complaint_form.attachment_document_hint'), tag: 'ANY',      tagBg: 'bg-green-600' },
+                { onPress: onPickImage,    bg: `${THEME.primary}10`, iconBg: THEME.primary, icon: <ImageIcon size={24} color="#ffffff" />, label: t('complaint_form.attachment_photo'),    hint: t('complaint_form.attachment_photo_hint'),    tag: 'JPG, PNG' },
+                { onPress: onPickVideo,    bg: '#f5f3ff',            iconBg: '#7c3aed',     icon: <Video size={24} color="#ffffff" />,     label: t('complaint_form.attachment_video'),    hint: t('complaint_form.attachment_video_hint'),    tag: 'MP4, MOV' },
+                { onPress: onPickDocument, bg: '#f0fdf4',            iconBg: '#16a34a',     icon: <FileText size={24} color="#ffffff" />,  label: t('complaint_form.attachment_document'), hint: t('complaint_form.attachment_document_hint'), tag: 'ANY' },
               ].map((opt, i) => (
-                <TouchableOpacity key={i} onPress={opt.onPress} disabled={isPickingFile} className={`flex-row items-center p-4 ${opt.bg} rounded-2xl mb-3 ${isPickingFile ? 'opacity-50' : ''}`}>
-                  <View className={`${opt.iconBg} p-3 rounded-2xl mr-4`}>{opt.icon}</View>
+                <TouchableOpacity
+                  key={i}
+                  onPress={opt.onPress}
+                  disabled={isPickingFile}
+                  className={`flex-row items-center p-4 rounded-2xl mb-3 ${isPickingFile ? 'opacity-50' : ''}`}
+                  style={{ backgroundColor: opt.bg }}
+                >
+                  <View className="p-3 rounded-2xl mr-4" style={{ backgroundColor: opt.iconBg }}>
+                    {opt.icon}
+                  </View>
                   <View className="flex-1">
                     <Text className="text-base font-bold text-gray-900 mb-0.5">{opt.label}</Text>
                     <Text className="text-sm text-gray-500">{opt.hint}</Text>
                   </View>
-                  <View className={`${opt.tagBg} px-3 py-1.5 rounded-full`}>
-                    <Text className="text-white text-xs font-bold">{opt.tag}</Text>
+                  <View className="px-3 py-1.5 rounded-full" style={{ backgroundColor: opt.iconBg }}>
+                    <Text className="text-xs font-bold" style={{ color: '#ffffff' }}>{opt.tag}</Text>
                   </View>
                 </TouchableOpacity>
               ))}

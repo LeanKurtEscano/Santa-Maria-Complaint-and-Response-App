@@ -4,6 +4,7 @@ import ErrorScreen from "@/screen/general/ErrorScreen";
 import { CategoryIcon } from "@/components/complaint/CategoryIcon";
 import { StatusBadge } from "@/components/complaint/StatusBadge";
 import { formatDate, formatTime, getCategoryLabel } from "@/constants/complaint/complaint";
+import { THEME } from "@/constants/theme";
 import { Complaint } from "@/types/complaints/complaint";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -32,129 +33,76 @@ import {
 } from "react-native";
 
 // ─── Status Pipeline ──────────────────────────────────────────────────────────
-//  0  submitted
-//  1  reviewed_by_barangay
-//  2  resolved_by_barangay
-//  3  forwarded_to_lgu
-//  4  forwarded_to_department
-//  5  reviewed_by_department
-//  6  resolved_by_department
+//
+// The raw statuses from the API are mapped into a simplified 4-step timeline:
+//
+//   1. Submitted
+//   2. Under Review       ← covers reviewed_by_barangay / reviewed_by_department
+//   3. Forwarded          ← covers forwarded_to_lgu / forwarded_to_department
+//                            (hidden when complaint is resolved at barangay level)
+//   4. Resolved           ← covers resolved_by_barangay / resolved_by_department
+//
+// The timeline auto-collapses: if resolved at barangay level, "Forwarded" is
+// never shown. Labels adjust based on who is currently handling the complaint.
 
-interface DisplayStage {
-  key: string;
-  labelKey: string;
-  sublabelKey: string;
-  group?: "barangay" | "lgu" | "department";
-  groupLabelKey?: string;
+type RawStatus =
+  | "submitted"
+  | "reviewed_by_barangay"
+  | "resolved_by_barangay"
+  | "forwarded_to_lgu"
+  | "forwarded_to_department"
+  | "reviewed_by_department"
+  | "resolved_by_department"
+  | "rejected";
+
+/** Which simplified stage index is active (0-based) */
+function getActiveStageIndex(raw: string): number {
+  switch (raw) {
+    case "submitted":               return 0;
+    case "reviewed_by_barangay":    return 1;
+    case "forwarded_to_lgu":        return 2;
+    case "forwarded_to_department": return 2;
+    case "reviewed_by_department":  return 1; // still "Under Review" at dept level
+    case "resolved_by_barangay":    return 3;
+    case "resolved_by_department":  return 3;
+    default:                        return 0;
+  }
 }
 
-const DISPLAY_STAGES: DisplayStage[] = [
-  {
-    key: "submitted",
-    labelKey: "complaintDetail.timeline.stages.submitted.label",
-    sublabelKey: "complaintDetail.timeline.stages.submitted.sublabel",
-  },
-  {
-    key: "reviewed_by_barangay",
-    labelKey: "complaintDetail.timeline.stages.reviewed_by_barangay.label",
-    sublabelKey: "complaintDetail.timeline.stages.reviewed_by_barangay.sublabel",
-    group: "barangay",
-    groupLabelKey: "complaintDetail.timeline.groups.barangay",
-  },
-  {
-    key: "resolved_by_barangay",
-    labelKey: "complaintDetail.timeline.stages.resolved_by_barangay.label",
-    sublabelKey: "complaintDetail.timeline.stages.resolved_by_barangay.sublabel",
-    group: "barangay",
-  },
-  {
-    key: "forwarded_to_lgu",
-    labelKey: "complaintDetail.timeline.stages.forwarded_to_lgu.label",
-    sublabelKey: "complaintDetail.timeline.stages.forwarded_to_lgu.sublabel",
-    group: "lgu",
-    groupLabelKey: "complaintDetail.timeline.groups.lgu",
-  },
-  {
-    key: "forwarded_to_department",
-    labelKey: "complaintDetail.timeline.stages.forwarded_to_department.label",
-    sublabelKey: "complaintDetail.timeline.stages.forwarded_to_department.sublabel",
-    group: "department",
-    groupLabelKey: "complaintDetail.timeline.groups.department",
-  },
-  {
-    key: "reviewed_by_department",
-    labelKey: "complaintDetail.timeline.stages.reviewed_by_department.label",
-    sublabelKey: "complaintDetail.timeline.stages.reviewed_by_department.sublabel",
-    group: "department",
-  },
-  {
-    key: "resolved_by_department",
-    labelKey: "complaintDetail.timeline.stages.resolved_by_department.label",
-    sublabelKey: "complaintDetail.timeline.stages.resolved_by_department.sublabel",
-    group: "department",
-  },
-];
-
-function statusToStageIndex(status: string): number {
-  return DISPLAY_STAGES.findIndex((s) => s.key === status);
+/** Whether to show the "Forwarded" step (hidden for barangay-only flow) */
+function showsForwardedStep(raw: string): boolean {
+  return [
+    "forwarded_to_lgu",
+    "forwarded_to_department",
+    "reviewed_by_department",
+    "resolved_by_department",
+  ].includes(raw);
 }
 
+/** Context-aware label for the "Under Review" stage */
+function getReviewLabel(raw: string, t: (k: string) => string): string {
+  if (["reviewed_by_department", "forwarded_to_department", "resolved_by_department"].includes(raw)) {
+    return t("complaintDetail.timeline.stages.reviewed_by_department.label");
+  }
+  return t("complaintDetail.timeline.stages.reviewed_by_barangay.label");
+}
 
+/** Context-aware sublabel for the "Under Review" stage */
+function getReviewSublabel(raw: string, t: (k: string) => string): string {
+  if (["reviewed_by_department", "forwarded_to_department", "resolved_by_department"].includes(raw)) {
+    return t("complaintDetail.timeline.stages.reviewed_by_department.sublabel");
+  }
+  return t("complaintDetail.timeline.stages.reviewed_by_barangay.sublabel");
+}
 
-
-const GROUP_STYLE = {
-  barangay: {
-    dotBg:       "#0284c7", // sky-600  — blue family, distinct from "done" green
-    dotBgLight:  "#e0f2fe", // sky-100
-    lineBg:      "#7dd3fc", // sky-300
-    labelColor:  "#0c4a6e", // sky-900
-    sublabel:    "#0369a1", // sky-700
-    badgeBg:     "#f0f9ff", // sky-50
-    badgeText:   "#0284c7",
-    headerColor: "#0284c7",
-    headerBg:    "#f0f9ff",
-  },
-  lgu: {
-    dotBg:       "#7c3aed", // violet-600
-    dotBgLight:  "#ede9fe",
-    lineBg:      "#c4b5fd",
-    labelColor:  "#4c1d95",
-    sublabel:    "#6d28d9",
-    badgeBg:     "#f5f3ff",
-    badgeText:   "#7c3aed",
-    headerColor: "#7c3aed",
-    headerBg:    "#f5f3ff",
-  },
-  department: {
-    dotBg:       "#d97706", // amber-600
-    dotBgLight:  "#fef3c7",
-    lineBg:      "#fcd34d",
-    labelColor:  "#78350f",
-    sublabel:    "#b45309",
-    badgeBg:     "#fffbeb",
-    badgeText:   "#d97706",
-    headerColor: "#d97706",
-    headerBg:    "#fffbeb",
-  },
-  default: {
-    dotBg:       "#2563eb",
-    dotBgLight:  "#dbeafe",
-    lineBg:      "#93c5fd",
-    labelColor:  "#1e3a8a",
-    sublabel:    "#2563eb",
-    badgeBg:     "#eff6ff",
-    badgeText:   "#2563eb",
-    headerColor: "#2563eb",
-    headerBg:    "#eff6ff",
-  },
-};
 // ─── Status Timeline ──────────────────────────────────────────────────────────
 
 function StatusTimeline({ status }: { status: string | null }) {
   const { t } = useTranslation();
-  const raw = status?.toLowerCase() ?? "";
+  const raw = (status ?? "").toLowerCase() as RawStatus;
   const isRejected = raw === "rejected";
-  const activeIndex = statusToStageIndex(raw);
+  const activeIndex = getActiveStageIndex(raw);
+  const hasForwarded = showsForwardedStep(raw);
 
   if (isRejected) {
     return (
@@ -181,24 +129,10 @@ function StatusTimeline({ status }: { status: string | null }) {
             <XCircle size={26} color="#e11d48" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 17,
-                fontWeight: "800",
-                color: "#9f1239",
-                marginBottom: 4,
-              }}
-            >
+            <Text style={{ fontSize: 17, fontWeight: "800", color: "#9f1239", marginBottom: 4 }}>
               {t("complaintDetail.timeline.rejected.title")}
             </Text>
-            <Text
-              style={{
-                fontSize: 14,
-                color: "#be123c",
-                lineHeight: 20,
-                fontWeight: "500",
-              }}
-            >
+            <Text style={{ fontSize: 14, color: "#be123c", lineHeight: 20, fontWeight: "500" }}>
               {t("complaintDetail.timeline.rejected.description")}
             </Text>
           </View>
@@ -206,6 +140,30 @@ function StatusTimeline({ status }: { status: string | null }) {
       </View>
     );
   }
+
+  // Build dynamic stage list
+  const stages: { label: string; sublabel: string }[] = [
+    {
+      label: t("complaintDetail.timeline.stages.submitted.label"),
+      sublabel: t("complaintDetail.timeline.stages.submitted.sublabel"),
+    },
+    {
+      label: getReviewLabel(raw, t),
+      sublabel: getReviewSublabel(raw, t),
+    },
+    ...(hasForwarded
+      ? [
+          {
+            label: t("complaintDetail.timeline.stages.forwarded_to_department.label"),
+            sublabel: t("complaintDetail.timeline.stages.forwarded_to_department.sublabel"),
+          },
+        ]
+      : []),
+    {
+      label: t("complaintDetail.timeline.stages.resolved_by_barangay.label"),
+      sublabel: t("complaintDetail.timeline.stages.resolved_by_barangay.sublabel"),
+    },
+  ];
 
   return (
     <View
@@ -222,20 +180,13 @@ function StatusTimeline({ status }: { status: string | null }) {
       }}
     >
       {/* Section header */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          marginBottom: 20,
-          gap: 10,
-        }}
-      >
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20, gap: 10 }}>
         <View
           style={{
             width: 6,
             height: 22,
             borderRadius: 3,
-            backgroundColor: "#2563eb",
+            backgroundColor: THEME.primary,
           }}
         />
         <Text
@@ -251,190 +202,156 @@ function StatusTimeline({ status }: { status: string | null }) {
         </Text>
       </View>
 
-      {DISPLAY_STAGES.map((stage, i) => {
+      {stages.map((stage, i) => {
         const isCompleted = activeIndex > i;
         const isActive = activeIndex === i;
-        const grp = stage.group ? GROUP_STYLE[stage.group] : GROUP_STYLE.default;
+        const isLast = i === stages.length - 1;
+        const isResolved = isLast; // last stage is always "Resolved"
 
-        const dotBg = isCompleted || isActive ? grp.dotBg : "#e5e7eb";
-        const lineBg = isCompleted ? grp.lineBg : "#e5e7eb";
+        const dotColor = isCompleted || isActive ? THEME.primary : "#e5e7eb";
+        const lineColor = isCompleted ? `${THEME.primary}80` : "#e5e7eb";
+        const activeBadgeBg = `${THEME.primary}15`;
+        const activeBadgeBorder = `${THEME.primary}40`;
 
         return (
-          <View key={stage.key}>
-            {/* ── Group header ── */}
-            {stage.groupLabelKey && (
+          <View key={i} style={{ flexDirection: "row" }}>
+            {/* Dot + connector */}
+            <View style={{ alignItems: "center", marginRight: 14, width: 36 }}>
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: dotColor,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 10,
+                  ...(isActive && {
+                    shadowColor: THEME.primary,
+                    shadowOpacity: 0.4,
+                    shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 0 },
+                  }),
+                }}
+              >
+                {isCompleted ? (
+                  <CheckCircle2 size={18} color="#fff" />
+                ) : isActive ? (
+                  isResolved ? (
+                    <CheckCircle2 size={18} color="#fff" />
+                  ) : (
+                    <Clock size={17} color="#fff" />
+                  )
+                ) : (
+                  <Circle size={13} color="#9ca3af" />
+                )}
+              </View>
+
+              {!isLast && (
+                <View
+                  style={{
+                    width: 3,
+                    borderRadius: 2,
+                    flex: 1,
+                    minHeight: 28,
+                    marginVertical: 3,
+                    backgroundColor: lineColor,
+                  }}
+                />
+              )}
+            </View>
+
+            {/* Text */}
+            <View style={{ flex: 1, paddingBottom: 18, justifyContent: "flex-start" }}>
               <View
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  marginLeft: 44,
-                  marginBottom: 10,
-                  marginTop: 6,
+                  flexWrap: "wrap",
                   gap: 8,
+                  marginTop: 5,
                 }}
               >
-                <View
+                <Text
                   style={{
-                    backgroundColor: grp.headerBg,
-                    borderRadius: 6,
-                    paddingHorizontal: 10,
-                    paddingVertical: 3,
+                    fontSize: isActive ? 16 : 15,
+                    fontWeight: isActive ? "800" : isCompleted ? "700" : "600",
+                    color: isActive
+                      ? THEME.primary
+                      : isCompleted
+                      ? "#374151"
+                      : "#9ca3af",
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: "800",
-                      color: grp.headerColor,
-                      letterSpacing: 1.1,
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {t(stage.groupLabelKey)}
-                  </Text>
-                </View>
-                <View style={{ flex: 1, height: 1, backgroundColor: "#f3f4f6" }} />
-              </View>
-            )}
+                  {stage.label}
+                </Text>
 
-            <View style={{ flexDirection: "row" }}>
-              {/* ── Dot + connector ── */}
-              <View
-                style={{ alignItems: "center", marginRight: 14, width: 36 }}
-              >
-                {/* Dot */}
-                <View
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: dotBg,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    zIndex: 10,
-                    // Active ring
-                    ...(isActive && {
-                      shadowColor: grp.dotBg,
-                      shadowOpacity: 0.45,
-                      shadowRadius: 8,
-                      shadowOffset: { width: 0, height: 0 },
-                    }),
-                  }}
-                >
-                  {isCompleted ? (
-                    <CheckCircle2 size={18} color="#fff" />
-                  ) : isActive ? (
-                    <Clock size={17} color="#fff" />
-                  ) : (
-                    <Circle size={13} color="#9ca3af" />
-                  )}
-                </View>
-
-                {/* Connector line */}
-                {i < DISPLAY_STAGES.length - 1 && (
+                {isActive && !isResolved && (
                   <View
                     style={{
-                      width: 3,
-                      borderRadius: 2,
-                      flex: 1,
-                      minHeight: 28,
-                      marginVertical: 3,
-                      backgroundColor: lineBg,
+                      backgroundColor: activeBadgeBg,
+                      borderRadius: 20,
+                      paddingHorizontal: 10,
+                      paddingVertical: 3,
+                      borderWidth: 1,
+                      borderColor: activeBadgeBorder,
                     }}
-                  />
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "700",
+                        color: THEME.primary,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.8,
+                      }}
+                    >
+                      {t("complaintDetail.timeline.badge.current")}
+                    </Text>
+                  </View>
+                )}
+
+                {(isCompleted || (isActive && isResolved)) && (
+                  <View
+                    style={{
+                      backgroundColor: isResolved && isActive ? "#f0fdf4" : "#f0fdf4",
+                      borderRadius: 20,
+                      paddingHorizontal: 10,
+                      paddingVertical: 3,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "700",
+                        color: "#16a34a",
+                        textTransform: "uppercase",
+                        letterSpacing: 0.8,
+                      }}
+                    >
+                      {isActive && isResolved
+                        ? t("complaintDetail.timeline.badge.resolved")
+                        : t("complaintDetail.timeline.badge.done")}
+                    </Text>
+                  </View>
                 )}
               </View>
 
-              {/* ── Text ── */}
-              <View style={{ flex: 1, paddingBottom: 18, justifyContent: "flex-start" }}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: 8,
-                    marginTop: 5,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: isActive ? 16 : 15,
-                      fontWeight: isActive ? "800" : isCompleted ? "700" : "600",
-                      color: isActive
-                        ? grp.labelColor
-                        : isCompleted
-                        ? "#374151"
-                        : "#9ca3af",
-                    }}
-                  >
-                    {t(stage.labelKey)}
-                  </Text>
-
-                  {isActive && (
-                    <View
-                      style={{
-                        backgroundColor: grp.badgeBg,
-                        borderRadius: 20,
-                        paddingHorizontal: 10,
-                        paddingVertical: 3,
-                        borderWidth: 1,
-                        borderColor: grp.dotBg + "40",
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontWeight: "700",
-                          color: grp.badgeText,
-                          textTransform: "uppercase",
-                          letterSpacing: 0.8,
-                        }}
-                      >
-                        {t("complaintDetail.timeline.badge.current")}
-                      </Text>
-                    </View>
-                  )}
-
-                  {isCompleted && (
-                    <View
-                      style={{
-                        backgroundColor: "#f0fdf4",
-                        borderRadius: 20,
-                        paddingHorizontal: 10,
-                        paddingVertical: 3,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontWeight: "700",
-                          color: "#16a34a",
-                          textTransform: "uppercase",
-                          letterSpacing: 0.8,
-                        }}
-                      >
-                        {t("complaintDetail.timeline.badge.done")}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                <Text
-                  style={{
-                    fontSize: 13,
-                    marginTop: 3,
-                    lineHeight: 18,
-                    fontWeight: isActive ? "600" : "400",
-                    color: isActive
-                      ? grp.sublabel
-                      : isCompleted
-                      ? "#6b7280"
-                      : "#d1d5db",
-                  }}
-                >
-                  {t(stage.sublabelKey)}
-                </Text>
-              </View>
+              <Text
+                style={{
+                  fontSize: 13,
+                  marginTop: 3,
+                  lineHeight: 18,
+                  fontWeight: isActive ? "600" : "400",
+                  color: isActive
+                    ? THEME.primary
+                    : isCompleted
+                    ? "#6b7280"
+                    : "#d1d5db",
+                }}
+              >
+                {stage.sublabel}
+              </Text>
             </View>
           </View>
         );
@@ -492,9 +409,7 @@ function InfoRow({
         >
           {label}
         </Text>
-        <Text
-          style={{ fontSize: 15, fontWeight: "600", color: "#1f2937", lineHeight: 21 }}
-        >
+        <Text style={{ fontSize: 15, fontWeight: "600", color: "#1f2937", lineHeight: 21 }}>
           {value}
         </Text>
       </View>
@@ -514,14 +429,14 @@ function ContactRow({ icon, value }: { icon: React.ReactNode; value: string }) {
           width: 34,
           height: 34,
           borderRadius: 10,
-          backgroundColor: "#dbeafe",
+          backgroundColor: `${THEME.primary}20`,
           alignItems: "center",
           justifyContent: "center",
         }}
       >
         {icon}
       </View>
-      <Text style={{ fontSize: 15, fontWeight: "700", color: "#1e40af" }}>{value}</Text>
+      <Text style={{ fontSize: 15, fontWeight: "700", color: THEME.primary }}>{value}</Text>
     </View>
   );
 }
@@ -531,10 +446,8 @@ function ContactRow({ icon, value }: { icon: React.ReactNode; value: string }) {
 function LoadingState() {
   const { t } = useTranslation();
   return (
-    <View
-      style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f9fafb" }}
-    >
-      <ActivityIndicator size="large" color="#2563eb" />
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f9fafb" }}>
+      <ActivityIndicator size="large" color={THEME.primary} />
       <Text style={{ fontSize: 14, color: "#9ca3af", marginTop: 12, fontWeight: "500" }}>
         {t("complaintDetail.loading")}
       </Text>
@@ -594,8 +507,8 @@ export default function ComplaintDetail() {
             style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <ArrowLeft size={22} color="#2563eb" />
-            <Text style={{ fontSize: 16, fontWeight: "700", color: "#2563eb" }}>
+            <ArrowLeft size={22} color={THEME.primary} />
+            <Text style={{ fontSize: 16, fontWeight: "700", color: THEME.primary }}>
               {t("complaintDetail.header.back")}
             </Text>
           </TouchableOpacity>
@@ -606,12 +519,12 @@ export default function ComplaintDetail() {
               width: 38,
               height: 38,
               borderRadius: 12,
-              backgroundColor: "#eff6ff",
+              backgroundColor: `${THEME.primary}15`,
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <RefreshCw size={17} color="#2563eb" />
+            <RefreshCw size={17} color={THEME.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -648,22 +561,20 @@ export default function ComplaintDetail() {
                 width: 56,
                 height: 56,
                 borderRadius: 16,
-                backgroundColor: "#eff6ff",
+                backgroundColor: `${THEME.primary}15`,
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
               <CategoryIcon categoryKey={catKey} size={28} />
             </View>
-            
-            
           </View>
 
           <Text
             style={{
               fontSize: 12,
               fontWeight: "800",
-              color: "#2563eb",
+              color: THEME.primary,
               textTransform: "uppercase",
               letterSpacing: 1,
               marginBottom: 6,
@@ -806,9 +717,9 @@ export default function ComplaintDetail() {
           (data.barangay.barangay_contact_number || data.barangay.barangay_email) && (
             <View
               style={{
-                backgroundColor: "#eff6ff",
+                backgroundColor: `${THEME.primary}10`,
                 borderWidth: 1,
-                borderColor: "#bfdbfe",
+                borderColor: `${THEME.primary}30`,
                 borderRadius: 20,
                 padding: 16,
                 marginBottom: 12,
@@ -818,7 +729,7 @@ export default function ComplaintDetail() {
                 style={{
                   fontSize: 12,
                   fontWeight: "800",
-                  color: "#3b82f6",
+                  color: THEME.primary,
                   textTransform: "uppercase",
                   letterSpacing: 1,
                   marginBottom: 12,
@@ -829,14 +740,14 @@ export default function ComplaintDetail() {
 
               {data.barangay.barangay_contact_number && (
                 <ContactRow
-                  icon={<Phone size={16} color="#2563eb" />}
+                  icon={<Phone size={16} color={THEME.primary} />}
                   value={data.barangay.barangay_contact_number}
                 />
               )}
 
               {data.barangay.barangay_email && (
                 <ContactRow
-                  icon={<Mail size={16} color="#2563eb" />}
+                  icon={<Mail size={16} color={THEME.primary} />}
                   value={data.barangay.barangay_email}
                 />
               )}

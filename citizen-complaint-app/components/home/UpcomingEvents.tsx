@@ -29,12 +29,11 @@ function getThumbnail(media: EventMedia[]): string | null {
 }
 
 const ACCENTS = [
-  { color: THEME.primary,     dark: THEME.primaryDark, text: THEME.primaryMuted },
-  { color: '#0E7490', dark: '#164E63', text: '#CFFAFE' },
-  { color: '#6D28D9', dark: '#3B0764', text: '#EDE9FE' },
-  { color: '#047857', dark: '#064E3B', text: '#D1FAE5' },
+  { color: '#D97706', dark: '#92400E', text: '#FFFBEB' }, // Amber
+  { color: '#0E7490', dark: '#164E63', text: '#CFFAFE' }, // Teal
+  { color: '#6D28D9', dark: '#3B0764', text: '#EDE9FE' }, // Purple
+  { color: '#047857', dark: '#064E3B', text: '#D1FAE5' }, // Green
 ];
-
 function EventCard({ event, index, onPress }: { event: EventData; index: number; onPress: () => void }) {
   const accent    = ACCENTS[index % ACCENTS.length];
   const { month, day, weekday, time } = formatEventDate(event.date);

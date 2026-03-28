@@ -11,6 +11,7 @@ import {
   getCategoryLabel,
   getStatusConfig,
 } from "@/constants/complaint/complaint";
+import { THEME } from '@/constants/theme';
 import { Complaint } from "@/types/complaints/complaint";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -54,7 +55,10 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
     >
       <View className="flex-row items-start gap-3">
         {/* Icon */}
-        <View className="w-11 h-11 rounded-xl bg-blue-50 items-center justify-center flex-shrink-0">
+        <View
+          className="w-11 h-11 rounded-xl items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: `${THEME.primary}15` }}
+        >
           <CategoryIcon categoryKey={catKey} size={20} />
         </View>
 
@@ -63,7 +67,8 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
           {/* Category + Status */}
           <View className="flex-row items-center justify-between mb-1 gap-2">
             <Text
-              className="text-xs font-semibold text-blue-600 uppercase tracking-wide flex-1"
+              className="text-xs font-semibold uppercase tracking-wide flex-1"
+              style={{ color: THEME.primary }}
               numberOfLines={1}
             >
               {catLabel}
@@ -126,8 +131,11 @@ function EmptyState({ filtered }: { filtered: boolean }) {
 
   return (
     <View className="flex-1 items-center justify-center py-20">
-      <View className="w-16 h-16 rounded-2xl bg-blue-50 items-center justify-center mb-4">
-        <AlertCircle size={28} color="#3b82f6" />
+      <View
+        className="w-16 h-16 rounded-2xl items-center justify-center mb-4"
+        style={{ backgroundColor: `${THEME.primary}15` }}
+      >
+        <AlertCircle size={28} color={THEME.primary} />
       </View>
       <Text className="text-base font-bold text-gray-800 mb-1">
         {filtered
@@ -150,7 +158,7 @@ function LoadingState() {
 
   return (
     <View className="flex-1 items-center justify-center">
-      <ActivityIndicator size="large" color="#2563eb" />
+      <ActivityIndicator size="large" color={THEME.primary} />
       <Text className="text-sm text-gray-400 mt-3">{t("complaints.loading")}</Text>
     </View>
   );
@@ -184,7 +192,7 @@ function FilterModal({
             {t("complaints.filter.title")}
           </Text>
           <TouchableOpacity onPress={onClear}>
-            <Text className="text-sm font-semibold text-blue-600">
+            <Text className="text-sm font-semibold" style={{ color: THEME.primary }}>
               {t("complaints.filter.clearAll")}
             </Text>
           </TouchableOpacity>
@@ -198,15 +206,17 @@ function FilterModal({
               <TouchableOpacity
                 key={s}
                 onPress={() => onToggleStatus(s)}
-                className={`flex-row items-center gap-1.5 px-3 py-2 rounded-xl border ${
-                  active ? "border-blue-500 bg-white" : "border-gray-200 bg-white"
-                }`}
+                className="flex-row items-center gap-1.5 px-3 py-2 rounded-xl border bg-white"
+                style={{ borderColor: active ? THEME.primary : "#e5e7eb" }}
               >
                 <View className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-                <Text className={`text-sm font-semibold ${active ? "text-gray-900" : "text-gray-600"}`}>
+                <Text
+                  className="text-sm font-semibold"
+                  style={{ color: active ? "#111827" : "#4b5563" }}
+                >
                   {cfg.label}
                 </Text>
-                {active && <CheckCircle2 size={14} color="#2563eb" />}
+                {active && <CheckCircle2 size={14} color={THEME.primary} />}
               </TouchableOpacity>
             );
           })}
@@ -214,9 +224,10 @@ function FilterModal({
 
         <TouchableOpacity
           onPress={onClose}
-          className="bg-blue-600 py-3.5 rounded-xl items-center"
+          className="py-3.5 rounded-xl items-center"
+          style={{ backgroundColor: THEME.primary }}
         >
-          <Text className="text-white font-bold text-base">
+          <Text className="font-bold text-base" style={{ color: "#ffffff" }}>
             {t("complaints.filter.apply")}
           </Text>
         </TouchableOpacity>
@@ -295,23 +306,27 @@ export default function UserComplaints() {
             className="flex-row items-center gap-2"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <ArrowLeft size={24} color="#2563eb" />
-            <Text className="text-base font-bold text-blue-600">
+            <ArrowLeft size={24} color={THEME.primary} />
+            <Text className="text-base font-bold" style={{ color: THEME.primary }}>
               {t("complaints.header.back")}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleRefresh}
-            className="w-9 h-9 rounded-xl bg-blue-50 items-center justify-center"
+            className="w-9 h-9 rounded-xl items-center justify-center"
+            style={{ backgroundColor: `${THEME.primary}15` }}
           >
-            <RefreshCw size={16} color="#2563eb" />
+            <RefreshCw size={16} color={THEME.primary} />
           </TouchableOpacity>
         </View>
 
         {/* Title */}
         <View className="mb-4">
-          <Text className="text-xs font-semibold text-blue-500 uppercase tracking-widest mb-0.5">
+          <Text
+            className="text-xs font-semibold uppercase tracking-widest mb-0.5"
+            style={{ color: THEME.primary }}
+          >
             {t("complaints.header.location")}
           </Text>
           <Text className="text-2xl font-bold text-gray-900">
@@ -340,20 +355,18 @@ export default function UserComplaints() {
         <View className="flex-row items-center justify-between mb-2">
           <TouchableOpacity
             onPress={() => setFilterVisible(true)}
-            className={`flex-row items-center gap-1.5 px-3 py-1.5 rounded-lg border ${
-              activeFilterCount > 0 ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white"
-            }`}
+            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-lg border"
+            style={{
+              borderColor: activeFilterCount > 0 ? THEME.primary : "#e5e7eb",
+              backgroundColor: activeFilterCount > 0 ? `${THEME.primary}15` : "#ffffff",
+            }}
           >
-            <Filter size={13} color={activeFilterCount > 0 ? "#2563eb" : "#6b7280"} />
+            <Filter size={13} color={activeFilterCount > 0 ? THEME.primary : "#6b7280"} />
             <Text
-              className={`text-xs font-semibold ${
-                activeFilterCount > 0 ? "text-blue-700" : "text-gray-600"
-              }`}
+              className="text-xs font-semibold"
+              style={{ color: activeFilterCount > 0 ? THEME.primary : "#4b5563" }}
             >
-              {activeFilterCount > 0
-                ? `Filter (${activeFilterCount})`
-                : "Filter" 
-              }
+              {activeFilterCount > 0 ? `Filter (${activeFilterCount})` : "Filter"}
             </Text>
           </TouchableOpacity>
 

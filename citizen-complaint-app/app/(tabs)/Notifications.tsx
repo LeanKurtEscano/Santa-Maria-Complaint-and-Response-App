@@ -24,6 +24,8 @@ import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { formatTime } from "@/utils/date/date";
 import { refreshAccessToken } from "@/utils/general/token";
+import { THEME } from "@/constants/theme";
+
 // ─── Notification Card ────────────────────────────────────────────────────────
 
 const NotificationCard = React.memo(({
@@ -80,12 +82,11 @@ const NotificationCard = React.memo(({
       <TouchableOpacity
         onPress={handlePress}
         activeOpacity={item.complaint_id ? 0.7 : 1}
-        className={`flex-row items-start rounded-2xl p-4 mb-3 gap-3 ${
+        className="flex-row items-start rounded-2xl p-4 mb-3 gap-3"
+        style={[
           item.is_read
-            ? "bg-white border border-slate-100"
-            : "bg-blue-50/60 border border-blue-100"
-        }`}
-        style={
+            ? { backgroundColor: "#ffffff", borderWidth: 1, borderColor: "#f1f5f9" }
+            : { backgroundColor: `${THEME.primary}0f`, borderWidth: 1, borderColor: `${THEME.primary}30` },
           Platform.OS === "ios"
             ? {
                 shadowColor: "#94A3B8",
@@ -93,8 +94,8 @@ const NotificationCard = React.memo(({
                 shadowOpacity: 0.07,
                 shadowRadius: 8,
               }
-            : isNew ? undefined : { elevation: 2 }  // ← no shadow on Android for new notifications
-        }
+            : isNew ? undefined : { elevation: 2 },
+        ]}
       >
         {/* Unread dot */}
         {!item.is_read && (
@@ -127,9 +128,8 @@ const NotificationCard = React.memo(({
 
           {/* Title */}
           <Text
-            className={`text-sm font-semibold leading-5 ${
-              item.is_read ? "text-slate-500" : "text-slate-900"
-            }`}
+            className="text-sm font-semibold leading-5"
+            style={{ color: item.is_read ? "#64748b" : "#0f172a" }}
           >
             {t(config.titleKey)}
           </Text>
@@ -149,7 +149,7 @@ const NotificationCard = React.memo(({
               activeOpacity={0.6}
               className="self-start mt-0.5"
             >
-              <Text className="text-[12px] text-blue-500 font-semibold">
+              <Text className="text-[12px] font-semibold" style={{ color: THEME.primary }}>
                 {expanded ? "View less" : "View more"}
               </Text>
             </TouchableOpacity>
@@ -158,12 +158,13 @@ const NotificationCard = React.memo(({
           {!item.is_read && (
             <View className="flex-row justify-end mt-1.5">
               <TouchableOpacity
-                className="flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-blue-200"
+                className="flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-white"
+                style={{ borderWidth: 1, borderColor: `${THEME.primary}40` }}
                 onPress={() => onMarkRead(item.id)}
                 activeOpacity={0.7}
               >
-                <Ionicons name="checkmark" size={11} color="#3B82F6" />
-                <Text className="text-[11px] text-blue-500 font-semibold">
+                <Ionicons name="checkmark" size={11} color={THEME.primary} />
+                <Text className="text-[11px] font-semibold" style={{ color: THEME.primary }}>
                   Mark as read
                 </Text>
               </TouchableOpacity>
@@ -174,14 +175,18 @@ const NotificationCard = React.memo(({
     </Animated.View>
   );
 });
+
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
 const EmptyState = () => {
   const { t } = useTranslation();
   return (
     <View className="flex-1 items-center justify-center pt-20 gap-3">
-      <View className="w-20 h-20 rounded-full bg-blue-50 items-center justify-center mb-2">
-        <Ionicons name="notifications-off-outline" size={38} color="#93C5FD" />
+      <View
+        className="w-20 h-20 rounded-full items-center justify-center mb-2"
+        style={{ backgroundColor: `${THEME.primary}15` }}
+      >
+        <Ionicons name="notifications-off-outline" size={38} color={`${THEME.primary}99`} />
       </View>
       <Text className="text-lg font-bold text-slate-900">
         {t("notifications.emptyTitle")}
@@ -206,7 +211,6 @@ const Notifications = () => {
   const [markingAll, setMarkingAll] = useState(false);
   const [sseStatus, setSseStatus] = useState<SSEStatus>("connecting");
   const [newIds, setNewIds] = useState<Set<number>>(new Set());
-  // ── Track whether the user manually triggered a pull-to-refresh ──
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const prevIdsRef = useRef<Set<number>>(new Set());
   const eventSourceRef = useRef<any>(null);
@@ -230,15 +234,10 @@ const Notifications = () => {
   } = useQuery({
     queryKey: ["notifications"],
     queryFn: fetchNotificationsApi,
-    // Background refetch every 30s — but we suppress its loading indicator
-    // by never letting isRefetching drive the UI (we use isManualRefreshing instead)
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
     staleTime: 10_000,
-    // Keep previous data so the list never flickers/jumps during background refetch
     placeholderData: (prev) => prev,
-    // Notify observers only when data actually changes — prevents list re-renders
-    // caused solely by metadata updates (isFetching, dataUpdatedAt, etc.)
     notifyOnChangeProps: ["data", "error"],
   });
 
@@ -329,7 +328,6 @@ const Notifications = () => {
       console.log(
         `${LOG_TAG} SSE event="${eventType}" received — invalidating query`
       );
-      // Invalidate silently — no loading spinner shown to the user
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     };
 
@@ -347,37 +345,32 @@ const Notifications = () => {
       setSseStatus("connected");
     };
 
-    
+    es.onerror = async (err: any) => {
+      console.error(`${LOG_TAG} connectSSE() — error:`, err);
+      setSseStatus("disconnected");
+      es.close();
+      eventSourceRef.current = null;
 
-  es.onerror = async (err: any) => {
-  console.error(`${LOG_TAG} connectSSE() — error:`, err);
-  setSseStatus("disconnected");
-  es.close();
-  eventSourceRef.current = null;
+      const is401 = err?.status === 401 || err?.xhrStatus === 401;
 
-  // Check if it's a 401
-  const is401 = err?.status === 401 || err?.xhrStatus === 401;
+      if (is401) {
+        console.log(`${LOG_TAG} SSE 401 — attempting token refresh...`);
+        const newToken = await refreshAccessToken();
 
-  if (is401) {
-    console.log(`${LOG_TAG} SSE 401 — attempting token refresh...`);
-    const newToken = await refreshAccessToken();
+        if (!newToken) {
+          console.warn(`${LOG_TAG} Refresh failed — forcing logout`);
+          const { useCurrentUser } = await import('@/store/useCurrentUserStore');
+          useCurrentUser.getState().clearUser();
+          return;
+        }
 
-    if (!newToken) {
-      console.warn(`${LOG_TAG} Refresh failed — forcing logout`);
-      // Force logout same way your axios interceptor does
-      const { useCurrentUser } = await import('@/store/useCurrentUserStore');
-      useCurrentUser.getState().clearUser();
-      return; // Don't retry
-    }
-
-    console.log(`${LOG_TAG} Token refreshed ✓ — reconnecting SSE`);
-    setTimeout(connectSSE, 500); // Reconnect with fresh token
-  } else {
-    // Non-401 error — retry as before
-    console.log(`${LOG_TAG} connectSSE() — retrying in 5s...`);
-    setTimeout(connectSSE, 5000);
-  }
-};
+        console.log(`${LOG_TAG} Token refreshed ✓ — reconnecting SSE`);
+        setTimeout(connectSSE, 500);
+      } else {
+        console.log(`${LOG_TAG} connectSSE() — retrying in 5s...`);
+        setTimeout(connectSSE, 5000);
+      }
+    };
 
     eventSourceRef.current = es;
     console.log(`${LOG_TAG} connectSSE() — registered ✓`);
@@ -430,7 +423,7 @@ const Notifications = () => {
     }
   };
 
-  // ── Pull to refresh — only this shows the spinner ───────────────────────
+  // ── Pull to refresh ──────────────────────────────────────────────────────
 
   const onRefresh = useCallback(async () => {
     console.log(`${LOG_TAG} onRefresh() — triggered`);
@@ -467,36 +460,39 @@ const Notifications = () => {
 
           <View className="flex-row items-center gap-2.5">
             {unreadCount > 0 && (
-              <View className="bg-blue-500 rounded-full min-w-[24px] h-6 items-center justify-center px-1.5">
-                <Text className="text-white text-xs font-bold">
+              <View
+                className="rounded-full min-w-[24px] h-6 items-center justify-center px-1.5"
+                style={{ backgroundColor: THEME.primary }}
+              >
+                <Text className="text-xs font-bold" style={{ color: "#ffffff" }}>
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </Text>
               </View>
             )}
 
             <TouchableOpacity
-              className={`flex-row items-center gap-1 px-3 py-1.5 rounded-full border ${
+              className="flex-row items-center gap-1 px-3 py-1.5 rounded-full border"
+              style={
                 unreadCount === 0
-                  ? "border-slate-200 bg-slate-50"
-                  : "border-blue-200 bg-blue-50"
-              }`}
+                  ? { borderColor: "#e2e8f0", backgroundColor: "#f8fafc" }
+                  : { borderColor: `${THEME.primary}40`, backgroundColor: `${THEME.primary}15` }
+              }
               onPress={handleMarkAllRead}
               disabled={unreadCount === 0 || markingAll}
               activeOpacity={0.7}
             >
               {markingAll ? (
-                <ActivityIndicator size="small" color="#3B82F6" />
+                <ActivityIndicator size="small" color={THEME.primary} />
               ) : (
                 <>
                   <Ionicons
                     name="checkmark-done"
                     size={14}
-                    color={unreadCount === 0 ? "#CBD5E1" : "#3B82F6"}
+                    color={unreadCount === 0 ? "#CBD5E1" : THEME.primary}
                   />
                   <Text
-                    className={`text-xs font-semibold ${
-                      unreadCount === 0 ? "text-slate-300" : "text-blue-500"
-                    }`}
+                    className="text-xs font-semibold"
+                    style={{ color: unreadCount === 0 ? "#CBD5E1" : THEME.primary }}
                   >
                     Mark all read
                   </Text>
@@ -509,9 +505,8 @@ const Notifications = () => {
 
       {/* ── Body ── */}
       {isLoading ? (
-        // Only shown on the very first load (no cached data yet)
         <View className="flex-1 items-center justify-center gap-3">
-          <ActivityIndicator size="large" color="#3B82F6" />
+          <ActivityIndicator size="large" color={THEME.primary} />
           <Text className="text-sm text-slate-400 font-medium">
             Loading notifications…
           </Text>
@@ -529,11 +524,10 @@ const Notifications = () => {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              // Only spin when the USER explicitly pulls down — never on background refetches
               refreshing={isManualRefreshing}
               onRefresh={onRefresh}
-              tintColor="#3B82F6"
-              colors={["#3B82F6"]}
+              tintColor={THEME.primary}
+              colors={[THEME.primary]}
             />
           }
         />
