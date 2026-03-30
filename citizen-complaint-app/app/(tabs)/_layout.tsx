@@ -5,6 +5,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { THEME } from '@/constants/theme';
 
 export default function TabsLayout() {
   const [isConnected, setIsConnected] = useState<boolean | null>(true);
@@ -28,7 +29,7 @@ export default function TabsLayout() {
   return (
     <View className="flex-1">
       {isConnected === false && (
-        <View className="bg-amber-500 py-3 px-4">
+        <View style={{ backgroundColor: THEME.primary }} className="py-3 px-4">
           <Text className="text-white text-center font-semibold">
             ⚠️ Please check your internet connection
           </Text>
@@ -38,7 +39,7 @@ export default function TabsLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: '#3B82F6',
+          tabBarActiveTintColor: THEME.primary,
           tabBarInactiveTintColor: '#9CA3AF',
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
@@ -97,10 +98,10 @@ export default function TabsLayout() {
           name="Emergency"
           options={{
             title: "Emergency",
+            tabBarActiveTintColor: '#EF4444',
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? "warning" : "warning-outline"} size={24} color={focused ? '#EF4444' : color} />
             ),
-            tabBarActiveTintColor: '#EF4444',
             tabBarLabel: ({ focused }) => (
               <Text style={{
                 fontSize: 12,

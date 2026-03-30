@@ -8,10 +8,13 @@ import {
   Alert,
   ScrollView,
   Pressable,
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import {
   Phone,
   ShieldAlert,
@@ -20,12 +23,33 @@ import {
   X,
   AlertTriangle,
   Tent,
+  Siren,
 } from 'lucide-react-native';
-import {EMERGENCY_CONTACTS,  EmergencyContact} from '@/constants/emergency/phoneNumber';
 import { EVACUATION_CENTERS } from '@/constants/emergency/evacuation';
 import { EvacuationCenterCard } from '@/components/emergency/EvacuationCenterCard';
 import { useProfileLogic } from '@/hooks/general/useProfile';
 import { formatPHPhoneForUI } from '@/utils/general/phone';
+import { emergencyApiClient } from '@/lib/client/emergency';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface EmergencyContactAPI {
+  id: number;
+  contact_number: string;
+}
+
+interface EmergencyAgency {
+  id: number;
+  agency_name: string;
+  created_at: string;
+  updated_at: string | null;
+  contacts: EmergencyContactAPI[];
+}
+
+interface PendingContact {
+  name: string;
+  phoneNumber: string;
+}
+
 // ── Per-service visual config ─────────────────────────────────────────────────
 interface ServiceTheme {
   Icon: React.ComponentType<{ size?: number; color?: string }>;
@@ -50,6 +74,13 @@ const SERVICE_THEMES: Record<string, ServiceTheme> = {
     borderColor: '#DC2626',
     btnColor: '#DC2626',
   },
+  mdrrmo: {
+    Icon: Siren,
+    iconColor: '#059669',
+    iconBg: 'bg-emerald-100',
+    borderColor: '#059669',
+    btnColor: '#059669',
+  },
 };
 
 const DEFAULT_THEME = SERVICE_THEMES.pnp;
@@ -59,35 +90,58 @@ const DEFAULT_THEME = SERVICE_THEMES.pnp;
 export default function EmergencyScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const [pendingContact, setPendingContact] = useState<EmergencyContact | null>(null);
+  const [pendingContact, setPendingContact] = useState<PendingContact | null>(null);
 
-  // Pull user coords for distance calculation — same hook used by ProfileScreen
   const { userData } = useProfileLogic();
   const userLat = userData?.latitude ? parseFloat(userData.latitude) : null;
   const userLng = userData?.longitude ? parseFloat(userData.longitude) : null;
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
-  const handleCallPress = (contact: EmergencyContact) => setPendingContact(contact);
+  // ── Fetch hotlines ───────────────────────────────────────────────────────────
+  const {
+    data: agencies = [],
+    isLoading,
+    isError,
+    refetch
+  } = useQuery<EmergencyAgency[]>({
+    queryKey: ['emergency-hotlines'],
+    queryFn: async () => {
+      const response = await emergencyApiClient.get('/');
+      return response.data;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+
+
+const [refreshing, setRefreshing] = useState(false);
+
+const handleRefresh = async () => {
+  setRefreshing(true);
+  await refetch();
+  setRefreshing(false);
+};
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+  const handleCallPress = (contact: PendingContact) => setPendingContact(contact);
 
   const handleConfirmCall = async () => {
-  if (!pendingContact) return;
-  setPendingContact(null);
-  const url = `tel:${pendingContact.phoneNumber}`;
-  try {
-    await Linking.openURL(url);
-  } catch {
-    Alert.alert(
-      t('emergency.dialerUnavailableTitle'),
-      t('emergency.dialerUnavailableMessage'),
-    );
-  }
-};
+    if (!pendingContact) return;
+    setPendingContact(null);
+    try {
+      await Linking.openURL(`tel:${pendingContact.phoneNumber}`);
+    } catch {
+      Alert.alert(
+        t('emergency.dialerUnavailableTitle'),
+        t('emergency.dialerUnavailableMessage'),
+      );
+    }
+  };
 
   const handleCancelCall = () => setPendingContact(null);
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={['top', 'bottom']}>
+    <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
 
       {/* ── Header ── */}
       <View className="flex-row items-center justify-between px-4 py-3 bg-white border-b border-slate-200">
@@ -98,18 +152,24 @@ export default function EmergencyScreen() {
         >
           <ChevronLeft size={24} color="#1E293B" />
         </TouchableOpacity>
-
         <Text className="text-[17px] font-bold text-slate-800 tracking-tight">
           {t('emergency.title')}
         </Text>
-
         <View className="w-10" />
       </View>
 
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 48 }}
-        showsVerticalScrollIndicator={false}
+       className="flex-1"
+  contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 48 }}
+  showsVerticalScrollIndicator={false}
+  refreshControl={
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={handleRefresh}
+      colors={['#1D4ED8']}        // Android
+      tintColor="#1D4ED8"         // iOS
+    />
+  }
       >
 
         {/* ── Warning banner ── */}
@@ -127,13 +187,27 @@ export default function EmergencyScreen() {
           {t('emergency.sections.hotlines')}
         </Text>
 
-        {EMERGENCY_CONTACTS.map((contact) => {
-          const theme = SERVICE_THEMES[contact.id] ?? DEFAULT_THEME;
-          const serviceName = contact.name;
+        {isLoading && (
+          <View className="items-center py-8">
+            <ActivityIndicator size="large" color="#1D4ED8" />
+          </View>
+        )}
+
+        {isError && (
+          <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
+            <Text className="text-[13px] font-medium text-red-700 text-center">
+              {t('emergency.loadError', { defaultValue: 'Failed to load hotlines. Please try again.' })}
+            </Text>
+          </View>
+        )}
+
+        {agencies.map((agency) => {
+          const themeKey = agency.agency_name.toLowerCase();
+          const theme = SERVICE_THEMES[themeKey] ?? DEFAULT_THEME;
 
           return (
             <View
-              key={contact.id}
+              key={agency.id}
               className="bg-white rounded-2xl p-5 mb-4"
               style={{
                 borderLeftWidth: 4,
@@ -145,33 +219,37 @@ export default function EmergencyScreen() {
                 elevation: 3,
               }}
             >
-              {/* Icon + info */}
-              <View className="flex-row items-center gap-x-4 mb-5">
+              {/* Icon + agency name */}
+              <View className="flex-row items-center gap-x-4 mb-4">
                 <View className={`w-14 h-14 rounded-full items-center justify-center ${theme.iconBg}`}>
                   <theme.Icon size={28} color={theme.iconColor} />
                 </View>
-                <View className="flex-1">
-                  <Text className="text-[16px] font-bold text-slate-800">
-                    {serviceName}
-                  </Text>
-                  <Text className="text-[14px] font-semibold text-slate-400 mt-0.5">
-                    {formatPHPhoneForUI(contact.phoneNumber)}
-                  </Text>
-                </View>
+                <Text className="text-[16px] font-bold text-slate-800">
+                  {agency.agency_name}
+                </Text>
               </View>
 
-              {/* Call button */}
-              <TouchableOpacity
-                className="flex-row items-center justify-center gap-x-2 rounded-xl py-[15px]"
-                style={{ backgroundColor: theme.btnColor }}
-                onPress={() => handleCallPress(contact)}
-                activeOpacity={0.82}
-              >
-                <Phone size={18} color="#fff" />
-                <Text className="text-[15px] font-bold text-white">
-                  {t('emergency.callButton')}
-                </Text>
-              </TouchableOpacity>
+   {agency.contacts.map((contact) => (
+  <TouchableOpacity
+    key={contact.id}
+    className="flex-row items-center justify-center rounded-xl py-[15px] mb-2"
+    style={{ backgroundColor: theme.btnColor }}
+    onPress={() =>
+      handleCallPress({
+        name: agency.agency_name,
+        phoneNumber: contact.contact_number,
+      })
+    }
+    activeOpacity={0.82}
+  >
+    <View className="flex-row items-center w-48">
+      <Phone size={18} color="#fff" />
+      <Text className="text-[15px] font-bold text-white ml-2">
+        {formatPHPhoneForUI(contact.contact_number)}
+      </Text>
+    </View>
+  </TouchableOpacity>
+))}
             </View>
           );
         })}
@@ -186,7 +264,6 @@ export default function EmergencyScreen() {
           </Text>
         </View>
 
-        {/* Evacuation info notice */}
         <View className="flex-row items-start gap-x-3 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-4">
           <Tent size={18} color="#059669" />
           <Text className="flex-1 text-[13px] font-medium text-emerald-800 leading-5">
@@ -242,13 +319,13 @@ export default function EmergencyScreen() {
             </Text>
 
             <Text className="text-[14px] text-slate-500 text-center leading-5">
-              {t('emergency.modal.body', {
-                service: t(pendingContact?.name ?? ''),
-              })}
+              {t('emergency.modal.body', { service: pendingContact?.name ?? '' })}
             </Text>
 
             <Text className="text-[22px] font-extrabold text-slate-800 mt-2 mb-6">
-              {pendingContact?.phoneNumber}
+              {pendingContact?.phoneNumber
+                ? formatPHPhoneForUI(pendingContact.phoneNumber)
+                : ''}
             </Text>
 
             <View className="flex-row gap-x-3 w-full">
