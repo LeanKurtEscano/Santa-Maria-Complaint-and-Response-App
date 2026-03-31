@@ -218,7 +218,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         <View style={styles.mapContainer}>
           {loading && (
             <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" color="#2563EB" />
+              <ActivityIndicator size="large" color="#10B981" />
               <Text style={styles.loadingText}>Loading map...</Text>
             </View>
           )}
@@ -242,9 +242,9 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
             disabled={gettingLocation}
           >
             {gettingLocation ? (
-              <ActivityIndicator size="small" color="#2563EB" />
+              <ActivityIndicator size="small" color="#10B981" />
             ) : (
-              <Navigation size={24} color="#2563EB" />
+              <Navigation size={24} color="#10B981" />
             )}
           </TouchableOpacity>
 

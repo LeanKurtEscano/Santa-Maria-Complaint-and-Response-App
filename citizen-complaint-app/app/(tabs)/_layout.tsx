@@ -87,7 +87,7 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="Notifications"
           options={{
-            title: "Notifications",
+            title: "Notif",
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? "notifications" : "notifications-outline"} size={24} color={color} />
             )

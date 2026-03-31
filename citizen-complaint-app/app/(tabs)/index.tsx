@@ -87,7 +87,7 @@ export default function HomeScreen() {
   if (isAnyLoading) {
   return (
     <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
-      <ActivityIndicator size="large" color="#2563EB" />
+      <ActivityIndicator size="large" color="#10B981" />
     </SafeAreaView>
   );
 }
@@ -134,8 +134,8 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={refetchAll}          // 👈 refresh all at once
-            tintColor="#2563EB"
-            colors={['#2563EB']}
+            tintColor="#10B981"
+            colors={['#10B981']}
           />
         }
       >

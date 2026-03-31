@@ -25,8 +25,6 @@ export interface SSENotificationData {
   [key: string]: any;
 }
 
-
-
 export const TYPE_CONFIG: Record<
   NotificationType,
   {
@@ -128,5 +126,16 @@ export const TYPE_CONFIG: Record<
     labelKey: "notifications.type.announcement",
     titleKey: "notifications.title.announcement",
     messageKey: "notifications.message.announcement",
+  },
+  rejected: {
+    icon: "close-circle",
+    iconColor: "#EF4444",
+    badgeClass: "bg-red-50 border border-red-100",
+    badgeTextClass: "text-red-500",
+    iconBgClass: "bg-red-50",
+    dotClass: "bg-red-500",
+    labelKey: "notifications.type.rejected",
+    titleKey: "notifications.title.rejected",
+    messageKey: "notifications.message.rejected",
   },
 };

@@ -59,7 +59,7 @@ export default function ProfileScreen() {
     return (
       <SafeAreaView className="flex-1 bg-white">
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color="#10B981" />
           <Text className="text-neutral-600 mt-4">{t('profile.loadingProfile')}</Text>
         </View>
       </SafeAreaView>
