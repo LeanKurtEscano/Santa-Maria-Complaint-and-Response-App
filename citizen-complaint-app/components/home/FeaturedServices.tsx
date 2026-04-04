@@ -59,7 +59,7 @@ export function FeaturedServicesGrid() {
         <View className="p-4 flex-row items-center justify-between">
           <View className="flex-row items-center gap-2.5">
             <GlassBox>
-              <ShieldCheck size={18} color="#FCD34D" />
+              <ShieldCheck size={18} color="#ffffff" />
             </GlassBox>
             <View>
               <Text style={{ color: 'white', fontSize: 20, fontWeight: '900', letterSpacing: -0.3 }}>
@@ -77,8 +77,8 @@ export function FeaturedServicesGrid() {
           style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.10)', paddingTop: 12 }}
         >
           {[
-            { Icon: BadgeCheck, label: t('badgeVerified'), color: '#6EE7B7' },
-            { Icon: Zap,        label: t('badgeInstant'),  color: '#FCD34D' },
+            { Icon: BadgeCheck, label: t('badgeVerified'), color: '#ffffff' },
+            { Icon: Zap,        label: t('badgeInstant'),  color: '#ffffff' },
           ].map((b, i) => (
             <View key={i} className="flex-row items-center gap-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5 }}>
               <b.Icon size={10} color={b.color} />
@@ -132,7 +132,7 @@ function ServiceCard({ service }: { service: typeof FEATURED_SERVICES[number] })
 
         <View>
           <GlassBox size={40}>
-            <service.Icon size={19} color={service.accent} />
+            <service.Icon size={19} color="#ffffff" />
           </GlassBox>
 
           <Text style={{ color: 'white', fontSize: 13, fontWeight: '900', lineHeight: 17, letterSpacing: -0.2, marginTop: 10, marginBottom: 3 }}>
@@ -145,7 +145,7 @@ function ServiceCard({ service }: { service: typeof FEATURED_SERVICES[number] })
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10 }}>
           <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.10)' }} />
-          <ChevronRight size={11} color={service.accent} />
+          <ChevronRight size={11} color="#ffffff" />
         </View>
       </TouchableOpacity>
     </Animated.View>

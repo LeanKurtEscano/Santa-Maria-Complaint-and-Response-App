@@ -98,28 +98,35 @@ export default function EmergencyScreen() {
 
   // ── Fetch hotlines ───────────────────────────────────────────────────────────
   const {
-    data: agencies = [],
+    data: rawAgencies,
     isLoading,
     isError,
-    refetch
+    refetch,
   } = useQuery<EmergencyAgency[]>({
     queryKey: ['emergency-hotlines'],
     queryFn: async () => {
       const response = await emergencyApiClient.get('/');
-      return response.data;
+      const data = response.data;
+      // Guard: API must return an array
+      if (!Array.isArray(data)) {
+        console.warn('[EmergencyScreen] Unexpected hotlines payload:', data);
+        return [];
+      }
+      return data;
     },
     staleTime: 1000 * 60 * 5,
   });
 
+  // Always a safe array regardless of what the query returned
+  const agencies: EmergencyAgency[] = Array.isArray(rawAgencies) ? rawAgencies : [];
 
+  const [refreshing, setRefreshing] = useState(false);
 
-const [refreshing, setRefreshing] = useState(false);
-
-const handleRefresh = async () => {
-  setRefreshing(true);
-  await refetch();
-  setRefreshing(false);
-};
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleCallPress = (contact: PendingContact) => setPendingContact(contact);
@@ -159,17 +166,17 @@ const handleRefresh = async () => {
       </View>
 
       <ScrollView
-       className="flex-1"
-  contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 48 }}
-  showsVerticalScrollIndicator={false}
-  refreshControl={
-    <RefreshControl
-      refreshing={refreshing}
-      onRefresh={handleRefresh}
-      colors={['#1D4ED8']}        // Android
-      tintColor="#1D4ED8"         // iOS
-    />
-  }
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 48 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={['#1D4ED8']}
+            tintColor="#1D4ED8"
+          />
+        }
       >
 
         {/* ── Warning banner ── */}
@@ -201,9 +208,26 @@ const handleRefresh = async () => {
           </View>
         )}
 
+        {/* Guard: only render when we have a valid non-empty array */}
+        {!isLoading && !isError && agencies.length === 0 && (
+          <View className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4">
+            <Text className="text-[13px] font-medium text-slate-500 text-center">
+              {t('emergency.noHotlines', { defaultValue: 'No hotlines available at the moment.' })}
+            </Text>
+          </View>
+        )}
+
         {agencies.map((agency) => {
-          const themeKey = agency.agency_name.toLowerCase();
+          // Guard: skip malformed agency entries
+          if (!agency || typeof agency !== 'object') return null;
+
+          const themeKey = agency.agency_name?.toLowerCase() ?? '';
           const theme = SERVICE_THEMES[themeKey] ?? DEFAULT_THEME;
+
+          // Guard: contacts must be an array
+          const contacts: EmergencyContactAPI[] = Array.isArray(agency.contacts)
+            ? agency.contacts
+            : [];
 
           return (
             <View
@@ -225,31 +249,42 @@ const handleRefresh = async () => {
                   <theme.Icon size={28} color={theme.iconColor} />
                 </View>
                 <Text className="text-[16px] font-bold text-slate-800">
-                  {agency.agency_name}
+                  {agency.agency_name ?? ''}
                 </Text>
               </View>
 
-   {agency.contacts.map((contact) => (
-  <TouchableOpacity
-    key={contact.id}
-    className="flex-row items-center justify-center rounded-xl py-[15px] mb-2"
-    style={{ backgroundColor: theme.btnColor }}
-    onPress={() =>
-      handleCallPress({
-        name: agency.agency_name,
-        phoneNumber: contact.contact_number,
-      })
-    }
-    activeOpacity={0.82}
-  >
-    <View className="flex-row items-center w-48">
-      <Phone size={18} color="#fff" />
-      <Text className="text-[15px] font-bold text-white ml-2">
-        {formatPHPhoneForUI(contact.contact_number)}
-      </Text>
-    </View>
-  </TouchableOpacity>
-))}
+              {contacts.length === 0 && (
+                <Text className="text-[13px] text-slate-400 text-center py-2">
+                  {t('emergency.noContacts', { defaultValue: 'No contact numbers available.' })}
+                </Text>
+              )}
+
+              {contacts.map((contact) => {
+                // Guard: skip malformed contact entries
+                if (!contact || !contact.contact_number) return null;
+
+                return (
+                  <TouchableOpacity
+                    key={contact.id}
+                    className="flex-row items-center justify-center rounded-xl py-[15px] mb-2"
+                    style={{ backgroundColor: theme.btnColor }}
+                    onPress={() =>
+                      handleCallPress({
+                        name: agency.agency_name ?? '',
+                        phoneNumber: contact.contact_number,
+                      })
+                    }
+                    activeOpacity={0.82}
+                  >
+                    <View className="flex-row items-center w-48">
+                      <Phone size={18} color="#fff" />
+                      <Text className="text-[15px] font-bold text-white ml-2">
+                        {formatPHPhoneForUI(contact.contact_number)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           );
         })}
@@ -271,7 +306,8 @@ const handleRefresh = async () => {
           </Text>
         </View>
 
-        {EVACUATION_CENTERS.map((center) => (
+        {/* Guard: EVACUATION_CENTERS must be an array */}
+        {Array.isArray(EVACUATION_CENTERS) && EVACUATION_CENTERS.map((center) => (
           <EvacuationCenterCard
             key={center.id}
             center={center}

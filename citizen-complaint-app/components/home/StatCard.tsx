@@ -3,11 +3,11 @@ import { View, Text, Animated } from 'react-native';
 import { useRef, useEffect } from 'react';
 
 type Props = { label: string; value: number; Icon: any; dot: string };
-import { useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
+
 export function StatCard({ label, value, Icon, dot }: Props) {
   const scale   = useRef(new Animated.Value(0.8)).current;
-  const {t} = useTranslation();
+  const { t } = useTranslation();
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -23,9 +23,9 @@ export function StatCard({ label, value, Icon, dot }: Props) {
         className="rounded-2xl py-3.5 px-2 items-center"
         style={{ backgroundColor: 'rgba(255,255,255,0.11)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }}
       >
-        <Icon size={15} color={dot} />
+        <Icon size={26} color="#ffffff" />
         <Text className="text-white text-2xl font-black mt-1.5">{value}</Text>
-        <Text className="text-blue-200 text-[10px] font-semibold text-center mt-0.5 leading-[14px]"> {t(label)}</Text>
+        <Text className="text-blue-200 text-[10px] font-semibold text-center mt-0.5 leading-[14px]">{t(label)}</Text>
       </View>
     </Animated.View>
   );
