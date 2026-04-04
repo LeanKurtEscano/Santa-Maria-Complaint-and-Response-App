@@ -38,6 +38,8 @@ export interface Complaint {
   created_at: string;
   barangay: BarangayInfo | null;
   category: CategoryInfo | null;
+    is_rejected_by_lgu: boolean;
+  is_rejected_by_department: boolean;
   department?: DepartmentInfo | null;
   priority_level?: PriorityLevel | null;
   sector?: Sector | null;

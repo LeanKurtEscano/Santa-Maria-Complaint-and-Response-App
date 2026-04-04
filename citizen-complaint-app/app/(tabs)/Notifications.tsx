@@ -241,6 +241,9 @@ const Notifications = () => {
     notifyOnChangeProps: ["data", "error"],
   });
 
+
+  console.log(notifications)
+
   // ── Sync query data → zustand store + detect new IDs for animation ───────
 
   useEffect(() => {

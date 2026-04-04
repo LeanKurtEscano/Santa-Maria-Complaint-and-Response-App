@@ -1,361 +1,286 @@
 import { complaintApiClient } from "@/lib/client/complaint";
 import { handleApiError } from "@/utils/general/errorHandler";
 import ErrorScreen from "@/screen/general/ErrorScreen";
-import { CategoryIcon } from "@/components/complaint/CategoryIcon";
-import { StatusBadge } from "@/components/complaint/StatusBadge";
-import { formatDate, formatTime, getCategoryLabel } from "@/constants/complaint/complaint";
+import {
+  formatDate,
+  formatTime,
+  getCategoryLabel,
+} from "@/constants/complaint/complaint";
 import { THEME } from "@/constants/theme";
 import { Complaint } from "@/types/complaints/complaint";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-  AlertCircle,
-  ArrowLeft,
+  AlertTriangle,
+  ArrowDownUp,
   Building2,
   Calendar,
   CheckCircle2,
-  Circle,
+  ChevronDown,
+  ChevronLeft,
   Clock,
+  FileText,
+  Hash,
+  Landmark,
+  Layers,
   Mail,
   MapPin,
+  MessageCircle,
+  MessageSquare,
   Phone,
-  RefreshCw,
-  Tag,
+  Shield,
   XCircle,
 } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
+    RefreshControl,
 } from "react-native";
 
-// ─── Status Pipeline ──────────────────────────────────────────────────────────
-//
-// The raw statuses from the API are mapped into a simplified 4-step timeline:
-//
-//   1. Submitted
-//   2. Under Review       ← covers reviewed_by_barangay / reviewed_by_department
-//   3. Forwarded          ← covers forwarded_to_lgu / forwarded_to_department
-//                            (hidden when complaint is resolved at barangay level)
-//   4. Resolved           ← covers resolved_by_barangay / resolved_by_department
-//
-// The timeline auto-collapses: if resolved at barangay level, "Forwarded" is
-// never shown. Labels adjust based on who is currently handling the complaint.
+// ─── Local Types for incident_links ──────────────────────────────────────────
 
-type RawStatus =
+interface IncidentResponse {
+  id: number;
+  incident_id: number;
+  responder_id: number;
+  actions_taken: string;
+  response_date: string;
+}
+
+interface IncidentDetail {
+  id: number;
+  responses: IncidentResponse[];
+}
+
+interface IncidentLink {
+  id: number;
+  response_id: number | null;
+  incident: IncidentDetail;
+}
+
+interface ComplaintWithLinks extends Complaint {
+  incident_links?: IncidentLink[];
+}
+
+// ─── Complaint Status Types ───────────────────────────────────────────────────
+
+type ComplaintStatus =
   | "submitted"
   | "reviewed_by_barangay"
   | "resolved_by_barangay"
   | "forwarded_to_lgu"
+  | "resolved_by_lgu"
   | "forwarded_to_department"
   | "reviewed_by_department"
-  | "resolved_by_department"
-  | "rejected";
+  | "resolved_by_department";
 
-/** Which simplified stage index is active (0-based) */
-function getActiveStageIndex(raw: string): number {
-  switch (raw) {
-    case "submitted":               return 0;
-    case "reviewed_by_barangay":    return 1;
-    case "forwarded_to_lgu":        return 2;
-    case "forwarded_to_department": return 2;
-    case "reviewed_by_department":  return 1; // still "Under Review" at dept level
-    case "resolved_by_barangay":    return 3;
-    case "resolved_by_department":  return 3;
-    default:                        return 0;
-  }
+type StepState = "completed" | "active" | "pending" | "rejected";
+
+interface TrackerStep {
+  id: string;
+  label: string;
+  sublabel: string;
+  state: StepState;
+  icon: React.ReactNode;
 }
 
-/** Whether to show the "Forwarded" step (hidden for barangay-only flow) */
-function showsForwardedStep(raw: string): boolean {
+function getTrackerSteps(
+  status: ComplaintStatus,
+  isRejectedByLgu: boolean,
+  isRejectedByDepartment: boolean,
+  t: (key: string) => string
+): TrackerStep[] {
+  const isResolved =
+    status === "resolved_by_barangay" ||
+    status === "resolved_by_lgu" ||
+    status === "resolved_by_department";
+
+  const statusOrder: Record<ComplaintStatus, number> = {
+    submitted: 0,
+    reviewed_by_barangay: 1,
+    resolved_by_barangay: 2,
+    forwarded_to_lgu: 2,
+    resolved_by_lgu: 3,
+    forwarded_to_department: 3,
+    reviewed_by_department: 4,
+    resolved_by_department: 5,
+  };
+
+  const currentOrder = statusOrder[status];
+  const ICON = 20;
+  const primary = THEME.primary;
+  const pendingCol = "#d1d5db";
+  const red = "#ef4444";
+
+  const col = (s: StepState) =>
+    s === "rejected" ? red : s === "completed" || s === "active" ? primary : pendingCol;
+
+  const submittedState: StepState = currentOrder >= 0 ? "completed" : "pending";
+
+  let barangayState: StepState = "pending";
+  if (currentOrder >= 2) barangayState = "completed";
+  else if (currentOrder === 1) barangayState = "active";
+
+  let lguState: StepState = "pending";
+  if (isRejectedByLgu && !isResolved) lguState = "rejected";
+  else if (currentOrder >= 3) lguState = "completed";
+  else if (currentOrder === 2 && status === "forwarded_to_lgu") lguState = "active";
+
+  let deptState: StepState = "pending";
+  if (isRejectedByDepartment && !isResolved) deptState = "rejected";
+  else if (currentOrder >= 5) deptState = "completed";
+  else if (currentOrder === 3 && status === "forwarded_to_department") deptState = "active";
+  else if (currentOrder === 4) deptState = "active";
+
+  let resolvedState: StepState = "pending";
+  if (isResolved) resolvedState = "completed";
+
+  const resolvedSublabel =
+    status === "resolved_by_barangay" ? t("complaintDetail.tracker.resolvedByBarangay") :
+    status === "resolved_by_lgu"      ? t("complaintDetail.tracker.resolvedByLgu") :
+    status === "resolved_by_department" ? t("complaintDetail.tracker.resolvedByDept") :
+    t("complaintDetail.tracker.resolvedSub");
+
   return [
-    "forwarded_to_lgu",
-    "forwarded_to_department",
-    "reviewed_by_department",
-    "resolved_by_department",
-  ].includes(raw);
-}
-
-/** Context-aware label for the "Under Review" stage */
-function getReviewLabel(raw: string, t: (k: string) => string): string {
-  if (["reviewed_by_department", "forwarded_to_department", "resolved_by_department"].includes(raw)) {
-    return t("complaintDetail.timeline.stages.reviewed_by_department.label");
-  }
-  return t("complaintDetail.timeline.stages.reviewed_by_barangay.label");
-}
-
-/** Context-aware sublabel for the "Under Review" stage */
-function getReviewSublabel(raw: string, t: (k: string) => string): string {
-  if (["reviewed_by_department", "forwarded_to_department", "resolved_by_department"].includes(raw)) {
-    return t("complaintDetail.timeline.stages.reviewed_by_department.sublabel");
-  }
-  return t("complaintDetail.timeline.stages.reviewed_by_barangay.sublabel");
-}
-
-// ─── Status Timeline ──────────────────────────────────────────────────────────
-
-function StatusTimeline({ status }: { status: string | null }) {
-  const { t } = useTranslation();
-  const raw = (status ?? "").toLowerCase() as RawStatus;
-  const isRejected = raw === "rejected";
-  const activeIndex = getActiveStageIndex(raw);
-  const hasForwarded = showsForwardedStep(raw);
-
-  if (isRejected) {
-    return (
-      <View
-        style={{
-          backgroundColor: "#fff1f2",
-          borderWidth: 1.5,
-          borderColor: "#fecdd3",
-          borderRadius: 20,
-          padding: 20,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-          <View
-            style={{
-              width: 52,
-              height: 52,
-              borderRadius: 26,
-              backgroundColor: "#ffe4e6",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <XCircle size={26} color="#e11d48" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 17, fontWeight: "800", color: "#9f1239", marginBottom: 4 }}>
-              {t("complaintDetail.timeline.rejected.title")}
-            </Text>
-            <Text style={{ fontSize: 14, color: "#be123c", lineHeight: 20, fontWeight: "500" }}>
-              {t("complaintDetail.timeline.rejected.description")}
-            </Text>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  // Build dynamic stage list
-  const stages: { label: string; sublabel: string }[] = [
     {
-      label: t("complaintDetail.timeline.stages.submitted.label"),
-      sublabel: t("complaintDetail.timeline.stages.submitted.sublabel"),
+      id: "submitted",
+      label: t("complaintDetail.tracker.submitted"),
+      sublabel: t("complaintDetail.tracker.submittedSub"),
+      state: submittedState,
+      icon: <FileText size={ICON} color={col(submittedState)} strokeWidth={2.5} />,
     },
     {
-      label: getReviewLabel(raw, t),
-      sublabel: getReviewSublabel(raw, t),
+      id: "barangay",
+      label: t("complaintDetail.tracker.barangay"),
+      sublabel: t("complaintDetail.tracker.barangaySub"),
+      state: barangayState,
+      icon: <Shield size={ICON} color={col(barangayState)} strokeWidth={2.5} />,
     },
-    ...(hasForwarded
-      ? [
-          {
-            label: t("complaintDetail.timeline.stages.forwarded_to_department.label"),
-            sublabel: t("complaintDetail.timeline.stages.forwarded_to_department.sublabel"),
-          },
-        ]
-      : []),
     {
-      label: t("complaintDetail.timeline.stages.resolved_by_barangay.label"),
-      sublabel: t("complaintDetail.timeline.stages.resolved_by_barangay.sublabel"),
+      id: "lgu",
+      label: isRejectedByLgu && !isResolved
+        ? t("complaintDetail.tracker.rejectedLgu")
+        : t("complaintDetail.tracker.lgu"),
+      sublabel: isRejectedByLgu && !isResolved
+        ? t("complaintDetail.tracker.rejectedSub")
+        : t("complaintDetail.tracker.lguSub"),
+      state: lguState,
+      icon: isRejectedByLgu && !isResolved
+        ? <XCircle size={ICON} color={red} strokeWidth={2.5} />
+        : <Landmark size={ICON} color={col(lguState)} strokeWidth={2.5} />,
+    },
+    {
+      id: "department",
+      label: isRejectedByDepartment && !isResolved
+        ? t("complaintDetail.tracker.rejectedDept")
+        : t("complaintDetail.tracker.department"),
+      sublabel: isRejectedByDepartment && !isResolved
+        ? t("complaintDetail.tracker.rejectedSub")
+        : t("complaintDetail.tracker.departmentSub"),
+      state: deptState,
+      icon: isRejectedByDepartment && !isResolved
+        ? <XCircle size={ICON} color={red} strokeWidth={2.5} />
+        : <Building2 size={ICON} color={col(deptState)} strokeWidth={2.5} />,
+    },
+    {
+      id: "resolved",
+      label: t("complaintDetail.tracker.resolved"),
+      sublabel: resolvedSublabel,
+      state: resolvedState,
+      icon: <CheckCircle2 size={ICON} color={col(resolvedState)} strokeWidth={2.5} />,
     },
   ];
+}
+function getStatusDisplay(
+  status: ComplaintStatus,
+  isRejectedByLgu: boolean,
+  isRejectedByDepartment: boolean,
+  t: (key: string) => string
+): { label: string; color: string; bg: string } {
+  if (isRejectedByLgu)
+    return { label: t("complaintDetail.status.rejectedLgu"), color: "#ef4444", bg: "#fef2f2" };
+  if (isRejectedByDepartment)
+    return { label: t("complaintDetail.status.rejectedDept"), color: "#ef4444", bg: "#fef2f2" };
 
+  const map: Record<ComplaintStatus, { label: string; color: string; bg: string }> = {
+    submitted: { label: t("complaintDetail.status.submitted"), color: "#6366f1", bg: "#eef2ff" },
+    reviewed_by_barangay: { label: t("complaintDetail.status.underReview"), color: "#f59e0b", bg: "#fffbeb" },
+  
+    forwarded_to_lgu: { label: t("complaintDetail.status.forwardedLgu"), color: THEME.primary, bg: "#eff6ff" },
+
+    forwarded_to_department: { label: t("complaintDetail.status.forwardedDept"), color: "#8b5cf6", bg: "#f5f3ff" },
+    reviewed_by_department: { label: t("complaintDetail.status.deptReview"), color: "#f59e0b", bg: "#fffbeb" },
+     resolved_by_barangay: { label: t("complaintDetail.status.resolvedBarangay"), color: "#10b981", bg: "#ecfdf5" },
+resolved_by_lgu:      { label: t("complaintDetail.status.resolvedLgu"),      color: "#10b981", bg: "#ecfdf5" },
+resolved_by_department: { label: t("complaintDetail.status.resolvedDept"),   color: "#10b981", bg: "#ecfdf5" },
+  };
+  return map[status];
+}
+
+// ─── Loading State ────────────────────────────────────────────────────────────
+
+function LoadingState() {
+  const { t } = useTranslation();
+  return (
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f9fafb" }}>
+      <ActivityIndicator size="large" color={THEME.primary} />
+      <Text style={{ fontSize: 17, color: "#9ca3af", marginTop: 14, fontWeight: "500" }}>
+        {t("complaintDetail.loading")}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Section Card ─────────────────────────────────────────────────────────────
+
+function SectionCard({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <View
       style={{
         backgroundColor: "#fff",
-        borderWidth: 1,
-        borderColor: "#e5e7eb",
         borderRadius: 20,
-        padding: 20,
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: "#f3f4f6",
         shadowColor: "#000",
-        shadowOpacity: 0.05,
+        shadowOpacity: 0.04,
         shadowRadius: 8,
         shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
+        overflow: "hidden",
       }}
     >
-      {/* Section header */}
-      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20, gap: 10 }}>
-        <View
-          style={{
-            width: 6,
-            height: 22,
-            borderRadius: 3,
-            backgroundColor: THEME.primary,
-          }}
-        />
-        <Text
-          style={{
-            fontSize: 13,
-            fontWeight: "800",
-            color: "#374151",
-            letterSpacing: 1.2,
-            textTransform: "uppercase",
-          }}
-        >
-          {t("complaintDetail.timeline.sectionTitle")}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
+          paddingHorizontal: 18,
+          paddingVertical: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: "#f3f4f6",
+        }}
+      >
+        {icon}
+        <Text style={{ fontSize: 15, fontWeight: "700", color: "#374151", letterSpacing: 0.3 }}>
+          {title}
         </Text>
       </View>
-
-      {stages.map((stage, i) => {
-        const isCompleted = activeIndex > i;
-        const isActive = activeIndex === i;
-        const isLast = i === stages.length - 1;
-        const isResolved = isLast; // last stage is always "Resolved"
-
-        const dotColor = isCompleted || isActive ? THEME.primary : "#e5e7eb";
-        const lineColor = isCompleted ? `${THEME.primary}80` : "#e5e7eb";
-        const activeBadgeBg = `${THEME.primary}15`;
-        const activeBadgeBorder = `${THEME.primary}40`;
-
-        return (
-          <View key={i} style={{ flexDirection: "row" }}>
-            {/* Dot + connector */}
-            <View style={{ alignItems: "center", marginRight: 14, width: 36 }}>
-              <View
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: dotColor,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  zIndex: 10,
-                  ...(isActive && {
-                    shadowColor: THEME.primary,
-                    shadowOpacity: 0.4,
-                    shadowRadius: 8,
-                    shadowOffset: { width: 0, height: 0 },
-                  }),
-                }}
-              >
-                {isCompleted ? (
-                  <CheckCircle2 size={18} color="#fff" />
-                ) : isActive ? (
-                  isResolved ? (
-                    <CheckCircle2 size={18} color="#fff" />
-                  ) : (
-                    <Clock size={17} color="#fff" />
-                  )
-                ) : (
-                  <Circle size={13} color="#9ca3af" />
-                )}
-              </View>
-
-              {!isLast && (
-                <View
-                  style={{
-                    width: 3,
-                    borderRadius: 2,
-                    flex: 1,
-                    minHeight: 28,
-                    marginVertical: 3,
-                    backgroundColor: lineColor,
-                  }}
-                />
-              )}
-            </View>
-
-            {/* Text */}
-            <View style={{ flex: 1, paddingBottom: 18, justifyContent: "flex-start" }}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  marginTop: 5,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: isActive ? 16 : 15,
-                    fontWeight: isActive ? "800" : isCompleted ? "700" : "600",
-                    color: isActive
-                      ? THEME.primary
-                      : isCompleted
-                      ? "#374151"
-                      : "#9ca3af",
-                  }}
-                >
-                  {stage.label}
-                </Text>
-
-                {isActive && !isResolved && (
-                  <View
-                    style={{
-                      backgroundColor: activeBadgeBg,
-                      borderRadius: 20,
-                      paddingHorizontal: 10,
-                      paddingVertical: 3,
-                      borderWidth: 1,
-                      borderColor: activeBadgeBorder,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: "700",
-                        color: THEME.primary,
-                        textTransform: "uppercase",
-                        letterSpacing: 0.8,
-                      }}
-                    >
-                      {t("complaintDetail.timeline.badge.current")}
-                    </Text>
-                  </View>
-                )}
-
-                {(isCompleted || (isActive && isResolved)) && (
-                  <View
-                    style={{
-                      backgroundColor: isResolved && isActive ? "#f0fdf4" : "#f0fdf4",
-                      borderRadius: 20,
-                      paddingHorizontal: 10,
-                      paddingVertical: 3,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: "700",
-                        color: "#16a34a",
-                        textTransform: "uppercase",
-                        letterSpacing: 0.8,
-                      }}
-                    >
-                      {isActive && isResolved
-                        ? t("complaintDetail.timeline.badge.resolved")
-                        : t("complaintDetail.timeline.badge.done")}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              <Text
-                style={{
-                  fontSize: 13,
-                  marginTop: 3,
-                  lineHeight: 18,
-                  fontWeight: isActive ? "600" : "400",
-                  color: isActive
-                    ? THEME.primary
-                    : isCompleted
-                    ? "#6b7280"
-                    : "#d1d5db",
-                }}
-              >
-                {stage.sublabel}
-              </Text>
-            </View>
-          </View>
-        );
-      })}
+      <View style={{ padding: 18 }}>{children}</View>
     </View>
   );
 }
@@ -372,44 +297,24 @@ function InfoRow({
   value: string;
 }) {
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "flex-start",
-        gap: 12,
-        paddingVertical: 13,
-        borderBottomWidth: 1,
-        borderBottomColor: "#f9fafb",
-      }}
-    >
+    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
       <View
         style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          backgroundColor: "#f3f4f6",
+          width: 46,
+          height: 46,
+          borderRadius: 14,
+          backgroundColor: "#f0f4ff",
           alignItems: "center",
           justifyContent: "center",
-          flexShrink: 0,
-          marginTop: 2,
         }}
       >
         {icon}
       </View>
-      <View style={{ flex: 1 }}>
-        <Text
-          style={{
-            fontSize: 11,
-            fontWeight: "700",
-            color: "#9ca3af",
-            textTransform: "uppercase",
-            letterSpacing: 0.8,
-            marginBottom: 3,
-          }}
-        >
+      <View style={{ flex: 1, paddingTop: 2 }}>
+        <Text style={{ fontSize: 13, color: "#9ca3af", fontWeight: "600", marginBottom: 3 }}>
           {label}
         </Text>
-        <Text style={{ fontSize: 15, fontWeight: "600", color: "#1f2937", lineHeight: 21 }}>
+        <Text style={{ fontSize: 16, color: "#1f2937", fontWeight: "500", lineHeight: 23 }}>
           {value}
         </Text>
       </View>
@@ -417,40 +322,415 @@ function InfoRow({
   );
 }
 
-// ─── Contact Row ──────────────────────────────────────────────────────────────
+// ─── Progress Tracker ─────────────────────────────────────────────────────────
 
-function ContactRow({ icon, value }: { icon: React.ReactNode; value: string }) {
+function ProgressTracker({ steps, title }: { steps: TrackerStep[]; title: string }) {
   return (
     <View
-      style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}
+      style={{
+        backgroundColor: "#fff",
+        borderRadius: 20,
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: "#f3f4f6",
+        shadowColor: "#000",
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
+        overflow: "hidden",
+      }}
     >
       <View
         style={{
-          width: 34,
-          height: 34,
-          borderRadius: 10,
-          backgroundColor: `${THEME.primary}20`,
+          flexDirection: "row",
           alignItems: "center",
-          justifyContent: "center",
+          gap: 10,
+          paddingHorizontal: 18,
+          paddingVertical: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: "#f3f4f6",
         }}
       >
-        {icon}
+        <Clock size={18} color={THEME.primary} strokeWidth={2.5} />
+        <Text style={{ fontSize: 15, fontWeight: "700", color: "#374151", letterSpacing: 0.3 }}>
+          {title}
+        </Text>
       </View>
-      <Text style={{ fontSize: 15, fontWeight: "700", color: THEME.primary }}>{value}</Text>
+
+      <View style={{ padding: 18 }}>
+        {steps.map((step, index) => {
+          const isLast = index === steps.length - 1;
+          const isCompleted = step.state === "completed";
+          const isActive = step.state === "active";
+          const isRejected = step.state === "rejected";
+
+          const dotBg = isRejected
+            ? "#fef2f2"
+            : isCompleted || isActive
+            ? "#eff6ff"
+            : "#f9fafb";
+
+          const dotBorder = isRejected
+            ? "#ef4444"
+            : isCompleted || isActive
+            ? THEME.primary
+            : "#e5e7eb";
+
+          return (
+            <View key={step.id} style={{ flexDirection: "row" }}>
+              {/* Left column: dot + line */}
+              <View style={{ alignItems: "center", width: 48 }}>
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    backgroundColor: dotBg,
+                    borderWidth: 2,
+                    borderColor: dotBorder,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {step.icon}
+                </View>
+                {!isLast && (
+                  <View
+                    style={{
+                      width: 2,
+                      flex: 1,
+                      minHeight: 24,
+                      backgroundColor: isCompleted ? THEME.primary : "#e5e7eb",
+                      marginTop: 3,
+                      marginBottom: 3,
+                    }}
+                  />
+                )}
+              </View>
+
+              {/* Right column: label + sublabel */}
+              <View
+                style={{
+                  flex: 1,
+                  paddingLeft: 14,
+                  paddingTop: 10,
+                  paddingBottom: isLast ? 0 : 22,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <Text
+                    style={{
+                      fontSize: 17,
+                      fontWeight: isActive ? "800" : "600",
+                      color: isRejected
+                        ? "#ef4444"
+                        : isActive
+                        ? THEME.primary
+                        : isCompleted
+                        ? "#1f2937"
+                        : "#9ca3af",
+                    }}
+                  >
+                    {step.label}
+                  </Text>
+
+                  {isActive && (
+                    <View
+                      style={{
+                        backgroundColor: "#eff6ff",
+                        borderRadius: 20,
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: THEME.primary, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Current
+                      </Text>
+                    </View>
+                  )}
+
+                  {isRejected && (
+                    <View
+                      style={{
+                        backgroundColor: "#fef2f2",
+                        borderRadius: 20,
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#ef4444", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Rejected
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: isRejected ? "#fca5a5" : "#9ca3af",
+                    marginTop: 4,
+                    lineHeight: 20,
+                  }}
+                >
+                  {step.sublabel}
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
 
-// ─── Loading State ────────────────────────────────────────────────────────────
+// ─── Rejection Banner ─────────────────────────────────────────────────────────
 
-function LoadingState() {
+function RejectionBanner({ by }: { by: "lgu" | "department" }) {
   const { t } = useTranslation();
+  const label =
+    by === "lgu"
+      ? t("complaintDetail.rejection.byLgu")
+      : t("complaintDetail.rejection.byDept");
+
   return (
-    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f9fafb" }}>
-      <ActivityIndicator size="large" color={THEME.primary} />
-      <Text style={{ fontSize: 14, color: "#9ca3af", marginTop: 12, fontWeight: "500" }}>
-        {t("complaintDetail.loading")}
-      </Text>
+    <View
+      style={{
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderRadius: 20,
+        borderWidth: 1.5,
+        borderColor: "#fecaca",
+        backgroundColor: "#fef2f2",
+        overflow: "hidden",
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 18 }}>
+        <View
+          style={{
+            width: 54,
+            height: 54,
+            borderRadius: 16,
+            backgroundColor: "#fee2e2",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <AlertTriangle size={26} color="#ef4444" strokeWidth={2.5} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 17, fontWeight: "800", color: "#dc2626", marginBottom: 4 }}>
+            {t("complaintDetail.rejection.title")}
+          </Text>
+          <Text style={{ fontSize: 15, color: "#f87171", lineHeight: 21 }}>
+            {label}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ─── Responses / Remarks Section ─────────────────────────────────────────────
+
+const PREVIEW_COUNT = 2;
+
+function ResponsesSection({ incidentLinks }: { incidentLinks: IncidentLink[] }) {
+  const { t } = useTranslation();
+  const [sortDesc, setSortDesc] = useState(true);
+  const [showAll, setShowAll] = useState(false);
+
+  const allResponses = useMemo(() => {
+    const flat = incidentLinks.flatMap((link) => link.incident?.responses ?? []);
+    return flat.slice().sort((a, b) => {
+      const diff = new Date(a.response_date).getTime() - new Date(b.response_date).getTime();
+      return sortDesc ? -diff : diff;
+    });
+  }, [incidentLinks, sortDesc]);
+
+  if (allResponses.length === 0) return null;
+
+  const visible = showAll ? allResponses : allResponses.slice(0, PREVIEW_COUNT);
+
+  return (
+    <View
+      style={{
+        backgroundColor: "#fff",
+        borderRadius: 20,
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: "#f3f4f6",
+        shadowColor: "#000",
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 2,
+        overflow: "hidden",
+      }}
+    >
+      {/* Header */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 18,
+          paddingVertical: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: "#f3f4f6",
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <MessageCircle size={18} color={THEME.primary} strokeWidth={2.5} />
+          <Text style={{ fontSize: 15, fontWeight: "700", color: "#374151", letterSpacing: 0.3 }}>
+            {t("complaintDetail.remarks.title")}
+          </Text>
+          <View
+            style={{
+              backgroundColor: "#eff6ff",
+              borderRadius: 20,
+              paddingHorizontal: 10,
+              paddingVertical: 3,
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: "700", color: THEME.primary }}>
+              {allResponses.length}
+            </Text>
+          </View>
+        </View>
+
+        {/* Sort toggle */}
+        <TouchableOpacity
+          onPress={() => setSortDesc((p) => !p)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            backgroundColor: "#f3f4f6",
+            borderRadius: 20,
+            paddingHorizontal: 13,
+            paddingVertical: 8,
+          }}
+          activeOpacity={0.7}
+        >
+          <ArrowDownUp size={15} color="#6b7280" strokeWidth={2.5} />
+          <Text style={{ fontSize: 14, fontWeight: "600", color: "#6b7280" }}>
+            {sortDesc
+              ? t("complaintDetail.remarks.newest")
+              : t("complaintDetail.remarks.oldest")}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Remark cards */}
+      <View style={{ padding: 18, gap: 14 }}>
+        {visible.map((resp, i) => {
+          const remarkNumber = sortDesc ? allResponses.length - i : i + 1;
+          return (
+            <View
+              key={resp.id}
+              style={{
+                borderRadius: 16,
+                backgroundColor: "#f9fafb",
+                borderWidth: 1,
+                borderColor: "#f3f4f6",
+                overflow: "hidden",
+              }}
+            >
+              {/* Top bar */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
+                  paddingHorizontal: 16,
+                  paddingTop: 14,
+                  paddingBottom: 10,
+                }}
+              >
+                <View
+                  style={{
+                    width: 5,
+                    height: 40,
+                    borderRadius: 4,
+                    backgroundColor: THEME.primary,
+                  }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: THEME.primary,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                      marginBottom: 4,
+                    }}
+                  >
+                    {t("complaintDetail.remarks.remarkLabel", { number: remarkNumber })}
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                    <Clock size={13} color="#9ca3af" strokeWidth={2} />
+                    <Text style={{ fontSize: 13, color: "#9ca3af" }}>
+                      {new Date(resp.response_date).toLocaleString("en-PH", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Actions taken text */}
+              <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+                <Text style={{ fontSize: 16, color: "#1f2937", lineHeight: 24 }}>
+                  {resp.actions_taken}
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* View All / Show Less */}
+      {allResponses.length > PREVIEW_COUNT && (
+        <TouchableOpacity
+          onPress={() => setShowAll((p) => !p)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            marginHorizontal: 18,
+            marginBottom: 18,
+            paddingVertical: 15,
+            borderRadius: 14,
+            borderWidth: 1.5,
+            borderColor: "#e5e7eb",
+            backgroundColor: "#f9fafb",
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={{ fontSize: 15, fontWeight: "700", color: THEME.primary }}>
+            {showAll
+              ? t("complaintDetail.remarks.showLess")
+              : t("complaintDetail.remarks.viewAll", { count: allResponses.length })}
+          </Text>
+          <ChevronDown
+            size={16}
+            color={THEME.primary}
+            strokeWidth={2.5}
+            style={{ transform: [{ rotate: showAll ? "180deg" : "0deg" }] }}
+          />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -462,7 +742,7 @@ export default function ComplaintDetail() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const { data, error, isLoading, refetch } = useQuery<Complaint>({
+  const { data, error, isLoading, isFetching, refetch } = useQuery<ComplaintWithLinks>({
     queryKey: ["complaintDetail", id],
     queryFn: async () => {
       const response = await complaintApiClient.get(`/${id}`);
@@ -485,274 +765,216 @@ export default function ComplaintDetail() {
   if (isLoading) return <LoadingState />;
   if (!data) return null;
 
-  const catKey = data.category?.category_name ?? "";
-  const catLabel = getCategoryLabel(catKey, data.title);
+ const status = (data.status ?? "submitted") as ComplaintStatus;
+
+const isResolved =
+  status === "resolved_by_barangay" ||
+  status === "resolved_by_lgu" ||
+  status === "resolved_by_department";
+
+const isRejectedByLgu = data.is_rejected_by_lgu && !isResolved;
+const isRejectedByDepartment = data.is_rejected_by_department && !isResolved;
+  const steps = getTrackerSteps(status, isRejectedByLgu, isRejectedByDepartment, t);
+  const statusDisplay = getStatusDisplay(status, isRejectedByLgu, isRejectedByDepartment, t);
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#f3f4f6" }}>
+    <View style={{ flex: 1, backgroundColor: "#f9fafb" }}>
+
       {/* ── Header ── */}
-      <View
+     {/* ── Header ── */}
+<View
+  style={{
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    paddingTop: 52,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+  }}
+>
+  {/* Row 1: back button + complaint ID */}
+  <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 8 }}>
+    <TouchableOpacity
+      onPress={() => router.back()}
+      style={{
+        width: 46,
+        height: 46,
+        borderRadius: 14,
+        backgroundColor: "#f3f4f6",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+      activeOpacity={0.7}
+    >
+      <ChevronLeft size={24} color="#374151" strokeWidth={2.5} />
+    </TouchableOpacity>
+
+    <Text style={{ fontSize: 13, color: "#9ca3af", fontWeight: "600" }}>
+      {t("complaintDetail.header.complaintId", { id: data.id })}
+    </Text>
+  </View>
+
+  {/* Row 2: title + status chip */}
+  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+    <Text
+      style={{
+        flex: 1,
+        fontSize: 17,
+        fontWeight: "800",
+        color: "#111827",
+        lineHeight: 24,
+      }}
+      numberOfLines={1}
+      ellipsizeMode="tail"
+    >
+      {data.title}
+    </Text>
+
+    <View
+      style={{
+        backgroundColor: statusDisplay.bg,
+        borderRadius: 22,
+        paddingHorizontal: 13,
+        paddingVertical: 8,
+        flexShrink: 0,
+      }}
+    >
+      <Text
         style={{
-          backgroundColor: "#fff",
-          paddingHorizontal: 20,
-          paddingTop: 56,
-          paddingBottom: 14,
-          borderBottomWidth: 1,
-          borderBottomColor: "#f3f4f6",
+          fontSize: 12,
+          fontWeight: "800",
+          color: statusDisplay.color,
+          textTransform: "uppercase",
+          letterSpacing: 0.4,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <ArrowLeft size={22} color={THEME.primary} />
-            <Text style={{ fontSize: 16, fontWeight: "700", color: THEME.primary }}>
-              {t("complaintDetail.header.back")}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => refetch()}
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 12,
-              backgroundColor: `${THEME.primary}15`,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <RefreshCw size={17} color={THEME.primary} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
+        {statusDisplay.label}
+      </Text>
+    </View>
+  </View>
+</View>
       <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
+         style={{ flex: 1 }}
+  showsVerticalScrollIndicator={false}
+  contentContainerStyle={{ paddingTop: 18, paddingBottom: 48 }}
+  refreshControl={                                        // ← add this
+    <RefreshControl
+      refreshing={isFetching && !isLoading}
+      onRefresh={refetch}
+      colors={[THEME.primary]}          // Android spinner color
+      tintColor={THEME.primary}         // iOS spinner color
+    />
+  }
       >
-        {/* ── Hero Card ── */}
-        <View
-          style={{
-            backgroundColor: "#fff",
-            borderWidth: 1,
-            borderColor: "#e5e7eb",
-            borderRadius: 20,
-            padding: 20,
-            marginBottom: 12,
-            shadowColor: "#000",
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 2 },
-          }}
+        {/* ── Rejection Banners ── */}
+        {isRejectedByLgu && <RejectionBanner by="lgu" />}
+        {isRejectedByDepartment && <RejectionBanner by="department" />}
+
+        {/* ── Progress Tracker ── */}
+        <ProgressTracker
+          steps={steps}
+          title={t("complaintDetail.tracker.title")}
+        />
+
+        {/* ── Complaint Info ── */}
+        <SectionCard
+          title={t("complaintDetail.sections.complaintInfo")}
+          icon={<FileText size={18} color={THEME.primary} strokeWidth={2.5} />}
         >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 16,
-            }}
-          >
-            <View
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 16,
-                backgroundColor: `${THEME.primary}15`,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <CategoryIcon categoryKey={catKey} size={28} />
-            </View>
-          </View>
-
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: "800",
-              color: THEME.primary,
-              textTransform: "uppercase",
-              letterSpacing: 1,
-              marginBottom: 6,
-            }}
-          >
-            {catLabel}
-          </Text>
-          <Text
-            style={{
-              fontSize: 22,
-              fontWeight: "800",
-              color: "#111827",
-              marginBottom: 8,
-              lineHeight: 30,
-            }}
-          >
-            {data.title}
-          </Text>
-          {data.description && (
-            <Text
-              style={{
-                fontSize: 14,
-                color: "#6b7280",
-                lineHeight: 22,
-                marginBottom: 12,
-                fontWeight: "400",
-              }}
-            >
-              {data.description}
-            </Text>
-          )}
-          <View
-            style={{
-              backgroundColor: "#f9fafb",
-              borderRadius: 8,
-              paddingHorizontal: 10,
-              paddingVertical: 5,
-              alignSelf: "flex-start",
-            }}
-          >
-            <Text style={{ fontSize: 12, color: "#6b7280", fontWeight: "600" }}>
-              {t("complaintDetail.hero.complaintId", {
-                id: String(data.id).padStart(5, "0"),
-              })}
-            </Text>
-          </View>
-        </View>
-
-        {/* ── Status Timeline ── */}
-        <View style={{ marginBottom: 12 }}>
-          <StatusTimeline status={data.status} />
-        </View>
-
-        {/* ── Details Card ── */}
-        <View
-          style={{
-            backgroundColor: "#fff",
-            borderWidth: 1,
-            borderColor: "#e5e7eb",
-            borderRadius: 20,
-            paddingHorizontal: 16,
-            marginBottom: 12,
-            shadowColor: "#000",
-            shadowOpacity: 0.04,
-            shadowRadius: 6,
-            shadowOffset: { width: 0, height: 2 },
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: "800",
-              color: "#6b7280",
-              textTransform: "uppercase",
-              letterSpacing: 1,
-              paddingTop: 16,
-              paddingBottom: 8,
-            }}
-          >
-            {t("complaintDetail.details.sectionTitle")}
-          </Text>
-
           <InfoRow
-            icon={<Calendar size={17} color="#4b5563" />}
-            label={t("complaintDetail.details.dateFiled")}
-            value={t("complaintDetail.details.dateFiled_value", {
-              date: formatDate(data.created_at),
-              time: formatTime(data.created_at),
-            })}
+            icon={<Layers size={18} color={THEME.primary} strokeWidth={2} />}
+            label={t("complaintDetail.fields.category")}
+            value={getCategoryLabel(data.category?.category_name ?? "")}
           />
-
-          {data.barangay && (
+          {data.description && (
             <InfoRow
-              icon={<MapPin size={17} color="#4b5563" />}
-              label={t("complaintDetail.details.barangay")}
-              value={t("complaintDetail.details.barangay_value", {
-                name: data.barangay.barangay_name,
-                address: data.barangay.barangay_address,
-              })}
+              icon={<MessageSquare size={18} color={THEME.primary} strokeWidth={2} />}
+              label={t("complaintDetail.fields.description")}
+              value={data.description}
             />
           )}
-
           {data.location_details && (
             <InfoRow
-              icon={<MapPin size={17} color="#4b5563" />}
-              label={t("complaintDetail.details.locationDetails")}
+              icon={<MapPin size={18} color={THEME.primary} strokeWidth={2} />}
+              label={t("complaintDetail.fields.location")}
               value={data.location_details}
             />
           )}
+          <InfoRow
+            icon={<Calendar size={18} color={THEME.primary} strokeWidth={2} />}
+            label={t("complaintDetail.fields.dateSubmitted")}
+            value={`${formatDate(data.created_at)}  •  ${formatTime(data.created_at)}`}
+          />
+        </SectionCard>
 
-          {data.department && (
+        {/* ── Barangay ── */}
+        {data.barangay && (
+          <SectionCard
+            title={t("complaintDetail.sections.barangay")}
+            icon={<Shield size={18} color={THEME.primary} strokeWidth={2.5} />}
+          >
             <InfoRow
-              icon={<Building2 size={17} color="#4b5563" />}
-              label={t("complaintDetail.details.assignedDepartment")}
+              icon={<Shield size={18} color={THEME.primary} strokeWidth={2} />}
+              label={t("complaintDetail.fields.barangayName")}
+              value={data.barangay.barangay_name}
+            />
+            <InfoRow
+              icon={<MapPin size={18} color={THEME.primary} strokeWidth={2} />}
+              label={t("complaintDetail.fields.address")}
+              value={data.barangay.barangay_address}
+            />
+            <InfoRow
+              icon={<Phone size={18} color={THEME.primary} strokeWidth={2} />}
+              label={t("complaintDetail.fields.contactNumber")}
+              value={data.barangay.barangay_contact_number}
+            />
+            <InfoRow
+              icon={<Mail size={18} color={THEME.primary} strokeWidth={2} />}
+              label={t("complaintDetail.fields.email")}
+              value={data.barangay.barangay_email}
+            />
+          </SectionCard>
+        )}
+
+        {/* ── Department ── */}
+        {data.department && (
+          <SectionCard
+            title={t("complaintDetail.sections.department")}
+            icon={<Building2 size={18} color={THEME.primary} strokeWidth={2.5} />}
+          >
+            <InfoRow
+              icon={<Building2 size={18} color={THEME.primary} strokeWidth={2} />}
+              label={t("complaintDetail.fields.departmentName")}
               value={data.department.department_name}
             />
-          )}
+            {data.department.department_address && (
+              <InfoRow
+                icon={<MapPin size={18} color={THEME.primary} strokeWidth={2} />}
+                label={t("complaintDetail.fields.address")}
+                value={data.department.department_address}
+              />
+            )}
+            {data.department.department_contact_number && (
+              <InfoRow
+                icon={<Phone size={18} color={THEME.primary} strokeWidth={2} />}
+                label={t("complaintDetail.fields.contactNumber")}
+                value={data.department.department_contact_number}
+              />
+            )}
+            {data.department.department_email && (
+              <InfoRow
+                icon={<Mail size={18} color={THEME.primary} strokeWidth={2} />}
+                label={t("complaintDetail.fields.email")}
+                value={data.department.department_email}
+              />
+            )}
+          </SectionCard>
+        )}
 
-          {data.priority_level && (
-            <InfoRow
-              icon={<Tag size={17} color="#4b5563" />}
-              label={t("complaintDetail.details.priorityLevel")}
-              value={data.priority_level.label}
-            />
-          )}
-
-          {data.sector && (
-            <InfoRow
-              icon={<Tag size={17} color="#4b5563" />}
-              label={t("complaintDetail.details.sector")}
-              value={data.sector.name}
-            />
-          )}
-
-          <View style={{ paddingBottom: 4 }} />
-        </View>
-
-        {/* ── Barangay Contact Card ── */}
-        {data.barangay &&
-          (data.barangay.barangay_contact_number || data.barangay.barangay_email) && (
-            <View
-              style={{
-                backgroundColor: `${THEME.primary}10`,
-                borderWidth: 1,
-                borderColor: `${THEME.primary}30`,
-                borderRadius: 20,
-                padding: 16,
-                marginBottom: 12,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "800",
-                  color: THEME.primary,
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                  marginBottom: 12,
-                }}
-              >
-                {t("complaintDetail.barangayContact.sectionTitle")}
-              </Text>
-
-              {data.barangay.barangay_contact_number && (
-                <ContactRow
-                  icon={<Phone size={16} color={THEME.primary} />}
-                  value={data.barangay.barangay_contact_number}
-                />
-              )}
-
-              {data.barangay.barangay_email && (
-                <ContactRow
-                  icon={<Mail size={16} color={THEME.primary} />}
-                  value={data.barangay.barangay_email}
-                />
-              )}
-            </View>
-          )}
+        {/* ── Remarks ── */}
+        {(data.incident_links ?? []).length > 0 && (
+          <ResponsesSection incidentLinks={data.incident_links!} />
+        )}
       </ScrollView>
     </View>
   );

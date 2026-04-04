@@ -424,83 +424,100 @@ const resources = {
         }
       },
 
-      
-
-      "complaintDetail": {
-  "header": {
-    "back": "Back"
-  },
-  "loading": "Fetching complaint details...",
-  "error": {
-    "title": "Unable to Retrieve Complaint Details",
-    "message": "Failed to fetch complaint details"
-  },
-  "hero": {
-    "complaintId": "Complaint #{{id}}"
-  },
-  "timeline": {
-    "sectionTitle": "Progress",
-    "rejected": {
-      "title": "Complaint Rejected",
-      "description": "This complaint has been reviewed and rejected."
+      complaintDetail: {
+    loading: "Loading complaint details…",
+ 
+    error: {
+      title: "Something went wrong",
+      message: "Failed to load complaint details.",
     },
-    // ── ADDED ──
-    "badge": {
-      "current": "In Progress",
-      "done": "Done"
+ 
+    header: {
+      complaintId: "Complaint #{{id}}",
     },
-    "groups": {
-      "barangay": "Barangay",
-      "lgu": "LGU",
-      "department": "Department"
+ 
+    // ── Status chip labels ──────────────────────────────────────────────────
+    status: {
+      submitted: "Submitted",
+      underReview: "Under Review",
+      resolved: "Resolved",
+      forwardedLgu: "Forwarded to LGU",
+      forwardedDept: "Forwarded to Dept.",
+      deptReview: "Dept. Review",
+      rejectedLgu: "Rejected by LGU",
+      rejectedDept: "Rejected by Dept.",
+      "resolvedBarangay": "Resolved by Barangay",
+"resolvedLgu":      "Resolved by LGU",
+"resolvedDept":     "Resolved by Department"
     },
-    "stages": {
-      "submitted": {
-        "label": "Submitted",
-        "sublabel": "Complaint received"
-      },
-      "reviewed_by_barangay": {
-        "label": "Reviewed",
-        "sublabel": "Under barangay review"
-      },
-      "resolved_by_barangay": {
-        "label": "Resolved",
-        "sublabel": "Resolved by barangay"
-      },
-      "forwarded_to_lgu": {
-        "label": "Forwarded to LGU",
-        "sublabel": "Escalated to local government"
-      },
-      "forwarded_to_department": {
-        "label": "Forwarded to Department",
-        "sublabel": "Assigned to a department"
-      },
-      "reviewed_by_department": {
-        "label": "Under Review",
-        "sublabel": "Department is reviewing"
-      },
-      "resolved_by_department": {
-        "label": "Resolved",
-        "sublabel": "Resolved by department"
-      }
-    }
-    // ── END ADDED ──
-  },
-  "details": {
-    "sectionTitle": "Details",
-    "dateFiled": "Date Filed",
-    "dateFiled_value": "{{date}} at {{time}}",
-    "barangay": "Barangay",
-    "barangay_value": "{{name}} — {{address}}",
-    "locationDetails": "Location Details",
-    "assignedDepartment": "Assigned Department",
-    "priorityLevel": "Priority Level",
-    "sector": "Sector"
-  },
-  "barangayContact": {
-    "sectionTitle": "Contact the Barangay"
+ 
+    // ── Progress tracker steps ──────────────────────────────────────────────
+    tracker: {
+      title: "Complaint Progress",
+ 
+      submitted: "Submitted",
+      submittedSub: "Complaint received",
+ 
+      barangay: "Barangay Review",
+      barangaySub: "Under barangay assessment",
+ 
+      lgu: "LGU Review",
+      lguSub: "Escalated to local government",
+ 
+      department: "Department Review",
+      departmentSub: "Referred to concerned department",
+ 
+      resolved: "Resolved",
+      resolvedSub: "Complaint has been addressed",
+       resolvedByBarangay: "Resolved at barangay level",  // ← add
+  resolvedByLgu: "Resolved at LGU level",            // ← add
+  resolvedByDept: "Resolved at department level",  
+ 
+      rejectedLgu: "Rejected by LGU",
+      rejectedDept: "Rejected by Department",
+      rejectedSub: "Complaint was not accepted",
+    },
+ 
+    // ── Rejection banner ────────────────────────────────────────────────────
+    rejection: {
+      title: "Complaint Rejected",
+      byLgu: "This complaint was not accepted by the Local Government Unit.",
+      byDept: "This complaint was not accepted by the Department.",
+    },
+ 
+    // ── Section headings ────────────────────────────────────────────────────
+    sections: {
+      complaintInfo: "Complaint Info",
+      barangay: "Handling Barangay",
+      department: "Handling Department",
+      remarks: "Remarks",
+    },
+ 
+    // ── Field labels ────────────────────────────────────────────────────────
+    fields: {
+      category: "Category",
+      description: "Description",
+      location: "Location",
+      dateSubmitted: "Date Submitted",
+      barangayName: "Barangay",
+      address: "Address",
+      contactNumber: "Contact Number",
+      email: "Email",
+      departmentName: "Department",
+    },
+ 
+    // ── Remarks / responses ─────────────────────────────────────────────────
+    remarks: {
+      title: "Remarks",
+      newest: "Newest",
+      oldest: "Oldest",
+      remarkLabel: "Remark #{{number}}",
+      viewAll: "View All {{count}} Remarks",
+      showLess: "Show Less",
+    },
   }
-},
+
+      ,
       "header": {
         "municipality": "Municipality of",
         "city": "Santa Maria",
@@ -1003,79 +1020,98 @@ const resources = {
       },
    
    
-   "complaintDetail": {
-  "header": {
-    "back": "Bumalik"
-  },
-  "loading": "Kinukuha ang detalye ng reklamo...",
-  "error": {
-    "title": "Hindi Makuha ang Detalye ng Reklamo",
-    "message": "Nabigo sa pagkuha ng detalye ng reklamo"
-  },
-  "hero": {
-    "complaintId": "Reklamo #{{id}}"
-  },
-  "timeline": {
-    "sectionTitle": "Progreso",
-    "rejected": {
-      "title": "Tinanggihan ang Reklamo",
-      "description": "Ang reklamong ito ay nasuri at tinanggihan."
+   complaintDetail: {
+    loading: "Kino-load ang detalye ng reklamo…",
+ 
+    error: {
+      title: "May nangyaring mali",
+      message: "Hindi ma-load ang detalye ng reklamo.",
     },
-    "badge": {
-      "current": "Isinasagawa",
-      "done": "Tapos Na"
+ 
+    header: {
+      complaintId: "Reklamo #{{id}}",
     },
-    "groups": {
-      "barangay": "Barangay",
-      "lgu": "LGU",
-      "department": "Departamento"
+ 
+    // ── Status chip labels ──────────────────────────────────────────────────
+    status: {
+      submitted: "Naisumite",
+      underReview: "Sinusuri",
+      resolved: "Naresolba",
+      forwardedLgu: "Ipinasa sa LGU",
+      forwardedDept: "Ipinasa sa Dept.",
+      deptReview: "Sinusuri ng Dept.",
+      rejectedLgu: "Tinanggihan ng LGU",
+      rejectedDept: "Tinanggihan ng Dept.",
+        "resolvedBarangay": "Niresolba ng Barangay",
+"resolvedLgu":      "Niresolba ng LGU",
+"resolvedDept":     "Niresolba ng Department"
     },
-    "stages": {
-      "submitted": {
-        "label": "Naisumite",
-        "sublabel": "Natanggap ang reklamo"
-      },
-      "reviewed_by_barangay": {
-        "label": "Nasuri",
-        "sublabel": "Sinusuri ng barangay"
-      },
-      "resolved_by_barangay": {
-        "label": "Nalutas",
-        "sublabel": "Nalutas ng barangay"
-      },
-      "forwarded_to_lgu": {
-        "label": "Ipinasa sa LGU",
-        "sublabel": "Isinulong sa lokal na pamahalaan"
-      },
-      "forwarded_to_department": {
-        "label": "Ipinasa sa Departamento",
-        "sublabel": "Itinalaga sa isang departamento"
-      },
-      "reviewed_by_department": {
-        "label": "Isinasaalang-alang",
-        "sublabel": "Sinusuri ng departamento"
-      },
-      "resolved_by_department": {
-        "label": "Nalutas",
-        "sublabel": "Nalutas ng departamento"
-      }
-    }
+ 
+    // ── Progress tracker steps ──────────────────────────────────────────────
+    tracker: {
+      title: "Katayuan ng Reklamo",
+ 
+      submitted: "Naisumite",
+      submittedSub: "Natanggap na ang reklamo",
+ 
+      barangay: "Pagsusuri ng Barangay",
+      barangaySub: "Sinusuri ng barangay",
+ 
+      lgu: "Pagsusuri ng LGU",
+      lguSub: "Ipinasa sa lokal na pamahalaan",
+ 
+      department: "Pagsusuri ng Departamento",
+      departmentSub: "Ipinasa sa kaukulang departamento",
+ 
+      resolved: "Naresolba",
+      resolvedSub: "Naalagaan na ang reklamo",
+       resolvedByBarangay: "Naresolba sa Barangay ",  // ← add
+  resolvedByLgu: "Naresolba sa LGU",            // ← add
+  resolvedByDept: "Naresolba sa Departamento",  
+ 
+      rejectedLgu: "Tinanggihan ng LGU",
+      rejectedDept: "Tinanggihan ng Departamento",
+      rejectedSub: "Hindi tinanggap ang reklamo",
+    },
+ 
+    // ── Rejection banner ────────────────────────────────────────────────────
+    rejection: {
+      title: "Tinanggihan ang Reklamo",
+      byLgu: "Hindi tinanggap ng Lokal na Pamahalaan ang inyong reklamo.",
+      byDept: "Hindi tinanggap ng Departamento ang inyong reklamo.",
+    },
+ 
+    // ── Section headings ────────────────────────────────────────────────────
+    sections: {
+      complaintInfo: "Impormasyon ng Reklamo",
+      barangay: "Nangangasiwa na Barangay",
+      department: "Nangangasiwa na Departamento",
+      remarks: "Mga Tugon",
+    },
+ 
+    // ── Field labels ────────────────────────────────────────────────────────
+    fields: {
+      category: "Kategorya",
+      description: "Paglalarawan",
+      location: "Lokasyon",
+      dateSubmitted: "Petsa ng Pagsusumite",
+      barangayName: "Barangay",
+      address: "Tirahan",
+      contactNumber: "Numero ng Telepono",
+      email: "Email",
+      departmentName: "Departamento",
+    },
+ 
+    // ── Remarks / responses ─────────────────────────────────────────────────
+    remarks: {
+      title: "Mga Tugon",
+      newest: "Pinakabago",
+      oldest: "Pinakamatanda",
+      remarkLabel: "Tugon #{{number}}",
+      viewAll: "Tingnan Lahat ({{count}})",
+      showLess: "Ipakita ang Mas Kaunti",
+    },
   },
-  "details": {
-    "sectionTitle": "Mga Detalye",
-    "dateFiled": "Petsa ng Pagsumite",
-    "dateFiled_value": "{{date}} nang {{time}}",
-    "barangay": "Barangay",
-    "barangay_value": "{{name}} — {{address}}",
-    "locationDetails": "Mga Detalye ng Lokasyon",
-    "assignedDepartment": "Itinalagang Departamento",
-    "priorityLevel": "Antas ng Priyoridad",
-    "sector": "Sektor"
-  },
-  "barangayContact": {
-    "sectionTitle": "Makipag-ugnayan sa Barangay"
-  }
-}   ,
       "complaint_form": {
         "screen_title": "Maghain ng Reklamo",
         "title_label": "Kategorya ng Reklamo",
