@@ -35,6 +35,7 @@ import { emergencyApiClient } from '@/lib/client/emergency';
 interface EmergencyContactAPI {
   id: number;
   contact_number: string;
+  agency_id: number; // ✅ added: present in API response
 }
 
 interface EmergencyAgency {
@@ -42,7 +43,7 @@ interface EmergencyAgency {
   agency_name: string;
   created_at: string;
   updated_at: string | null;
-  contacts: EmergencyContactAPI[];
+  emergency_contacts: EmergencyContactAPI[]; // ✅ fixed: was `contacts`
 }
 
 interface PendingContact {
@@ -224,9 +225,9 @@ export default function EmergencyScreen() {
           const themeKey = agency.agency_name?.toLowerCase() ?? '';
           const theme = SERVICE_THEMES[themeKey] ?? DEFAULT_THEME;
 
-          // Guard: contacts must be an array
-          const contacts: EmergencyContactAPI[] = Array.isArray(agency.contacts)
-            ? agency.contacts
+          // ✅ Fixed: was `agency.contacts`, now `agency.emergency_contacts`
+          const contacts: EmergencyContactAPI[] = Array.isArray(agency.emergency_contacts)
+            ? agency.emergency_contacts
             : [];
 
           return (

@@ -77,7 +77,7 @@ function RootLayoutNav() {
   if (loading || retrying) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color="#10B981" />
       </View>
     );
   }
