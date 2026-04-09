@@ -227,9 +227,9 @@ interface ChatbotModalProps {
 export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const insets = useSafeAreaInsets();
 
-  const [messages,   setMessages]   = useState<Message[]>(INITIAL_MESSAGES);
-  const [input,      setInput]      = useState('');
-  const [isTyping,   setIsTyping]   = useState(false);
+  const [messages,    setMessages]   = useState<Message[]>(INITIAL_MESSAGES);
+  const [input,       setInput]      = useState('');
+  const [isTyping,    setIsTyping]   = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
 
   const listRef         = useRef<FlatList>(null);
@@ -237,6 +237,8 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const inputRef        = useRef<TextInput>(null);
   const abortRef        = useRef<AbortController | null>(null);
   const streamFinishRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 🔒 Prevents duplicate requests from lag-induced double taps
+  const isSendingRef    = useRef(false);
 
   useEffect(() => {
     if (visible) {
@@ -252,11 +254,18 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     setIsTyping(false);
     setIsStreaming(false);
     setMessages((prev) => prev.map((m) => (m.streaming ? { ...m, streaming: false } : m)));
+    isSendingRef.current = false; // 🔓 Release lock on manual cancel
   }, []);
 
   const sendMessage = useCallback(async (text: string, isSuggestion = false) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    // 🔒 Hard lock — ignore all taps while a request is already in flight
+    if (isSendingRef.current) return;
+    isSendingRef.current = true;
+
+    // Cancel any lingering stream before starting fresh
     if (isTyping || isStreaming) handleCancel();
 
     setInput('');
@@ -280,6 +289,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
         if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
           setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
           setIsTyping(false);
+          isSendingRef.current = false; // 🔓 Release lock on abort
           return;
         }
         reply = 'Pasensya na, may problema sa koneksyon. Subukan ulit o pumili mula sa mga mungkahi sa itaas. 🙏';
@@ -301,6 +311,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
       setMessages((prev) => prev.map((m) => (m.id === botId ? { ...m, streaming: false } : m)));
       setIsStreaming(false);
       streamFinishRef.current = null;
+      isSendingRef.current = false; // 🔓 Release lock after stream finishes
     }, estimatedDuration);
   }, [isTyping, isStreaming, handleCancel]);
 
@@ -313,6 +324,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
         <Animated.View style={{ flex: 1, transform: [{ translateY: slideAnim }] }}>
           <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={kavOffset}>
 
+            {/* Header */}
             <View style={{ paddingTop: insets.top, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, gap: 8 }}>
                 <TouchableOpacity onPress={onClose} activeOpacity={0.7} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
@@ -342,6 +354,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               </View>
             </View>
 
+            {/* Message list */}
             <FlatList
               ref={listRef}
               data={messages}
@@ -371,6 +384,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               }
             />
 
+            {/* Suggestion chips */}
             <View style={{ backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12, paddingBottom: 10 }}>
               <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 8 }}>
                 Mga Madalas na Tanong
@@ -387,6 +401,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               />
             </View>
 
+            {/* Input bar */}
             <View style={{ backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingHorizontal: 12, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 12), flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
               <View style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 2, flexDirection: 'row', alignItems: 'flex-end', minHeight: 44, borderWidth: 1.5, borderColor: isBusy ? THEME.primary + '55' : '#E2E8F0' }}>
                 <TextInput
