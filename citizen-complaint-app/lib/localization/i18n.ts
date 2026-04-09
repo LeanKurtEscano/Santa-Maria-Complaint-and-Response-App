@@ -261,6 +261,8 @@ const resources = {
         }
       },
 
+      
+
 
       "complaint": {
         "screen_title": "New Complaint",
@@ -319,6 +321,44 @@ const resources = {
           "other": "Other (specify below)"
         }
       },
+       "complaints": {
+    "header": {
+      "location": "Santa Maria, Laguna",
+      "title": "My Complaints",
+      "back": "Back"
+    },
+    "search": {
+      "placeholder": "Search Barangay..."
+    },
+    "filter": {
+      "label": "Filter",
+      "labelWithCount": "Filter ({{count}})",
+      "title": "Filter by Status",
+      "clearAll": "Clear All",
+      "apply": "Apply Filters"
+    },
+    "count": "{{filtered}} of {{total}} complaint",
+    "count_plural": "{{filtered}} of {{total}} complaints",
+    "card": {
+      "id": "#{{id}}"
+    },
+    "empty": {
+      "noResults": {
+        "title": "No results found",
+        "description": "Try changing your filters or search terms."
+      },
+      "noComplaints": {
+        "title": "No complaints yet",
+        "description": "You haven’t submitted any complaints yet."
+      }
+    },
+    "loading": "Fetching your complaints...",
+    "error": {
+      "title": "Unable to Retrieve Complaints",
+      "message": "Failed to fetch complaints"
+    }
+  },
+
 
       "complaintsScreen": {
         "header": {
@@ -384,46 +424,6 @@ const resources = {
         "proceed_to_form": "I Understand — Proceed to Form"
       },
 
-
-
-      "complaints": {
-        "header": {
-          "location": "Santa Maria, Laguna",
-          "title": "Aking mga Reklamo",
-          "back": "Bumalik"
-        },
-        "search": {
-          "placeholder": "Search Barangay..."
-        },
-        "filter": {
-          "label": "Salain",
-          "labelWithCount": "Salain ({{count}})",
-          "title": "Salain ayon sa Katayuan",
-          "clearAll": "Alisin lahat",
-          "apply": "Ilapat ang Mga Filter"
-        },
-        "count": "{{filtered}} sa {{total}} reklamo",
-        "count_plural": "{{filtered}} sa {{total}} mga reklamo",
-        "card": {
-          "id": "#{{id}}"
-        },
-        "empty": {
-          "noResults": {
-            "title": "Walang nahanap na resulta",
-            "description": "Subukang baguhin ang iyong mga filter o mga salitang hinahanap."
-          },
-          "noComplaints": {
-            "title": "Wala pang reklamo",
-            "description": "Wala ka pang naisumiteng reklamo."
-          }
-        },
-        "loading": "Kinukuha ang iyong mga reklamo...",
-        "error": {
-          "title": "Hindi Makuha ang mga Reklamo",
-          "message": "Nabigo sa pagkuha ng mga reklamo"
-        }
-      },
-
       complaintDetail: {
     loading: "Loading complaint details…",
  
@@ -444,6 +444,7 @@ const resources = {
       forwardedLgu: "Forwarded to LGU",
       forwardedDept: "Forwarded to Dept.",
       deptReview: "Dept. Review",
+      "rejectedBarangay": "Rejected by Barangay",
       rejectedLgu: "Rejected by LGU",
       rejectedDept: "Rejected by Dept.",
       "resolvedBarangay": "Resolved by Barangay",
@@ -460,6 +461,7 @@ const resources = {
  
       barangay: "Barangay Review",
       barangaySub: "Under barangay assessment",
+      "rejectedBarangay": "Rejected by Barangay",
  
       lgu: "LGU Review",
       lguSub: "Escalated to local government",
@@ -483,6 +485,7 @@ const resources = {
       title: "Complaint Rejected",
       byLgu: "This complaint was not accepted by the Local Government Unit.",
       byDept: "This complaint was not accepted by the Department.",
+      "byBarangay": "Your complaint was reviewed and rejected by the barangay."
     },
  
     // ── Section headings ────────────────────────────────────────────────────
@@ -996,6 +999,45 @@ const resources = {
         }
       },
 
+
+      "complaints": {
+    "header": {
+      "location": "Santa Maria, Laguna",
+      "title": "Aking mga Reklamo",
+      "back": "Bumalik"
+    },
+    "search": {
+      "placeholder": "Maghanap ng Barangay..."
+    },
+    "filter": {
+      "label": "Salain",
+      "labelWithCount": "Salain ({{count}})",
+      "title": "Salain ayon sa Katayuan",
+      "clearAll": "Alisin Lahat",
+      "apply": "Ilapat ang Mga Filter"
+    },
+    "count": "{{filtered}} sa {{total}} reklamo",
+    "count_plural": "{{filtered}} sa {{total}} mga reklamo",
+    "card": {
+      "id": "#{{id}}"
+    },
+    "empty": {
+      "noResults": {
+        "title": "Walang Nahanap na Resulta",
+        "description": "Subukang baguhin ang iyong mga filter o ang mga salitang hinahanap."
+      },
+      "noComplaints": {
+        "title": "Wala Pang Reklamo",
+        "description": "Wala ka pang naisusumiteng reklamo."
+      }
+    },
+    "loading": "Kinukuha ang iyong mga reklamo...",
+    "error": {
+      "title": "Hindi Makuha ang mga Reklamo",
+      "message": "Nabigo sa pagkuha ng mga reklamo"
+    }
+  },
+
       "complaintsScreen": {
         "header": {
           "title": "Mag-file ng Reklamo",
@@ -1040,8 +1082,8 @@ const resources = {
       forwardedLgu: "Ipinasa sa LGU",
       forwardedDept: "Ipinasa sa Dept.",
       deptReview: "Sinusuri ng Dept.",
-      rejectedLgu: "Tinanggihan ng LGU",
-      rejectedDept: "Tinanggihan ng Dept.",
+      rejectedLgu: "Nireject ng LGU",
+      rejectedDept: "Nireject ng Dept.",
         "resolvedBarangay": "Niresolba ng Barangay",
 "resolvedLgu":      "Niresolba ng LGU",
 "resolvedDept":     "Niresolba ng Department"
@@ -1050,7 +1092,7 @@ const resources = {
     // ── Progress tracker steps ──────────────────────────────────────────────
     tracker: {
       title: "Katayuan ng Reklamo",
- 
+      "rejectedBarangay": "Nireject ng Barangay",
       submitted: "Naisumite",
       submittedSub: "Natanggap na ang reklamo",
  
@@ -1079,6 +1121,7 @@ const resources = {
       title: "Tinanggihan ang Reklamo",
       byLgu: "Hindi tinanggap ng Lokal na Pamahalaan ang inyong reklamo.",
       byDept: "Hindi tinanggap ng Departamento ang inyong reklamo.",
+        "byBarangay": "Ang iyong reklamo ay nasuri at tinanggihan ng barangay."
     },
  
     // ── Section headings ────────────────────────────────────────────────────
