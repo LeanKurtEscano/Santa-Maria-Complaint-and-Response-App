@@ -74,11 +74,12 @@ type ComplaintStatus =
   | "reviewed_by_barangay"
   | "resolved_by_barangay"
   | "forwarded_to_lgu"
+  | "reviewed_by_lgu"
   | "resolved_by_lgu"
   | "forwarded_to_department"
   | "reviewed_by_department"
   | "resolved_by_department"
-  | "rejected"; // rejected = rejected by barangay
+  | "rejected";
 
 type StepState = "completed" | "active" | "pending" | "rejected";
 
@@ -106,13 +107,14 @@ function getTrackerSteps(
   const statusOrder: Record<ComplaintStatus, number> = {
     submitted: 0,
     reviewed_by_barangay: 1,
-    rejected: 1, // barangay acted on it at the same level as reviewed
+    rejected: 1,
     resolved_by_barangay: 2,
     forwarded_to_lgu: 2,
-    resolved_by_lgu: 3,
-    forwarded_to_department: 3,
-    reviewed_by_department: 4,
-    resolved_by_department: 5,
+    reviewed_by_lgu: 3,
+    resolved_by_lgu: 4,
+    forwarded_to_department: 4,
+    reviewed_by_department: 5,
+    resolved_by_department: 6,
   };
 
   const currentOrder = statusOrder[status];
@@ -139,19 +141,20 @@ function getTrackerSteps(
   // LGU step
   let lguState: StepState = "pending";
   if (isRejectedByLgu && !isResolved) lguState = "rejected";
-  else if (currentOrder >= 3) lguState = "completed";
-  else if (currentOrder === 2 && status === "forwarded_to_lgu") lguState = "active";
+  else if (currentOrder >= 4) lguState = "completed";
+  else if (
+    (currentOrder === 2 && status === "forwarded_to_lgu") ||
+    (currentOrder === 3 && status === "reviewed_by_lgu")
+  )
+    lguState = "active";
 
   // Department step
   let deptState: StepState = "pending";
   if (isRejectedByDepartment && !isResolved) deptState = "rejected";
-  else if (currentOrder >= 5) deptState = "completed";
-  else if (
-    currentOrder === 3 &&
-    status === "forwarded_to_department"
-  )
+  else if (currentOrder >= 6) deptState = "completed";
+  else if (currentOrder === 4 && status === "forwarded_to_department")
     deptState = "active";
-  else if (currentOrder === 4) deptState = "active";
+  else if (currentOrder === 5) deptState = "active";
 
   // Resolved step
   let resolvedState: StepState = "pending";
@@ -200,6 +203,8 @@ function getTrackerSteps(
       sublabel:
         isRejectedByLgu && !isResolved
           ? t("complaintDetail.tracker.rejectedSub")
+          : status === "reviewed_by_lgu"
+          ? t("complaintDetail.tracker.lguReviewSub")
           : t("complaintDetail.tracker.lguSub"),
       state: lguState,
       icon:
@@ -286,6 +291,11 @@ function getStatusDisplay(
       label: t("complaintDetail.status.forwardedLgu"),
       color: THEME.primary,
       bg: "#eff6ff",
+    },
+    reviewed_by_lgu: {
+      label: t("complaintDetail.status.underReviewLgu"),
+      color: "#f59e0b",
+      bg: "#fffbeb",
     },
     forwarded_to_department: {
       label: t("complaintDetail.status.forwardedDept"),

@@ -444,6 +444,7 @@ const resources = {
       forwardedLgu: "Forwarded to LGU",
       forwardedDept: "Forwarded to Dept.",
       deptReview: "Dept. Review",
+         "underReviewLgu": "Under Review ng LGU",
       "rejectedBarangay": "Rejected by Barangay",
       rejectedLgu: "Rejected by LGU",
       rejectedDept: "Rejected by Dept.",
@@ -464,11 +465,12 @@ const resources = {
       "rejectedBarangay": "Rejected by Barangay",
  
       lgu: "LGU Review",
+      
       lguSub: "Escalated to local government",
- 
+         "lguReviewSub": "Being reviewed by the Local Government Unit",
       department: "Department Review",
       departmentSub: "Referred to concerned department",
- 
+   
       resolved: "Resolved",
       resolvedSub: "Complaint has been addressed",
        resolvedByBarangay: "Resolved at barangay level",  // ← add
@@ -1081,6 +1083,7 @@ const resources = {
       resolved: "Naresolba",
       forwardedLgu: "Ipinasa sa LGU",
       forwardedDept: "Ipinasa sa Dept.",
+       "underReviewLgu": "Under Review ng LGU",
       deptReview: "Sinusuri ng Dept.",
       rejectedLgu: "Nireject ng LGU",
       rejectedDept: "Nireject ng Dept.",
@@ -1098,10 +1101,10 @@ const resources = {
  
       barangay: "Pagsusuri ng Barangay",
       barangaySub: "Sinusuri ng barangay",
- 
+      
       lgu: "Pagsusuri ng LGU",
       lguSub: "Ipinasa sa lokal na pamahalaan",
- 
+       "lguReviewSub": "Sinusuri ng Lgu",
       department: "Pagsusuri ng Departamento",
       departmentSub: "Ipinasa sa kaukulang departamento",
  
