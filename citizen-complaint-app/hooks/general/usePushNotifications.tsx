@@ -94,7 +94,7 @@ export function usePushNotifications(userId: string | null): PushNotificationSta
       })
       .catch((err: Error) => {
         setError(err.message);
-        console.error('Push notification setup failed:', err.message);
+        
       });
 
     // Foreground notification listener

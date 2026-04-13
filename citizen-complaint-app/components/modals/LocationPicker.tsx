@@ -77,7 +77,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
       }
       setGettingLocation(false);
     } catch (error) {
-      console.error('Error getting current location:', error);
+   
       setGettingLocation(false);
     }
   };
@@ -95,7 +95,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         setLoading(false);
       }
     } catch (error) {
-      console.error('Error parsing message from WebView:', error);
+      
     }
   };
 

@@ -150,7 +150,7 @@ export const useAttachments = (): UseAttachmentsReturn => {
       setShowAttachmentModal(false);
       setIsPickingFile(false);
       showToast('Failed to pick image. Please try again.', 'error');
-      console.error('Image picker error:', error);
+    
     }
   };
 
@@ -201,7 +201,7 @@ export const useAttachments = (): UseAttachmentsReturn => {
       setShowAttachmentModal(false);
       setIsPickingFile(false);
       showToast('Failed to pick video. Please try again.', 'error');
-      console.error('Video picker error:', error);
+
     }
   };
 
@@ -244,7 +244,7 @@ export const useAttachments = (): UseAttachmentsReturn => {
       setShowAttachmentModal(false);
       setIsPickingFile(false);
       showToast('Failed to pick document. Please try again.', 'error');
-      console.error('Document picker error:', error);
+     
     }
   };
 

@@ -141,7 +141,7 @@ export default function RegisterScreen({ navigation }: any) {
         }
       }
     } catch (error) {
-      console.error('Error loading saved registration data:', error);
+     
     }
   };
 
@@ -150,7 +150,7 @@ export default function RegisterScreen({ navigation }: any) {
       const currentData = watch();
       await AsyncStorage.setItem('registrationFormData', JSON.stringify({ ...currentData, age }));
     } catch (error) {
-      console.error('Error saving form data:', error);
+      
     }
   };
 
@@ -233,7 +233,7 @@ export default function RegisterScreen({ navigation }: any) {
     try {
       await AsyncStorage.setItem('registrationData', JSON.stringify({ ...data, idFrontImage: idFrontBase64, idBackImage: idBackBase64, selfieImage: selfieBase64, age }));
     } catch (error) {
-      console.error('Error storing registration data:', error);
+      
       throw error;
     }
   };

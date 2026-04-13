@@ -71,7 +71,7 @@ export const useLocationPermission = (): UseLocationPermissionReturn => {
         longitude: location.coords.longitude,
       };
     } catch (error) {
-      console.error('Error requesting location:', error);
+
       setLocationLoading(false);
       
       Alert.alert(

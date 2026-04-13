@@ -105,7 +105,7 @@ export function useNotificationSSE(options: UseNotificationSSEOptions = {}) {
         try {
           handleEvent(eventName, JSON.parse(e.data));
         } catch (err) {
-          console.error(`[SSE] Failed to parse event "${eventName}":`, err);
+          
         }
       });
     });
@@ -115,7 +115,7 @@ export function useNotificationSSE(options: UseNotificationSSEOptions = {}) {
       try {
         handleEvent('message', JSON.parse(e.data));
       } catch (err) {
-        console.error('[SSE] Failed to parse message event:', err);
+       
       }
     };
   }, [enabled, token, baseUrl, disconnect, handleEvent]);

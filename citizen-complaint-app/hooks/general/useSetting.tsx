@@ -18,7 +18,7 @@ export const useSettingsLogic = () => {
       await AsyncStorage.setItem('userLanguage', language);
       setCurrentLanguage(language);
     } catch (error) {
-      console.error('Error changing language:', error);
+      
     }
   };
 

@@ -349,7 +349,7 @@ const Notifications = () => {
     };
 
     es.onerror = async (err: any) => {
-      console.error(`${LOG_TAG} connectSSE() — error:`, err);
+     
       setSseStatus("disconnected");
       es.close();
       eventSourceRef.current = null;
@@ -399,7 +399,7 @@ const Notifications = () => {
       console.log(`${LOG_TAG} handleMarkRead() — API success for id=${id}`);
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     } catch (err) {
-      console.error(`${LOG_TAG} handleMarkRead() — API error for id=${id}:`, err);
+    
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     }
   }, [markAsRead, queryClient]);
@@ -419,7 +419,7 @@ const Notifications = () => {
       console.log(`${LOG_TAG} handleMarkAllRead() — API success`);
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     } catch (err) {
-      console.error(`${LOG_TAG} handleMarkAllRead() — API error:`, err);
+     
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     } finally {
       setMarkingAll(false);

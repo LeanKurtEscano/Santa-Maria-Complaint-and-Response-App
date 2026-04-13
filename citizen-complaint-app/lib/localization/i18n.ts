@@ -1439,7 +1439,7 @@ const languageDetector = {
       const deviceLanguage = Localization.locale.split('-')[0];
       callback(deviceLanguage === 'tl' ? 'tl' : 'en');
     } catch (error) {
-      console.error('Error detecting language:', error);
+
       callback('en');
     }
   },
@@ -1448,7 +1448,7 @@ const languageDetector = {
     try {
       await AsyncStorage.setItem(LANGUAGE_KEY, language);
     } catch (error) {
-      console.error('Error saving language:', error);
+
     }
   },
 };

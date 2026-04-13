@@ -43,7 +43,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       await SecureStore.deleteItemAsync('complaint_refresh_token');
       set({ userData: null, loading: false, isAuthenticated: false });
     } catch (error) {
-      console.error("Error clearing user:", error);
+      
       set({ userData: null, loading: false, isAuthenticated: false });
     }
   },
@@ -54,7 +54,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       await SecureStore.deleteItemAsync('complaint_refresh_token');
       set({ userData: null, loading: false, isAuthenticated: false });
     } catch (error) {
-      console.error("Error during logout:", error);
+      
       set({ userData: null, loading: false, isAuthenticated: false });
     }
   },
@@ -84,7 +84,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       await get().fetchCurrentUser();
 
     } catch (error) {
-      console.error("Error checking auth status:", error);
+     
       set({ userData: null, loading: false, isAuthenticated: false });
     }
   },
@@ -144,7 +144,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       set({ userData: null, loading: false, isAuthenticated: false });
     }
   } catch (error) {
-    console.error("Failed to fetch current user:", error);
+  
     set({ loading: false });
     throw error;
   }

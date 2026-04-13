@@ -9,6 +9,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage/lib/typescri
       await AsyncStorage.removeItem('registrationData');
       console.log('All registration data cleared');
     } catch (error) {
-      console.error('Error clearing registration data:', error);
+     
     }
   };

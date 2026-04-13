@@ -26,7 +26,7 @@ function RootLayoutNav() {
       setRetrying(false);
       await checkAuthStatus();
     } catch (error) {
-      console.error("Failed to initialize app:", error);
+    
       setInitError(error);
     }
   };
