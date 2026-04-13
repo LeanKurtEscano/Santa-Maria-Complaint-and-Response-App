@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
-import { MapPin, Navigation, X, Check } from 'lucide-react-native';
+import { MapPin, Navigation, X, Check, RefreshCw, WifiOff } from 'lucide-react-native';
+import { THEME } from '@/constants/theme';
 
 interface LocationPickerProps {
   visible: boolean;
@@ -29,17 +30,31 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   title = 'Pin Your Location',
 }) => {
   const webViewRef = useRef<WebView>(null);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [loading, setLoading] = useState(true);
+  const [mapError, setMapError] = useState(false);
+  const [webViewKey, setWebViewKey] = useState(0); // increment to remount WebView
   const [gettingLocation, setGettingLocation] = useState(false);
-  const [confirming, setConfirming] = useState(false); // ← NEW
+  const [confirming, setConfirming] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState({
     latitude: initialLatitude ? parseFloat(initialLatitude.toString()) : 14.5995,
     longitude: initialLongitude ? parseFloat(initialLongitude.toString()) : 120.9842,
   });
 
+  // Clear the load-timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     if (visible) {
-      setConfirming(false); // ← Reset when modal opens
+      setConfirming(false);
+      setMapError(false);
+      setLoading(true);
+
       if (initialLatitude && initialLongitude) {
         setSelectedLocation({
           latitude: parseFloat(initialLatitude.toString()),
@@ -50,6 +65,27 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
       }
     }
   }, [visible, initialLatitude, initialLongitude]);
+
+  // Start a 10-second timeout whenever loading resets to true
+  useEffect(() => {
+    if (loading && !mapError) {
+      loadTimeoutRef.current = setTimeout(() => {
+        setLoading(false);
+        setMapError(true);
+      }, 10_000);
+    } else {
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
+    }
+  }, [loading, mapError]);
+
+  const handleRetry = useCallback(() => {
+    setMapError(false);
+    setLoading(true);
+    setWebViewKey((k) => k + 1); // remounts the WebView entirely
+  }, []);
 
   const getCurrentLocation = async () => {
     try {
@@ -75,9 +111,9 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
           `);
         }
       }
-      setGettingLocation(false);
-    } catch (error) {
-   
+    } catch (_) {
+      // silently ignore — user can still drag the pin
+    } finally {
       setGettingLocation(false);
     }
   };
@@ -93,17 +129,23 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         });
       } else if (data.type === 'mapLoaded') {
         setLoading(false);
+        setMapError(false);
       }
-    } catch (error) {
-      
-    }
+    } catch (_) {}
   };
 
-  // ← FIXED: no more loading/finally conflict
+  const handleWebViewError = () => {
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+    setLoading(false);
+    setMapError(true);
+  };
+
   const handleConfirm = () => {
     setConfirming(true);
     onConfirm(selectedLocation.latitude, selectedLocation.longitude);
-    // No reset needed — parent closes modal on success/error, unmounting this component
   };
 
   const mapHTML = `
@@ -141,9 +183,9 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
               <svg width="40" height="45" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
                 <ellipse cx="20" cy="48" rx="8" ry="3" fill="rgba(0,0,0,0.2)"/>
                 <path d="M20 0C11.716 0 5 6.716 5 15c0 8.284 15 35 15 35s15-26.716 15-35C35 6.716 28.284 0 20 0z" 
-                      fill="#2563EB" stroke="#1E40AF" stroke-width="1.5"/>
+                      fill="${THEME.primary}" stroke="${THEME.primary}" stroke-width="1.5"/>
                 <circle cx="20" cy="15" r="6" fill="white"/>
-                <circle cx="20" cy="15" r="3" fill="#2563EB"/>
+                <circle cx="20" cy="15" r="3" fill="${THEME.primary}"/>
                 <path d="M15 8C15 8 17 6 20 6C23 6 25 8 25 8" 
                       stroke="rgba(255,255,255,0.4)" stroke-width="2" fill="none" stroke-linecap="round"/>
               </svg>
@@ -216,37 +258,62 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
         {/* Map WebView */}
         <View style={styles.mapContainer}>
-          {loading && (
+          {/* Loading overlay */}
+          {loading && !mapError && (
             <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" color="#10B981" />
+              <ActivityIndicator size="large" color={THEME.primary} />
               <Text style={styles.loadingText}>Loading map...</Text>
             </View>
           )}
 
+          {/* Error / retry overlay */}
+          {mapError && (
+            <View style={styles.errorOverlay}>
+              <WifiOff size={48} color={THEME.primary} style={styles.errorIcon} />
+              <Text style={styles.errorTitle}>Map failed to load</Text>
+              <Text style={styles.errorSubtitle}>
+                Check your internet connection and try again.
+              </Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={handleRetry}
+                activeOpacity={0.8}
+              >
+                <RefreshCw size={18} color="#fff" />
+                <Text style={styles.retryButtonText}>Reload Map</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <WebView
+            key={webViewKey}
             ref={webViewRef}
             originWhitelist={['*']}
             source={{ html: mapHTML }}
             style={styles.webview}
             onMessage={handleMessage}
+            onError={handleWebViewError}
+            onHttpError={handleWebViewError}
             javaScriptEnabled={true}
             domStorageEnabled={true}
-            startInLoadingState={true}
+            startInLoadingState={false} // we handle loading state ourselves
           />
 
-          {/* Current Location Button */}
-          <TouchableOpacity
-            style={styles.currentLocationButton}
-            onPress={getCurrentLocation}
-            activeOpacity={0.8}
-            disabled={gettingLocation}
-          >
-            {gettingLocation ? (
-              <ActivityIndicator size="small" color="#10B981" />
-            ) : (
-              <Navigation size={24} color="#10B981" />
-            )}
-          </TouchableOpacity>
+          {/* Current Location Button — hidden while error shown */}
+          {!mapError && (
+            <TouchableOpacity
+              style={styles.currentLocationButton}
+              onPress={getCurrentLocation}
+              activeOpacity={0.8}
+              disabled={gettingLocation}
+            >
+              {gettingLocation ? (
+                <ActivityIndicator size="small" color={THEME.primary} />
+              ) : (
+                <Navigation size={24} color={THEME.primary} />
+              )}
+            </TouchableOpacity>
+          )}
 
           {/* Coordinates Display */}
           <View style={styles.coordinatesCard}>
@@ -260,7 +327,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
           </View>
         </View>
 
-        {/* Footer with Actions */}
+        {/* Footer */}
         <View style={styles.footer}>
           <TouchableOpacity
             onPress={onCancel}
@@ -271,12 +338,11 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
 
-          {/* ← UPDATED confirm button */}
           <TouchableOpacity
             onPress={handleConfirm}
             style={[styles.confirmButton, confirming && { opacity: 0.8 }]}
             activeOpacity={0.8}
-            disabled={confirming}
+            disabled={confirming || mapError}
           >
             {confirming ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -299,7 +365,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: {
-    backgroundColor: '#2563EB',
+    backgroundColor: THEME.primary,
     paddingTop: 60,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -317,7 +383,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: '#E0E7FF',
+    color: 'rgba(255,255,255,0.75)',
   },
   closeButton: {
     padding: 4,
@@ -344,6 +410,50 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#6B7280',
+  },
+  errorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#F9FAFB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    paddingHorizontal: 32,
+  },
+  errorIcon: {
+    marginBottom: 16,
+    opacity: 0.85,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: THEME.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
   currentLocationButton: {
     position: 'absolute',
@@ -408,7 +518,7 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     flex: 2,
-    backgroundColor: '#2563EB',
+    backgroundColor: THEME.primary,
     borderRadius: 12,
     paddingVertical: 14,
     flexDirection: 'row',
