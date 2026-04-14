@@ -51,6 +51,57 @@ const resources = {
 "supportCenter": "Support Center",
 "supportCenterDesc": "24/7 assistance",
 "resolutionStatus": "Resolution Status",
+"notVerified": {
+    "title": "Account Not Verified",
+    "message": "Your account has not been verified yet. Please check your email and follow the verification link we sent you.",
+    "goBackButton": "Go Back to Login",
+    "refreshHint": "Pull down to refresh"
+  },
+
+ "back": "Back",
+  "forgotPasswordTitle": "Forgot Password?",
+  "forgotPasswordSubtitle": "Enter your email address and we'll send you a verification code to reset your password.",
+  "emailAddress": "Email Address",
+  "emailPlaceholder": "Enter your email address",
+  "sendResetCode": "Send Reset Code",
+  "rememberPassword": "Remember your password? ",
+  "signIn": "Sign in",
+
+  "forgotPasswordEmailRequired": "Please enter your email address.",
+  "forgotPasswordEmailInvalid": "Please enter a valid email address.",
+  "forgotPasswordNetworkError": "No internet connection. Please check your network and try again.",
+  "forgotPasswordTimeout": "Request timed out. Please try again.",
+  "forgotPasswordNotFound": "No account found with this email address.",
+  "forgotPasswordValidationError": "Invalid email format.",
+  "forgotPasswordServerError": "Something went wrong on our end. Please try again later.",
+  "forgotPasswordFailed": "Failed to send reset code. Please try again.",
+
+
+  "resetPasswordTitle": "Create New Password",
+  "resetPasswordSubtitle": "Your new password must be different from your previous password.",
+
+  "newPassword": "New Password",
+  "newPasswordPlaceholder": "Enter new password",
+  "confirmNewPassword": "Confirm New Password",
+  "confirmPasswordPlaceholder": "Confirm new password",
+
+  "resetPassword": "Reset Password",
+
+  "passwordRequirements": "Password Requirements",
+  "passwordRequirementsDetail": "Must be at least 8 characters long.",
+
+  "resetPasswordNewRequired": "Please enter a new password.",
+  "resetPasswordConfirmRequired": "Please confirm your new password.",
+  "resetPasswordTooShort": "Password must be at least 8 characters.",
+  "resetPasswordMismatch": "Passwords do not match.",
+
+  "resetPasswordNetworkError": "No internet connection. Please check your network and try again.",
+  "resetPasswordTimeout": "Request timed out. Please try again.",
+  "resetPasswordOtpPending": "OTP verification is still pending. Please verify your email first.",
+  "resetPasswordUserNotFound": "No account found with this email address.",
+  "resetPasswordServerError": "Something went wrong on our end. Please try again later.",
+  "resetPasswordFailed": "Failed to reset password. Please try again.",
+
 "resolutionStatusDesc": "Transparent process",
       "feedback": {
     "card_badge": "Share Feedback",
@@ -767,6 +818,58 @@ const resources = {
 "resolutionStatus": "Katayuan ng Resolusyon",
 "resolutionStatusDesc": "Transparent na proseso",
 
+
+ "back": "Bumalik",
+  "forgotPasswordTitle": "Nakalimutan ang Password?",
+  "forgotPasswordSubtitle": "Ilagay ang iyong email at magpapadala kami ng code para ma-reset ang password mo.",
+  "emailAddress": "Email Address",
+  "emailPlaceholder": "Ilagay ang iyong email",
+  "sendResetCode": "Magpadala ng Code",
+  "rememberPassword": "Naalala mo na ang password mo? ",
+  "signIn": "Mag Sign in",
+
+  "forgotPasswordEmailRequired": "Pakilagay ang iyong email.",
+  "forgotPasswordEmailInvalid": "Pakilagay ang tamang email.",
+  "forgotPasswordNetworkError": "Walang internet. Paki-check ang connection at subukan ulit.",
+  "forgotPasswordTimeout": "Nag-timeout ang request. Subukan ulit.",
+  "forgotPasswordNotFound": "Walang account na naka-link sa email na ito.",
+  "forgotPasswordValidationError": "Hindi valid ang email format.",
+  "forgotPasswordServerError": "May problema sa server. Subukan ulit mamaya.",
+  "forgotPasswordFailed": "Hindi naipadala ang code. Subukan ulit.",
+
+
+  "resetPasswordTitle": "Gumawa ng Bagong Password",
+  "resetPasswordSubtitle": "Dapat iba ang bagong password mo sa dati mong password.",
+
+  "newPassword": "Bagong Password",
+  "newPasswordPlaceholder": "Ilagay ang bagong password",
+  "confirmNewPassword": "Kumpirmahin ang Password",
+  "confirmPasswordPlaceholder": "Ulitin ang bagong password",
+
+  "resetPassword": "I-reset ang Password",
+
+  "passwordRequirements": "Mga Kailangan sa Password",
+  "passwordRequirementsDetail": "Dapat hindi bababa sa 8 characters.",
+
+  "resetPasswordNewRequired": "Pakilagay ang bagong password.",
+  "resetPasswordConfirmRequired": "Pakikumpirma ang bagong password.",
+  "resetPasswordTooShort": "Dapat hindi bababa sa 8 characters ang password.",
+  "resetPasswordMismatch": "Hindi magkapareho ang password.",
+
+  "resetPasswordNetworkError": "Walang internet. Paki-check ang connection at subukan ulit.",
+  "resetPasswordTimeout": "Nag-timeout ang request. Subukan ulit.",
+  "resetPasswordOtpPending": "Hindi pa tapos ang OTP verification. Paki-verify muna ang email mo.",
+  "resetPasswordUserNotFound": "Walang account na naka-link sa email na ito.",
+  "resetPasswordServerError": "May problema sa server. Subukan ulit mamaya.",
+  "resetPasswordFailed": "Hindi na-reset ang password. Subukan ulit.",
+  
+
+   "notVerified": {
+    "title": "Hindi Pa Na-verify ang Account",
+    "message": "Hindi pa na-verify ang iyong account. Pakisuri ang iyong email at sundan ang verification link na ipinadala namin sa iyo.",
+    "goBackButton": "Bumalik sa Pag-login",
+    "refreshHint": "I-drag pababa para i-refresh"
+  },
       // Registration
       personalInfo: 'Personal na Impormasyon',
       firstName: 'Pangalan',

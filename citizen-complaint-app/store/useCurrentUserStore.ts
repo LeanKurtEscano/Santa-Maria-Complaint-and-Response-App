@@ -88,41 +88,41 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       set({ userData: null, loading: false, isAuthenticated: false });
     }
   },
+mapUserFromBackend: (data) => {
+  console.log("Mapping user data:", data);
 
-  mapUserFromBackend: (data) => {
-    console.log("Mapping user data:", data);
-    const mappedUser: User = {
-      id: data.id,
-      email: data.email,
-      role: data.role,
-      is_administrator: data.is_administrator,
+  const mappedUser: User = {
+    id: data.id,
+    email: data.email,
+    role: data.role,
+    is_administrator: data.is_administrator,
 
-      profile_image: data.profile_image,
-      last_login: data.last_login,
-      created_at: data.created_at,
-      updated_at: data.updated_at,
+    profile_image: data.profile_image,
+    last_login: data.last_login,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
 
-      first_name: data.first_name,
-      last_name: data.last_name,
-      age: data.age,
-      gender: data.gender,
-      barangay: data.barangay,
-      full_address: data.full_address,
-      zip_code: data.zip_code,
+    first_name: data.first_name,
+    last_name: data.last_name,
+    age: data.age,
+    gender: data.gender,
+    barangay: data.barangay,
+    full_address: data.full_address,
+    zip_code: data.zip_code,
 
-      latitude: data.latitude,
-      longitude: data.longitude,
+    latitude: data.latitude,
+    longitude: data.longitude,
 
-      id_type: data.id_type,
-      id_number: data.id_number,
-      front_id: data.front_id,
-      back_id: data.back_id,
-      selfie_with_id: data.selfie_with_id,
-    };
+    id_type: data.id_type,
+    id_number: data.id_number,
+    front_id: data.front_id,
+    back_id: data.back_id,
+    selfie_with_id: data.selfie_with_id,
+    is_verified: data.is_verified === true || data.is_verified === 1 || data.is_verified === "true",
+  };
 
-    set({ userData: mappedUser, loading: false, isAuthenticated: true });
-  },
-
+  set({ userData: mappedUser, loading: false, isAuthenticated: true });
+},
   fetchCurrentUser: async (background = false) => {
   try {
     if (!background) {

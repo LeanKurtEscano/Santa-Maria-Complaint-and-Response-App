@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -37,6 +38,8 @@ import {
   WifiOff,
   Eye,
   EyeOff,
+  Shield,
+  ShieldCheck,
 } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { authApiClient } from '@/lib/client/user';
@@ -52,7 +55,269 @@ import {
 } from '@/utils/validation/register';
 import { TAGALOG_MONTHS } from '@/constants/localization/date';
 
+import { THEME } from '@/constants/theme';
+
 const SUFFIX_OPTIONS = ['Jr.', 'Sr.', 'II', 'III', 'IV'];
+
+// ─── reCAPTCHA Component ───────────────────────────────────────────────────
+interface RecaptchaProps {
+  verified: boolean;
+  onVerify: () => void;
+  error?: string;
+}
+
+const Recaptcha = ({ verified, onVerify, error }: RecaptchaProps) => {
+  const [showModal, setShowModal] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  const handlePress = () => {
+    if (verified) return;
+    setShowModal(true);
+  };
+
+  const handleVerify = () => {
+    setChecking(true);
+    // Simulate a brief verification delay for UX realism
+    setTimeout(() => {
+      setChecking(false);
+      setShowModal(false);
+      onVerify();
+    }, 1000);
+  };
+
+  return (
+    <>
+      <TouchableOpacity
+        onPress={handlePress}
+        activeOpacity={0.8}
+        style={[
+          styles.recaptchaBox,
+          error ? styles.recaptchaBoxError : styles.recaptchaBoxDefault,
+        ]}
+      >
+        {/* Checkbox */}
+        <View
+          style={[
+            styles.recaptchaCheckbox,
+            verified ? styles.recaptchaCheckboxChecked : styles.recaptchaCheckboxUnchecked,
+          ]}
+        >
+          {verified && <Check size={14} color="#FFFFFF" />}
+        </View>
+
+        <Text style={styles.recaptchaLabel}>I'm not a robot</Text>
+
+        {/* reCAPTCHA branding */}
+        <View style={styles.recaptchaBrand}>
+          <Shield size={22} color={THEME.primary} />
+          <Text style={[styles.recaptchaBrandText, { color: THEME.primary }]}>reCAPTCHA</Text>
+          <Text style={styles.recaptchaPrivacy}>Privacy - Terms</Text>
+        </View>
+      </TouchableOpacity>
+
+      {error ? (
+        <View style={styles.errorRow}>
+          <AlertCircle size={14} color="#EF4444" />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+
+      {/* Verification Modal */}
+      <Modal
+        visible={showModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.recaptchaModal}>
+            {/* Header */}
+            <View style={[styles.recaptchaModalHeader, { backgroundColor: THEME.primary }]}>
+              <ShieldCheck size={24} color="#FFFFFF" />
+              <Text style={styles.recaptchaModalTitle}>Security Check</Text>
+              <TouchableOpacity
+                onPress={() => setShowModal(false)}
+                style={styles.recaptchaModalClose}
+                activeOpacity={0.7}
+              >
+                <X size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.recaptchaModalBody}>
+              <Text style={styles.recaptchaModalSubtitle}>
+                Please confirm you are not a robot
+              </Text>
+
+              {/* Big clickable verify button */}
+              <TouchableOpacity
+                onPress={handleVerify}
+                disabled={checking}
+                activeOpacity={0.85}
+                style={[styles.recaptchaVerifyBtn, { backgroundColor: THEME.primary }]}
+              >
+                {checking ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <View style={styles.recaptchaVerifyBtnContent}>
+                    <ShieldCheck size={20} color="#FFFFFF" />
+                    <Text style={styles.recaptchaVerifyBtnText}>I'm not a robot</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.recaptchaFooter}>
+                <Shield size={14} color="#9CA3AF" />
+                <Text style={styles.recaptchaFooterText}>
+                  Protected by reCAPTCHA
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+};
+
+// ─── StyleSheet (for components that need THEME.primary dynamically) ──────────
+const styles = StyleSheet.create({
+  recaptchaBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 4,
+  },
+  recaptchaBoxDefault: {
+    borderColor: '#E5E7EB',
+  },
+  recaptchaBoxError: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  recaptchaCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  recaptchaCheckboxUnchecked: {
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+  },
+  recaptchaCheckboxChecked: {
+    borderColor: THEME.primary,
+    backgroundColor: THEME.primary,
+  },
+  recaptchaLabel: {
+    flex: 1,
+    fontSize: 15,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  recaptchaBrand: {
+    alignItems: 'center',
+  },
+  recaptchaBrandText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  recaptchaPrivacy: {
+    fontSize: 8,
+    color: '#9CA3AF',
+    marginTop: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 24,
+  },
+  recaptchaModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    width: '100%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  recaptchaModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 10,
+  },
+  recaptchaModalTitle: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  recaptchaModalClose: {
+    padding: 4,
+  },
+  recaptchaModalBody: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  recaptchaModalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  recaptchaVerifyBtn: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  recaptchaVerifyBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  recaptchaVerifyBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  recaptchaFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  recaptchaFooterText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+});
 
 export default function RegisterScreen({ navigation }: any) {
   const router = useRouter();
@@ -71,6 +336,8 @@ export default function RegisterScreen({ navigation }: any) {
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [recaptchaVerified, setRecaptchaVerified] = useState(false);
+  const [recaptchaError, setRecaptchaError] = useState<string | undefined>(undefined);
   const [selectedDate, setSelectedDate] = useState(() => {
     const date = new Date();
     date.setFullYear(date.getFullYear() - 18);
@@ -140,18 +407,14 @@ export default function RegisterScreen({ navigation }: any) {
           setSelectedDate(date);
         }
       }
-    } catch (error) {
-     
-    }
+    } catch (error) {}
   };
 
   const saveFormData = async () => {
     try {
       const currentData = watch();
       await AsyncStorage.setItem('registrationFormData', JSON.stringify({ ...currentData, age }));
-    } catch (error) {
-      
-    }
+    } catch (error) {}
   };
 
   const changeLanguage = (lang: string) => i18n.changeLanguage(lang);
@@ -213,11 +476,11 @@ export default function RegisterScreen({ navigation }: any) {
     setCurrentImageField(null);
   };
 
-  const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
-    setValue(field, undefined);
-    clearErrors(field);
-    await saveFormData();
-  };
+const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
+  setValue(field, '' as any, { shouldValidate: false, shouldDirty: true });
+  clearErrors(field);
+  await saveFormData();
+};
 
   const getFileName = (uri: string | undefined) => {
     if (!uri) return '';
@@ -233,7 +496,6 @@ export default function RegisterScreen({ navigation }: any) {
     try {
       await AsyncStorage.setItem('registrationData', JSON.stringify({ ...data, idFrontImage: idFrontBase64, idBackImage: idBackBase64, selfieImage: selfieBase64, age }));
     } catch (error) {
-      
       throw error;
     }
   };
@@ -242,7 +504,6 @@ export default function RegisterScreen({ navigation }: any) {
     try { await AsyncStorage.removeItem('registrationFormData'); } catch (error) { console.error('Error clearing saved form data:', error); }
   };
 
-  // ─── Password strength helper ──────────────────────────────────────────────
   const getPasswordStrength = (password: string): { label: string; color: string; width: string } => {
     if (!password) return { label: '', color: 'bg-neutral-200', width: 'w-0' };
     let score = 0;
@@ -258,7 +519,7 @@ export default function RegisterScreen({ navigation }: any) {
   const onSubmit = async (data: RegistrationFormData) => {
     setNetworkError(null);
 
-    // ── Step 1 validation ─────────────────────────────────────────────────
+    // ── Step 1 validation ────────────────────────────────────────────────
     const step1Errors: { field: keyof RegistrationFormData; message: string }[] = [];
 
     const firstNameError = validateFirstName(data.firstName, t);
@@ -281,7 +542,7 @@ export default function RegisterScreen({ navigation }: any) {
       return;
     }
 
-    // ── Step 2 validation ─────────────────────────────────────────────────
+    // ── Step 2 validation ────────────────────────────────────────────────
     const step2Errors: { field: keyof RegistrationFormData; message: string }[] = [];
 
     const emailError = validateEmail(data.email, t);
@@ -298,15 +559,13 @@ export default function RegisterScreen({ navigation }: any) {
       step2Errors.push({ field: 'confirmPassword', message: t('passwordMismatch') });
     }
 
-   // if (!data.barangay) step2Errors.push({ field: 'barangay', message: t('required') });
-
     if (step2Errors.length > 0) {
       step2Errors.forEach(({ field, message }) => setError(field, { type: 'manual', message }));
       setStep(2);
       return;
     }
 
-    // ── Step 3 validation ─────────────────────────────────────────────────
+    // ── Step 3 validation ────────────────────────────────────────────────
     const step3Errors: { field: keyof RegistrationFormData; message: string }[] = [];
 
     if (!data.idType) step3Errors.push({ field: 'idType', message: t('required') });
@@ -314,6 +573,13 @@ export default function RegisterScreen({ navigation }: any) {
     if (!data.idFrontImage) step3Errors.push({ field: 'idFrontImage', message: t('required') });
     if (!data.selfieImage) step3Errors.push({ field: 'selfieImage', message: t('required') });
     if (!data.agreedToTerms) step3Errors.push({ field: 'agreedToTerms', message: t('required') });
+
+    // ── reCAPTCHA validation ─────────────────────────────────────────────
+    if (!recaptchaVerified) {
+      setRecaptchaError('Please complete the reCAPTCHA verification.');
+      setStep(3);
+      return;
+    }
 
     if (step3Errors.length > 0) {
       step3Errors.forEach(({ field, message }) => setError(field, { type: 'manual', message }));
@@ -324,16 +590,15 @@ export default function RegisterScreen({ navigation }: any) {
     setIsLoading(true);
     try {
       await saveFormData();
-      const response = await authApiClient.post('/register', { email: data.email, phone_number:  data.phoneNumber });
+      const response = await authApiClient.post('/register', { email: data.email, phone_number: data.phoneNumber });
       if (!response || !response.data) throw new Error('Invalid response from server');
       await storeRegistrationData(data);
       setSubmittedEmail(data.email);
       await clearSavedFormData();
-      router.replace({ pathname: '/(auth)/Otp', params: { email: data.email } });
+      router.replace({ pathname: '/(auth)/Otp', params: { email: data.email, apiRoute: '/verify-otp', otpResendRoute: '/resend-otp' } });
     } catch (error: any) {
       if (error?.response?.status === 400) {
         const detail = error?.response?.data?.detail || '';
-
         if (detail.toLowerCase().includes('phone')) {
           setError('phoneNumber', { type: 'server', message: detail || 'Phone number already registered' });
         } else {
@@ -520,7 +785,7 @@ export default function RegisterScreen({ navigation }: any) {
                 activeOpacity={0.7}
               >
                 <Text className="text-base text-neutral-900">{option}</Text>
-                {watch('suffix') === option && <Check size={18} color="#2563EB" />}
+                {watch('suffix') === option && <Check size={18} color={THEME.primary} />}
               </TouchableOpacity>
             ))}
           </View>
@@ -578,7 +843,7 @@ export default function RegisterScreen({ navigation }: any) {
                 </View>
                 {i18n.language === 'tl' && (
                   <View className="flex-row justify-center items-center mb-3 bg-primary-50 rounded-xl py-2 px-4">
-                    <Text className="text-base font-semibold text-primary-700">
+                    <Text style={{ color: THEME.primary }} className="text-base font-semibold">
                       {TAGALOG_MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}, {selectedDate.getFullYear()}
                     </Text>
                   </View>
@@ -594,7 +859,12 @@ export default function RegisterScreen({ navigation }: any) {
                     textColor="#000000"
                   />
                 </View>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)} className="bg-primary-600 rounded-xl py-4 items-center mt-4" activeOpacity={0.7}>
+                <TouchableOpacity
+                  onPress={() => setShowDatePicker(false)}
+                  style={{ backgroundColor: THEME.primary }}
+                  className="rounded-xl py-4 items-center mt-4"
+                  activeOpacity={0.7}
+                >
                   <Text className="text-white font-semibold text-base">
                     {i18n.language === 'tl' ? 'Tapos Na' : 'Done'}
                   </Text>
@@ -653,17 +923,23 @@ export default function RegisterScreen({ navigation }: any) {
               <TouchableOpacity
                 key={option.value}
                 onPress={() => { setValue('gender', option.value); clearErrors('gender'); setShowGenderModal(false); saveFormData(); }}
-                className={`py-4 border-b border-neutral-200 ${watch('gender') === option.value ? 'bg-primary-50' : ''}`}
+                className={`py-4 border-b border-neutral-200 flex-row justify-between items-center ${watch('gender') === option.value ? 'bg-primary-50' : ''}`}
                 activeOpacity={0.7}
               >
                 <Text className="text-base text-neutral-900">{option.label}</Text>
+                {watch('gender') === option.value && <Check size={18} color={THEME.primary} />}
               </TouchableOpacity>
             ))}
           </View>
         </View>
       </Modal>
 
-      <TouchableOpacity onPress={() => setStep(2)} className="bg-primary-600 rounded-xl py-4 items-center shadow-sm" activeOpacity={0.85}>
+      <TouchableOpacity
+        onPress={() => setStep(2)}
+        style={{ backgroundColor: THEME.primary }}
+        className="rounded-xl py-4 items-center shadow-sm"
+        activeOpacity={0.85}
+      >
         <Text className="text-white font-semibold text-base">{t('continue')}</Text>
       </TouchableOpacity>
     </View>
@@ -772,7 +1048,6 @@ export default function RegisterScreen({ navigation }: any) {
             validate: (value) => validatePassword(value, t) || true,
           }}
           render={({ field: { onChange, onBlur, value } }) => {
-            const strength = getPasswordStrength(value);
             return (
               <>
                 <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.password ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
@@ -799,9 +1074,6 @@ export default function RegisterScreen({ navigation }: any) {
                     {showPassword ? <EyeOff size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
                   </TouchableOpacity>
                 </View>
-
-
-
                 <Text className="text-xs text-neutral-500 mt-1">
                   {t('registerValidation.passwordHint')}
                 </Text>
@@ -840,39 +1112,7 @@ export default function RegisterScreen({ navigation }: any) {
         <ErrorMessage message={errors.confirmPassword?.message} />
       </View>
 
-      {/* ── Address Section ── */}
-  
-
-      {/* 
-      
-          <Text className="text-lg font-semibold text-neutral-800 mb-4">{t('addressInfo')}</Text>
-
-           <View className="mb-6">
-        <Text className="text-sm font-medium text-neutral-700 mb-2">{t('barangay')} *</Text>
-        <Controller
-          control={control}
-          name="barangay"
-          rules={{ required: t('required') }}
-          render={({ field: { value } }) => (
-            <TouchableOpacity
-              onPress={() => setShowBarangayModal(true)}
-              className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${errors.barangay ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}
-              activeOpacity={0.7}
-            >
-              <MapPin size={20} color="#6B7280" />
-              <Text className={`flex-1 ml-3 text-base ${value ? 'text-neutral-900' : 'text-neutral-400'}`}>
-                {value || t('selectBarangay')}
-              </Text>
-              <ChevronDown size={20} color="#6B7280" />
-            </TouchableOpacity>
-          )}
-        />
-        <ErrorMessage message={errors.barangay?.message} />
-      </View>
-      
-      */}
-     
-
+      {/* Barangay modal (kept for when re-enabled) */}
       <Modal visible={showBarangayModal} transparent animationType="slide" onRequestClose={() => setShowBarangayModal(false)}>
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-3xl p-6 max-h-[70%]">
@@ -885,10 +1125,11 @@ export default function RegisterScreen({ navigation }: any) {
                 <TouchableOpacity
                   key={brgy}
                   onPress={() => { setValue('barangay', brgy); clearErrors('barangay'); setShowBarangayModal(false); saveFormData(); }}
-                  className={`py-4 border-b border-neutral-200 ${watch('barangay') === brgy ? 'bg-primary-50' : ''}`}
+                  className={`py-4 border-b border-neutral-200 flex-row justify-between items-center ${watch('barangay') === brgy ? 'bg-primary-50' : ''}`}
                   activeOpacity={0.7}
                 >
                   <Text className="text-base text-neutral-900">{brgy}</Text>
+                  {watch('barangay') === brgy && <Check size={18} color={THEME.primary} />}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -900,7 +1141,12 @@ export default function RegisterScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => setStep(1)} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
           <Text className="text-neutral-700 font-semibold text-base">{t('back')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setStep(3)} className="flex-1 bg-primary-600 rounded-xl py-4 items-center shadow-sm" activeOpacity={0.85}>
+        <TouchableOpacity
+          onPress={() => setStep(3)}
+          style={{ backgroundColor: THEME.primary }}
+          className="flex-1 rounded-xl py-4 items-center shadow-sm"
+          activeOpacity={0.85}
+        >
           <Text className="text-white font-semibold text-base">{t('continue')}</Text>
         </TouchableOpacity>
       </View>
@@ -908,6 +1154,7 @@ export default function RegisterScreen({ navigation }: any) {
   );
 
   // ─── Step 3: ID Verification ───────────────────────────────────────────────
+// ─── Step 3: ID Verification ───────────────────────────────────────────────
   const renderStep3 = () => (
     <View>
       <Text className="text-2xl font-bold text-neutral-900 mb-2">{t('idVerification')}</Text>
@@ -949,10 +1196,11 @@ export default function RegisterScreen({ navigation }: any) {
                 <TouchableOpacity
                   key={type}
                   onPress={() => { setValue('idType', type); clearErrors('idType'); setShowIdTypeModal(false); saveFormData(); }}
-                  className={`py-4 border-b border-neutral-200 ${watch('idType') === type ? 'bg-primary-50' : ''}`}
+                  className={`py-4 border-b border-neutral-200 flex-row justify-between items-center ${watch('idType') === type ? 'bg-primary-50' : ''}`}
                   activeOpacity={0.7}
                 >
                   <Text className="text-base text-neutral-900">{t(type)}</Text>
+                  {watch('idType') === type && <Check size={18} color={THEME.primary} />}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -993,16 +1241,29 @@ export default function RegisterScreen({ navigation }: any) {
           rules={{ required: t('required') }}
           render={({ field: { value } }) => (
             <>
-              {value ? (
-                <View className="border-2 border-neutral-200 rounded-xl p-4 bg-white">
+              {value && value !== '' ? (
+                <View className={`border-2 rounded-xl p-4 bg-white ${errors.idFrontImage ? 'border-error-500' : 'border-neutral-200'}`}>
                   <View className="flex-row items-center justify-between">
                     <View className="flex-row items-center flex-1">
                       <ImageIcon size={20} color="#10B981" />
                       <Text className="ml-2 text-sm text-neutral-700 flex-1" numberOfLines={1}>{getFileName(value)}</Text>
                     </View>
-                    <TouchableOpacity onPress={() => removeImage('idFrontImage')} className="bg-error-100 rounded-lg p-2" activeOpacity={0.7}>
-                      <X size={16} color="#EF4444" />
-                    </TouchableOpacity>
+                    <View className="flex-row" style={{ gap: 8 }}>
+                      <TouchableOpacity
+                        onPress={() => handleImagePick('idFrontImage')}
+                        className="bg-primary-100 rounded-lg p-2"
+                        activeOpacity={0.7}
+                      >
+                        <Camera size={16} color={THEME.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => removeImage('idFrontImage')}
+                        className="bg-error-100 rounded-lg p-2"
+                        activeOpacity={0.7}
+                      >
+                        <X size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               ) : (
@@ -1012,7 +1273,7 @@ export default function RegisterScreen({ navigation }: any) {
                   activeOpacity={0.7}
                 >
                   <Camera size={32} color="#9CA3AF" />
-                  <Text className="text-primary-600 font-medium mt-2">{t('tapToUpload')}</Text>
+                  <Text style={{ color: THEME.primary }} className="font-medium mt-2">{t('tapToUpload')}</Text>
                   <Text className="text-neutral-500 text-xs mt-1">Front side of your ID</Text>
                 </TouchableOpacity>
               )}
@@ -1028,34 +1289,49 @@ export default function RegisterScreen({ navigation }: any) {
         <Controller
           control={control}
           name="idBackImage"
+           rules={{ required: t('required') }}
           render={({ field: { value } }) => (
             <>
-              {value ? (
-                <View className="border-2 border-neutral-200 rounded-xl p-4 bg-white">
+              {value && value !== '' ? (
+             <View className={`border-2 rounded-xl p-4 bg-white ${errors.idBackImage ? 'border-error-500' : 'border-neutral-200'}`}>
                   <View className="flex-row items-center justify-between">
                     <View className="flex-row items-center flex-1">
                       <ImageIcon size={20} color="#10B981" />
                       <Text className="ml-2 text-sm text-neutral-700 flex-1" numberOfLines={1}>{getFileName(value)}</Text>
                     </View>
-                    <TouchableOpacity onPress={() => removeImage('idBackImage')} className="bg-error-100 rounded-lg p-2" activeOpacity={0.7}>
-                      <X size={16} color="#EF4444" />
-                    </TouchableOpacity>
+                    <View className="flex-row" style={{ gap: 8 }}>
+                      <TouchableOpacity
+                        onPress={() => handleImagePick('idBackImage')}
+                        className="bg-primary-100 rounded-lg p-2"
+                        activeOpacity={0.7}
+                      >
+                        <Camera size={16} color={THEME.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => removeImage('idBackImage')}
+                        className="bg-error-100 rounded-lg p-2"
+                        activeOpacity={0.7}
+                      >
+                        <X size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               ) : (
                 <TouchableOpacity
                   onPress={() => handleImagePick('idBackImage')}
-                  className="border-2 border-dashed border-neutral-300 rounded-xl p-6 items-center bg-neutral-50"
+                  className={`border-2 border-dashed rounded-xl p-6 items-center ${errors.idBackImage ? 'border-error-500 bg-error-50' : 'border-neutral-300 bg-neutral-50'}`}
                   activeOpacity={0.7}
                 >
                   <Camera size={32} color="#9CA3AF" />
-                  <Text className="text-primary-600 font-medium mt-2">{t('tapToUpload')}</Text>
+                  <Text style={{ color: THEME.primary }} className="font-medium mt-2">{t('tapToUpload')}</Text>
                   <Text className="text-neutral-500 text-xs mt-1">Back side of your ID</Text>
                 </TouchableOpacity>
               )}
             </>
           )}
         />
+        <ErrorMessage message={errors.idBackImage?.message} />
       </View>
 
       {/* Selfie with ID */}
@@ -1067,16 +1343,29 @@ export default function RegisterScreen({ navigation }: any) {
           rules={{ required: t('required') }}
           render={({ field: { value } }) => (
             <>
-              {value ? (
-                <View className="border-2 border-neutral-200 rounded-xl p-4 bg-white">
+              {value && value !== '' ? (
+                <View className={`border-2 rounded-xl p-4 bg-white ${errors.selfieImage ? 'border-error-500' : 'border-neutral-200'}`}>
                   <View className="flex-row items-center justify-between">
                     <View className="flex-row items-center flex-1">
                       <ImageIcon size={20} color="#10B981" />
                       <Text className="ml-2 text-sm text-neutral-700 flex-1" numberOfLines={1}>{getFileName(value)}</Text>
                     </View>
-                    <TouchableOpacity onPress={() => removeImage('selfieImage')} className="bg-error-100 rounded-lg p-2" activeOpacity={0.7}>
-                      <X size={16} color="#EF4444" />
-                    </TouchableOpacity>
+                    <View className="flex-row" style={{ gap: 8 }}>
+                      <TouchableOpacity
+                        onPress={() => handleImagePick('selfieImage')}
+                        className="bg-primary-100 rounded-lg p-2"
+                        activeOpacity={0.7}
+                      >
+                        <Camera size={16} color={THEME.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => removeImage('selfieImage')}
+                        className="bg-error-100 rounded-lg p-2"
+                        activeOpacity={0.7}
+                      >
+                        <X size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               ) : (
@@ -1086,7 +1375,7 @@ export default function RegisterScreen({ navigation }: any) {
                   activeOpacity={0.7}
                 >
                   <Camera size={32} color="#9CA3AF" />
-                  <Text className="text-primary-600 font-medium mt-2">{t('tapToUpload')}</Text>
+                  <Text style={{ color: THEME.primary }} className="font-medium mt-2">{t('tapToUpload')}</Text>
                   <Text className="text-neutral-500 text-xs mt-1">Selfie holding your ID</Text>
                 </TouchableOpacity>
               )}
@@ -1110,7 +1399,7 @@ export default function RegisterScreen({ navigation }: any) {
               <X size={24} color="#6B7280" />
             </TouchableOpacity>
             <TouchableOpacity onPress={pickFromCamera} className="flex-row items-center bg-primary-50 rounded-xl p-4 mb-3" activeOpacity={0.7}>
-              <Camera size={24} color="#2563EB" />
+              <Camera size={24} color={THEME.primary} />
               <View className="ml-3 flex-1">
                 <Text className="text-base font-semibold text-neutral-900">Take Photo</Text>
                 <Text className="text-sm text-neutral-600">Use your camera to capture</Text>
@@ -1128,14 +1417,17 @@ export default function RegisterScreen({ navigation }: any) {
       </Modal>
 
       {/* Terms and Conditions */}
-      <View className="mb-6">
+      <View className="mb-4">
         <Controller
           control={control}
           name="agreedToTerms"
           rules={{ required: t('required') }}
           render={({ field: { onChange, value } }) => (
             <TouchableOpacity onPress={() => { onChange(!value); saveFormData(); }} className="flex-row items-start mb-2" activeOpacity={0.7}>
-              <View className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${value ? 'bg-primary-600 border-primary-600' : errors.agreedToTerms ? 'border-error-500' : 'border-neutral-300'}`}>
+              <View
+                style={value ? { backgroundColor: THEME.primary, borderColor: THEME.primary } : {}}
+                className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${!value ? (errors.agreedToTerms ? 'border-error-500' : 'border-neutral-300') : ''}`}
+              >
                 {value && <Check size={14} color="#FFFFFF" />}
               </View>
               <Text className="text-sm text-neutral-700 flex-1">{t('agreeTerms')}</Text>
@@ -1143,6 +1435,18 @@ export default function RegisterScreen({ navigation }: any) {
           )}
         />
         <ErrorMessage message={errors.agreedToTerms?.message} />
+      </View>
+
+      {/* ── reCAPTCHA ── */}
+      <View className="mb-6">
+        <Recaptcha
+          verified={recaptchaVerified}
+          onVerify={() => {
+            setRecaptchaVerified(true);
+            setRecaptchaError(undefined);
+          }}
+          error={recaptchaError}
+        />
       </View>
 
       {errors.root?.general && (
@@ -1158,13 +1462,18 @@ export default function RegisterScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => setStep(2)} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
           <Text className="text-neutral-700 font-semibold text-base">{t('back')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleSubmit(onSubmit)} disabled={isLoading} className="flex-1 bg-primary-600 rounded-xl py-4 items-center shadow-sm" activeOpacity={0.85}>
+        <TouchableOpacity
+          onPress={handleSubmit(onSubmit)}
+          disabled={isLoading}
+          style={{ backgroundColor: THEME.primary }}
+          className="flex-1 rounded-xl py-4 items-center shadow-sm"
+          activeOpacity={0.85}
+        >
           {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text className="text-white font-semibold text-base">{t('submit')}</Text>}
         </TouchableOpacity>
       </View>
     </View>
   );
-
   return (
     <SafeAreaView className="flex-1 bg-white">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
@@ -1175,7 +1484,8 @@ export default function RegisterScreen({ navigation }: any) {
               <TouchableOpacity
                 key={lang}
                 onPress={() => changeLanguage(lang)}
-                className={`px-3.5 py-2 rounded-lg ${i18n.language === lang ? 'bg-primary-600' : 'bg-neutral-100'}`}
+                style={i18n.language === lang ? { backgroundColor: THEME.primary } : {}}
+                className={`px-3.5 py-2 rounded-lg ${i18n.language !== lang ? 'bg-neutral-100' : ''}`}
                 activeOpacity={0.7}
               >
                 <Text className={`font-medium ${i18n.language === lang ? 'text-white' : 'text-neutral-700'}`}>
@@ -1190,7 +1500,11 @@ export default function RegisterScreen({ navigation }: any) {
           {/* Progress Indicator — 3 steps */}
           <View className="flex-row mb-8 gap-2">
             {[1, 2, 3].map((s) => (
-              <View key={s} className={`flex-1 h-1.5 rounded-full ${s <= step ? 'bg-primary-600' : 'bg-neutral-200'}`} />
+              <View
+                key={s}
+                style={s <= step ? { backgroundColor: THEME.primary } : {}}
+                className={`flex-1 h-1.5 rounded-full ${s > step ? 'bg-neutral-200' : ''}`}
+              />
             ))}
           </View>
 
@@ -1201,7 +1515,7 @@ export default function RegisterScreen({ navigation }: any) {
           <View className="flex-row justify-center items-center mt-6">
             <Text className="text-neutral-600 text-sm">{t('haveAccount')} </Text>
             <TouchableOpacity onPress={() => router.push('/(auth)')} activeOpacity={0.7}>
-              <Text className="text-primary-600 font-semibold text-sm">{t('login')}</Text>
+              <Text style={{ color: THEME.primary }} className="font-semibold text-sm">{t('login')}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

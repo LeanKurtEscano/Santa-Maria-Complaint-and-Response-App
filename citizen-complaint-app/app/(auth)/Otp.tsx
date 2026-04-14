@@ -20,6 +20,9 @@ interface OTPVerificationScreenProps {
   navigation?: any;
   route?: {
     params?: {
+      otpResendRoute?: string;
+      successRoute?: string;
+      apiRoute?: string;
       email?: string;
       phoneNumber?: string;
     };
@@ -42,6 +45,8 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   const email = route?.params?.email || '';
+  const apiRoute = route?.params?.apiRoute;
+  const isResetPassword = apiRoute === 'verify-reset-password-otp';
 
   useEffect(() => {
     if (resendTimer > 0) {
@@ -84,7 +89,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     if (!canResend) return;
     clearErrors();
     try {
-      await authApiClient.post('/register', { email });
+      await authApiClient.post(route?.params?.otpResendRoute || '/register', { email });
       setResendTimer(60);
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);
@@ -149,71 +154,87 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     clearErrors();
 
     try {
-      const registrationDataString = await AsyncStorage.getItem('registrationData');
-      if (!registrationDataString) {
-        setErrorMessage(t('otpRegistrationDataNotFound'));
-        setErrorType('generic');
-        setIsVerifying(false);
-        return;
+      if (isResetPassword) {
+        
+        const response = await authApiClient.post(`/${apiRoute}`, { email, otp: otpString });
+        if (response.status !== 200) {
+          setErrorMessage(t('otpVerificationFailed'));
+          setErrorType('generic');
+          setIsVerifying(false);
+          return;
+        }
+        router.push({
+          pathname: '/(auth)/ResetPassword',
+          params: { email },
+        });
+      } else {
+       
+        const registrationDataString = await AsyncStorage.getItem('registrationData');
+        if (!registrationDataString) {
+          setErrorMessage(t('otpRegistrationDataNotFound'));
+          setErrorType('generic');
+          setIsVerifying(false);
+          return;
+        }
+
+        const registrationData = JSON.parse(registrationDataString);
+        const formData = new FormData();
+
+        const dataObject = {
+          email: registrationData.email,
+          password: registrationData.password,
+          first_name: registrationData.firstName,
+          last_name: registrationData.lastName,
+          middle_name: registrationData.middleName || null,
+          suffix: registrationData.suffix || null,
+          age: registrationData.age,
+          birthdate: formatDateForBackend(registrationData.dateOfBirth),
+          phone_number: registrationData.phoneNumber,
+          gender: registrationData.gender,
+          barangay: registrationData.barangay,
+          zip_code: registrationData.zipCode || registrationData.zone || null,
+          full_address: registrationData.streetAddress,
+          longitude: registrationData.longitude || null,
+          latitude: registrationData.latitude || null,
+          id_type: registrationData.idType,
+          id_number: registrationData.idNumber,
+          otp: otpString,
+        };
+
+        formData.append('data', JSON.stringify(dataObject));
+
+        if (registrationData.idFrontImage) {
+          formData.append('front_id', {
+            uri: registrationData.idFrontImage,
+            type: 'image/jpeg',
+            name: 'front_id.jpg',
+          } as any);
+        }
+        if (registrationData.idBackImage) {
+          formData.append('back_id', {
+            uri: registrationData.idBackImage,
+            type: 'image/jpeg',
+            name: 'back_id.jpg',
+          } as any);
+        }
+        if (registrationData.selfieImage) {
+          formData.append('selfie_with_id', {
+            uri: registrationData.selfieImage,
+            type: 'image/jpeg',
+            name: 'selfie_with_id.jpg',
+          } as any);
+        }
+
+        const response = await authApiClient.post('/verify-otp', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        if (response.status === 201) {
+          await AsyncStorage.removeItem('registrationData');
+        }
+
+        router.push('/(auth)');
       }
-
-      const registrationData = JSON.parse(registrationDataString);
-      const formData = new FormData();
-
-      const dataObject = {
-        email: registrationData.email,
-        password: registrationData.password,
-        first_name: registrationData.firstName,
-        last_name: registrationData.lastName,
-        middle_name: registrationData.middleName || null,
-        suffix: registrationData.suffix || null,
-        age: registrationData.age,
-        birthdate: formatDateForBackend(registrationData.dateOfBirth),
-        phone_number: registrationData.phoneNumber,
-        gender: registrationData.gender,
-        barangay: registrationData.barangay,
-        zip_code: registrationData.zipCode || registrationData.zone || null,
-        full_address: registrationData.streetAddress,
-        longitude: registrationData.longitude || null,
-        latitude: registrationData.latitude || null,
-        id_type: registrationData.idType,
-        id_number: registrationData.idNumber,
-        otp: otpString,
-      };
-
-      formData.append('data', JSON.stringify(dataObject));
-
-      if (registrationData.idFrontImage) {
-        formData.append('front_id', {
-          uri: registrationData.idFrontImage,
-          type: 'image/jpeg',
-          name: 'front_id.jpg',
-        } as any);
-      }
-      if (registrationData.idBackImage) {
-        formData.append('back_id', {
-          uri: registrationData.idBackImage,
-          type: 'image/jpeg',
-          name: 'back_id.jpg',
-        } as any);
-      }
-      if (registrationData.selfieImage) {
-        formData.append('selfie_with_id', {
-          uri: registrationData.selfieImage,
-          type: 'image/jpeg',
-          name: 'selfie_with_id.jpg',
-        } as any);
-      }
-
-      const response = await authApiClient.post('/verify-otp', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      if (response.status === 201) {
-        await AsyncStorage.removeItem('registrationData');
-      }
-
-      router.push('/(auth)');
 
     } catch (err: any) {
       const status = err?.response?.status;

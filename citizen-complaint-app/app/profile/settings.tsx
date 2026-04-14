@@ -17,6 +17,7 @@ import {
   Check,
 } from 'lucide-react-native';
 import { THEME } from '@/constants/theme';
+
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
@@ -67,8 +68,8 @@ export default function SettingsScreen() {
             {/* Section Header */}
             <View className="px-5 py-4 border-b border-neutral-100">
               <View className="flex-row items-center">
-                <View className="bg-primary-100 rounded-full p-2 mr-3">
-                  <Globe size={20} color="#2563EB" />
+                <View style={{ backgroundColor: `${THEME.primaryDark}20` }} className="rounded-full p-2 mr-3">
+                  <Globe size={20} color={THEME.primaryDark} />
                 </View>
                 <Text className="text-base font-semibold text-neutral-900">
                   {t('settings.localization.title')}
@@ -92,8 +93,8 @@ export default function SettingsScreen() {
                   {t('settings.localization.english')}
                 </Text>
                 {currentLanguage === 'en' && (
-                  <View className="bg-primary-100 rounded-full p-1">
-                    <Check size={16} color="#2563EB" />
+                  <View style={{ backgroundColor: `${THEME.primaryDark}20` }} className="rounded-full p-1">
+                    <Check size={16} color={THEME.primaryDark} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -108,8 +109,8 @@ export default function SettingsScreen() {
                   {t('settings.localization.tagalog')}
                 </Text>
                 {currentLanguage === 'tl' && (
-                  <View className="bg-primary-100 rounded-full p-1">
-                    <Check size={16} color="#2563EB" />
+                  <View style={{ backgroundColor: `${THEME.primaryDark}20` }} className="rounded-full p-1">
+                    <Check size={16} color={THEME.primaryDark} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -147,8 +148,8 @@ export default function SettingsScreen() {
                 <Switch
                   value={pushNotifications}
                   onValueChange={togglePushNotifications}
-                  trackColor={{ false: '#D1D5DB', true: '#93C5FD' }}
-                  thumbColor={pushNotifications ? '#2563EB' : '#F3F4F6'}
+                  trackColor={{ false: '#D1D5DB', true: `${THEME.primaryDark}60` }}
+                  thumbColor={pushNotifications ? THEME.primaryDark : '#F3F4F6'}
                 />
               </View>
 
@@ -165,8 +166,8 @@ export default function SettingsScreen() {
                 <Switch
                   value={emailNotifications}
                   onValueChange={toggleEmailNotifications}
-                  trackColor={{ false: '#D1D5DB', true: '#93C5FD' }}
-                  thumbColor={emailNotifications ? '#2563EB' : '#F3F4F6'}
+                  trackColor={{ false: '#D1D5DB', true: `${THEME.primaryDark}60` }}
+                  thumbColor={emailNotifications ? THEME.primaryDark : '#F3F4F6'}
                 />
               </View>
 
@@ -183,8 +184,8 @@ export default function SettingsScreen() {
                 <Switch
                   value={complaintUpdates}
                   onValueChange={toggleComplaintUpdates}
-                  trackColor={{ false: '#D1D5DB', true: '#93C5FD' }}
-                  thumbColor={complaintUpdates ? '#2563EB' : '#F3F4F6'}
+                  trackColor={{ false: '#D1D5DB', true: `${THEME.primaryDark}60` }}
+                  thumbColor={complaintUpdates ? THEME.primaryDark : '#F3F4F6'}
                 />
               </View>
 
@@ -201,8 +202,8 @@ export default function SettingsScreen() {
                 <Switch
                   value={newsAlerts}
                   onValueChange={toggleNewsAlerts}
-                  trackColor={{ false: '#D1D5DB', true: '#93C5FD' }}
-                  thumbColor={newsAlerts ? '#2563EB' : '#F3F4F6'}
+                  trackColor={{ false: '#D1D5DB', true: `${THEME.primaryDark}60` }}
+                  thumbColor={newsAlerts ? THEME.primaryDark : '#F3F4F6'}
                 />
               </View>
             </View>

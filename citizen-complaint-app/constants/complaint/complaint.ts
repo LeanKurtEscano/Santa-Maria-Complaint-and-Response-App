@@ -22,7 +22,8 @@ export const STATUS_CONFIG: Record<string, StatusConfig> = {
   resolved_by_barangay: { label: "Resolved by Barangay", badge: "bg-sky-100", text: "text-sky-800",  dot: "bg-sky-600",  border: "border-sky-300"  },
 
   // ── LGU (violet) ─────────────────────────────────────────────────────────
-  forwarded_to_lgu:     { label: "Forwarded to LGU",     badge: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500", border: "border-violet-200" },
+  forwarded_to_lgu:     { label: "Forwarded to LGU",     badge: "bg-violet-50",  text: "text-violet-700", dot: "bg-violet-500", border: "border-violet-200" },
+  reviewed_by_lgu:      { label: "Reviewed by LGU",      badge: "bg-violet-100", text: "text-violet-800", dot: "bg-violet-600", border: "border-violet-300" },
 
   // ── Department (amber) ───────────────────────────────────────────────────
   forwarded_to_department:  { label: "Forwarded to Dept.",      badge: "bg-amber-50",  text: "text-amber-700",  dot: "bg-amber-500",  border: "border-amber-200"  },
@@ -35,6 +36,7 @@ export const ALL_STATUSES = [
   "reviewed_by_barangay",
   "resolved_by_barangay",
   "forwarded_to_lgu",
+  "reviewed_by_lgu",
   "forwarded_to_department",
   "reviewed_by_department",
   "resolved_by_department",

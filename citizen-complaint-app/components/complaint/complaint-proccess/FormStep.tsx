@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 import {
   X, Upload, FileText, Video, Image as ImageIcon,
   ArrowLeft, AlertCircle, ChevronDown, Check, PenLine,
-  Info, ArrowRight, MapPin,
+  Info, ArrowRight, MapPin, CheckCircle,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { PRESET_TITLE_KEYS, OTHER_KEY, PresetTitle } from '@/constants/localization/complaint-title-key';
@@ -21,6 +21,132 @@ import { Attachment } from '@/hooks/general/useAttachment';
 import { StepDots } from './StepDots';
 import { THEME } from '@/constants/theme';
 
+// ─── Validation Constants ──────────────────────────────────────────────────────
+// Minimum enforces meaningful complaints (prevents "noise" or "pothole" alone).
+// Maximum keeps records manageable for barangay staff across high-volume usage.
+export const COMPLAINT_DETAILS_MIN_LENGTH = 40;
+export const COMPLAINT_DETAILS_MAX_LENGTH = 100;
+
+const DETAILS_WARN_THRESHOLD = Math.floor(COMPLAINT_DETAILS_MAX_LENGTH * 0.9);  // 1800 — "you're close to the limit"
+const DETAILS_GOOD_THRESHOLD = COMPLAINT_DETAILS_MIN_LENGTH;                    // 50   — minimum satisfied
+
+type DetailsValidationState = 'idle' | 'too_short' | 'good' | 'warning' | 'error';
+
+function getDetailsValidationState(length: number, dirty: boolean): DetailsValidationState {
+  if (!dirty) return 'idle';
+  if (length < COMPLAINT_DETAILS_MIN_LENGTH) return 'too_short';
+  if (length >= COMPLAINT_DETAILS_MAX_LENGTH) return 'error';   // should not happen — capped by maxLength
+  if (length >= DETAILS_WARN_THRESHOLD) return 'warning';
+  return 'good';
+}
+
+function getDetailsCounterStyle(state: DetailsValidationState): {
+  color: string;
+  fontWeight?: 'bold';
+} {
+  switch (state) {
+    case 'good':    return { color: '#059669' };
+    case 'warning': return { color: '#D97706', fontWeight: 'bold' };
+    case 'error':   return { color: '#DC2626', fontWeight: 'bold' };
+    default:        return { color: '#9CA3AF' };
+  }
+}
+
+function getDetailsBorderColor(state: DetailsValidationState, hasError: boolean): string {
+  if (hasError) return '#EF4444';
+  switch (state) {
+    case 'good':    return '#059669';
+    case 'warning': return '#D97706';
+    case 'error':   return '#DC2626';
+    default:        return '#E5E7EB';
+  }
+}
+
+// ─── Progress Bar ─────────────────────────────────────────────────────────────
+function DetailsProgressBar({ length }: { length: number }) {
+  const pct = Math.min(length / COMPLAINT_DETAILS_MAX_LENGTH, 1);
+  const minPct = COMPLAINT_DETAILS_MIN_LENGTH / COMPLAINT_DETAILS_MAX_LENGTH;
+
+  let barColor = '#E5E7EB'; // idle gray
+  if (length >= DETAILS_WARN_THRESHOLD) barColor = '#D97706';
+  else if (length >= COMPLAINT_DETAILS_MIN_LENGTH) barColor = '#059669';
+  else if (length > 0) barColor = '#F59E0B';
+
+  return (
+    <View className="mt-2.5">
+      {/* Track */}
+      <View className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        {/* Min marker overlay */}
+        <View
+          style={{
+            position: 'absolute',
+            left: `${minPct * 100}%` as any,
+            top: 0,
+            bottom: 0,
+            width: 2,
+            backgroundColor: '#D1D5DB',
+            zIndex: 2,
+          }}
+        />
+        {/* Fill */}
+        <View
+          style={{
+            width: `${pct * 100}%`,
+            height: '100%',
+            backgroundColor: barColor,
+            borderRadius: 99,
+          }}
+        />
+      </View>
+      {/* Labels */}
+      <View className="flex-row justify-between mt-1">
+        <Text className="text-xs text-gray-400">0</Text>
+        <Text className="text-xs text-gray-400" style={{ position: 'absolute', left: `${minPct * 100}%` as any }}>
+          |{COMPLAINT_DETAILS_MIN_LENGTH}
+        </Text>
+        <Text className="text-xs text-gray-400">{COMPLAINT_DETAILS_MAX_LENGTH}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ─── Inline hint beneath the textarea ────────────────────────────────────────
+function DetailsHint({ state, length }: { state: DetailsValidationState; length: number }) {
+  const remaining = COMPLAINT_DETAILS_MIN_LENGTH - length;
+  const charsLeft = COMPLAINT_DETAILS_MAX_LENGTH - length;
+
+  if (state === 'too_short' && length > 0) {
+    return (
+      <View className="flex-row items-center gap-1.5 mt-1.5">
+        <AlertCircle size={13} color="#F59E0B" />
+        <Text className="text-xs text-amber-600">
+          {remaining} more character{remaining !== 1 ? 's' : ''} needed to describe the issue clearly.
+        </Text>
+      </View>
+    );
+  }
+  if (state === 'good') {
+    return (
+      <View className="flex-row items-center gap-1.5 mt-1.5">
+        <CheckCircle size={13} color="#059669" />
+        <Text className="text-xs text-emerald-600">Looks good — enough detail for review.</Text>
+      </View>
+    );
+  }
+  if (state === 'warning') {
+    return (
+      <View className="flex-row items-center gap-1.5 mt-1.5">
+        <AlertCircle size={13} color="#D97706" />
+        <Text className="text-xs text-amber-600">
+          Approaching the limit — {charsLeft} character{charsLeft !== 1 ? 's' : ''} remaining.
+        </Text>
+      </View>
+    );
+  }
+  return null;
+}
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 interface FormStepProps {
   barangayName: string;
   hasProfileLocation: boolean;
@@ -47,8 +173,12 @@ interface FormStepProps {
   formatFileSize: (size: number) => string;
   onBack: () => void;
   onNext: () => void;
+  // Pass this from the parent so the parent can track dirty state
+  messageWasTouched?: boolean;
+  onMessageBlur?: () => void;
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
 export function FormStep({
   barangayName,
   hasProfileLocation,
@@ -75,11 +205,18 @@ export function FormStep({
   formatFileSize,
   onBack,
   onNext,
+  messageWasTouched = false,
+  onMessageBlur,
 }: FormStepProps) {
   const { t } = useTranslation();
   const router = useRouter();
 
   const isOtherSelected = selectedPreset?.key === OTHER_KEY;
+
+  // ── Details validation state ──────────────────────────────────────────────
+  const detailsState = getDetailsValidationState(message.length, messageWasTouched || !!messageError);
+  const detailsBorderColor = getDetailsBorderColor(detailsState, !!messageError);
+  const counterStyle = getDetailsCounterStyle(detailsState);
 
   const getAttachmentIcon = (type: string) => {
     switch (type) {
@@ -182,28 +319,56 @@ export function FormStep({
           <Text className="text-base font-bold text-gray-800 mb-2">
             {t('complaint_form.details_label')} <Text className="text-red-500">*</Text>
           </Text>
+
+        
+
           <Text className="text-sm text-gray-500 mb-3 leading-5">
-            Describe your complaint clearly and with as much detail as possible.
+            Describe your complaint clearly. Include when it happened, who is affected, and any relevant details that will help the barangay address it promptly.
           </Text>
+
+          {/* Textarea */}
           <TextInput
             value={message}
             onChangeText={onChangeMessage}
+            onBlur={onMessageBlur}
             placeholder={t('complaint_form.details_placeholder')}
             placeholderTextColor="#9CA3AF"
             multiline
             textAlignVertical="top"
-            maxLength={1000}
-            className={`bg-white border-2 rounded-2xl px-4 py-4 text-base text-gray-900 min-h-[180px] ${messageError ? 'border-red-400' : 'border-gray-200'}`}
-            style={{ shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}
+            maxLength={COMPLAINT_DETAILS_MAX_LENGTH}
+            className="bg-white rounded-2xl px-4 py-4 text-base text-gray-900 min-h-[180px]"
+            style={{
+              borderWidth: 2,
+              borderColor: detailsBorderColor,
+              shadowColor: '#000',
+              shadowOpacity: 0.04,
+              shadowRadius: 6,
+              elevation: 1,
+            }}
           />
-          <View className="flex-row items-center justify-between mt-2">
-            {messageError ? (
-              <View className="flex-row items-center gap-1.5">
-                <AlertCircle size={14} color="#EF4444" />
-                <Text className="text-sm text-red-500">{messageError}</Text>
-              </View>
-            ) : <View />}
-            <Text className="text-xs text-gray-400">{message.length}/1000</Text>
+
+          {/* Progress bar */}
+          <DetailsProgressBar length={message.length} />
+
+          {/* Counter row + inline hint */}
+          <View className="flex-row items-start justify-between mt-1">
+            <View className="flex-1 mr-2">
+              {/* Server-side / parent-driven error takes priority */}
+              {messageError ? (
+                <View className="flex-row items-center gap-1.5 mt-0.5">
+                  <AlertCircle size={14} color="#EF4444" />
+                  <Text className="text-sm text-red-500">{messageError}</Text>
+                </View>
+              ) : (
+                <DetailsHint state={detailsState} length={message.length} />
+              )}
+            </View>
+            <Text
+              className="text-xs mt-0.5"
+              style={counterStyle}
+            >
+              {message.length}/{COMPLAINT_DETAILS_MAX_LENGTH}
+            </Text>
           </View>
         </View>
 

@@ -18,6 +18,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { authApiClient } from '@/lib/client/user';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
 import * as SecureStore from 'expo-secure-store';
+import { THEME } from '@/constants/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 interface LoginFormData {
     email: string;
     password: string;
@@ -65,6 +67,7 @@ export default function LoginScreen({ navigation }: any) {
     };
 
     const handleLogin = () => {
+        AsyncStorage.removeItem('registrationFormData');
         loginMutation.mutate(formData, {
            onError: (error: any) => {
   if (error?.type === 'validation') {
@@ -97,9 +100,8 @@ export default function LoginScreen({ navigation }: any) {
                     <View className="absolute top-4 right-6 z-10 flex-row gap-2">
                         <TouchableOpacity
                             onPress={() => changeLanguage('en')}
-                            className={`px-3.5 py-2 rounded-lg ${
-                                i18n.language === 'en' ? 'bg-primary-600' : 'bg-neutral-100'
-                            }`}
+                            className={`px-3.5 py-2 rounded-lg `}
+                            style={{backgroundColor: i18n.language === 'en' ? THEME.primary : '#F5F5F5' }}
                             activeOpacity={0.7}
                         >
                             <Text
@@ -111,10 +113,10 @@ export default function LoginScreen({ navigation }: any) {
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
+                         
                             onPress={() => changeLanguage('tl')}
-                            className={`px-3.5 py-2 rounded-lg ${
-                                i18n.language === 'tl' ? 'bg-primary-600' : 'bg-neutral-100'
-                            }`}
+                            className={`px-3.5 py-2 rounded-lg `}
+                            style={{backgroundColor: i18n.language === 'tl' ? THEME.primary : '#F5F5F5' }}
                             activeOpacity={0.7}
                         >
                             <Text
@@ -282,8 +284,10 @@ export default function LoginScreen({ navigation }: any) {
                         <TouchableOpacity 
                             className="self-end mb-8"
                             activeOpacity={0.7}
+                            onPress={() => router.push('/(auth)/ForgotPassword')}
                         >
-                            <Text className="text-primary-600 text-sm font-semibold">
+                            <Text className="text-sm font-semibold" style={{color: THEME.primary}}>
+
                                 {t('forgotPassword')}
                             </Text>
                         </TouchableOpacity>
@@ -292,9 +296,8 @@ export default function LoginScreen({ navigation }: any) {
                         <TouchableOpacity
                             onPress={handleLogin}
                             disabled={loginMutation.isPending}
-                            className={`bg-primary-600 rounded-xl py-4 items-center mb-6 shadow-sm ${
-                                loginMutation.isPending ? 'opacity-60' : 'active:opacity-90'
-                            }`}
+                            className="rounded-xl py-4 items-center mb-6 shadow-sm"
+                            style={{backgroundColor: THEME.primary}}
                             activeOpacity={0.85}
                         >
                             {loginMutation.isPending ? (
@@ -324,7 +327,7 @@ export default function LoginScreen({ navigation }: any) {
                                 onPress={() => router.push('/(auth)/Register')}
                                 activeOpacity={0.7}
                             >
-                                <Text className="text-primary-600 text-sm font-bold">
+                                <Text className="text-sm font-bold" style={{color: THEME.primary}}>
                                     {t('register')}
                                 </Text>
                             </TouchableOpacity>

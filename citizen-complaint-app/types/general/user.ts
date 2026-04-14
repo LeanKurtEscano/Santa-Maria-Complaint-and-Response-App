@@ -14,6 +14,7 @@ export interface User {
   id_number: string | null;
   latitude: number | null;
   longitude: number | null;
+  is_verified: boolean;
   id: number;
   email: string;
   role: string;

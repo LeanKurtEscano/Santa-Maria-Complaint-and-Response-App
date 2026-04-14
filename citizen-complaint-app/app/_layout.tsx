@@ -38,27 +38,39 @@ function RootLayoutNav() {
   };
 
   useEffect(() => {
-    if (loading || retrying) return;
+  if (loading || retrying) return;
 
-    const inAuthGroup = segments[0] === "(auth)";
+  const inAuthGroup = segments[0] === "(auth)";
 
-    console.log("🔍 Auth Check:", {
-      isAuthenticated: !!userData,
-      currentSegment: segments[0],
-      inAuthGroup,
-    });
+  console.log("🔍 Auth Check:", {
+    isAuthenticated: !!userData,
+    isVerified: userData?.is_verified,
+    currentSegment: segments[0],
+    inAuthGroup,
+  });
 
-    if (!userData && !inAuthGroup) {
-      console.log("➡️ Not authenticated, redirecting to auth");
-      router.replace("/(auth)");
-    } else if (userData && inAuthGroup) {
-      console.log("➡️ Authenticated, redirecting to tabs");
-      router.replace("/(tabs)");
-    } else {
-      console.log("✅ Already in correct location");
+  // ❌ Not authenticated
+  if (!userData && !inAuthGroup) {
+    router.replace("/(auth)");
+    return;
+  }
+
+  // ✅ Authenticated but NOT verified
+  if (userData && !userData.is_verified) {
+    if (segments[1] !== "NotVerified") {
+      router.replace("/(auth)/NotVerified");
     }
-  }, [userData, loading, segments, retrying]);
+    return;
+  }
 
+  // ✅ Authenticated and verified
+  if (userData && userData.is_verified && inAuthGroup) {
+    router.replace("/(tabs)");
+    return;
+  }
+
+}, [userData, loading, segments, retrying]);
+   
   if (initError && !loading) {
     const appError = handleApiError(initError);
 
@@ -81,6 +93,8 @@ function RootLayoutNav() {
       </View>
     );
   }
+
+  
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

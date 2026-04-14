@@ -6,6 +6,8 @@ import * as Location from 'expo-location';
 import { ArrowLeft, MapPin, Navigation, LocateFixed, AlertCircle, Check, WifiOff, RefreshCw } from 'lucide-react-native';
 import { StepDots } from './StepDots';
 import { THEME } from '@/constants/theme';
+import { complaintApiClient } from '@/lib/client/complaint';
+import { useQuery } from '@tanstack/react-query';
 
 interface LocationStepProps {
   barangayName: string;
@@ -22,7 +24,6 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   const [webViewKey, setWebViewKey] = useState(0);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState(false);
-
   const [pinned, setPinned] = useState<{ lat: number; lng: number }>({
     lat: barangayLat,
     lng: barangayLng,
@@ -30,14 +31,40 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   const [locationMode, setLocationMode] = useState<'barangay' | 'gps' | 'pin'>('barangay');
   const [gettingGps, setGettingGps] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
+  const [boundaryError, setBoundaryError] = useState<string | null>(null);
   const cardAnim = useRef(new Animated.Value(1)).current;
+
+  // ── Fetch location details + geometry ──
+  const { data: locationDetails } = useQuery({
+    queryKey: ['location-details', barangayLat, barangayLng, barangayName],
+    queryFn: () =>
+      complaintApiClient
+        .get('/location-details', {
+          params: {
+            latitude: barangayLat,
+            longitude: barangayLng,
+            barangay_name: barangayName,
+          },
+        })
+        .then((res) => res.data),
+    staleTime: Infinity, // geometry won't change mid-session
+    retry: 2,
+  });
+
+  // ── Once map is ready AND geometry is available, draw boundary ──
+  useEffect(() => {
+    if (mapReady && locationDetails?.geometry) {
+      const geoJson = JSON.stringify(locationDetails.geometry);
+      webViewRef.current?.injectJavaScript(`
+        drawBoundary(${geoJson}); true;
+      `);
+    }
+  }, [mapReady, locationDetails?.geometry]);
 
   // ── Timeout: if mapReady never fires within 10s, show error ──
   useEffect(() => {
     if (!mapReady && !mapError) {
-      loadTimeoutRef.current = setTimeout(() => {
-        setMapError(true);
-      }, 10_000);
+      loadTimeoutRef.current = setTimeout(() => setMapError(true), 10_000);
     } else {
       if (loadTimeoutRef.current) {
         clearTimeout(loadTimeoutRef.current);
@@ -65,6 +92,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
 
   const handleResetToBarangay = () => {
     setGpsError(null);
+    setBoundaryError(null);
     setPinned({ lat: barangayLat, lng: barangayLng });
     setLocationMode('barangay');
     webViewRef.current?.injectJavaScript(
@@ -74,6 +102,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
 
   const handleUseCurrentLocation = async () => {
     setGpsError(null);
+    setBoundaryError(null);
     setGettingGps(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -103,6 +132,10 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         setPinned({ lat: data.lat, lng: data.lng });
         setLocationMode('pin');
         setGpsError(null);
+        setBoundaryError(null);
+      } else if (data.type === 'pinOutOfBounds') {
+        // Map snapped the pin back — just show a message
+        setBoundaryError('Pin must be placed within the barangay boundary.');
       }
     } catch {}
   };
@@ -148,25 +181,98 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
             iconAnchor: [18, 44],
           });
 
+          let boundaryLayer = null;
+          let boundaryPolygon = null; // turf/raw coords for point-in-polygon check
+
+          // ── Draw red boundary from GeoJSON ──
+          function drawBoundary(geoJson) {
+            if (boundaryLayer) {
+              map.removeLayer(boundaryLayer);
+            }
+            boundaryLayer = L.geoJSON(geoJson, {
+              style: {
+                color: '#DC2626',
+                weight: 2.5,
+                opacity: 0.85,
+                fillColor: '#DC2626',
+                fillOpacity: 0.07,
+                dashArray: '6 4',
+              }
+            }).addTo(map);
+
+            // Extract coordinates for pip check (supports Polygon & MultiPolygon)
+            if (geoJson.type === 'Polygon') {
+              boundaryPolygon = geoJson.coordinates[0]; // outer ring
+            } else if (geoJson.type === 'MultiPolygon') {
+              boundaryPolygon = geoJson.coordinates[0][0];
+            } else if (geoJson.type === 'Feature') {
+              const g = geoJson.geometry;
+              if (g.type === 'Polygon') boundaryPolygon = g.coordinates[0];
+              else if (g.type === 'MultiPolygon') boundaryPolygon = g.coordinates[0][0];
+            }
+          }
+
+          // ── Point-in-polygon (ray casting) ──
+          function isInsideBoundary(lat, lng) {
+            if (!boundaryPolygon) return true; // no boundary loaded yet = allow
+            let inside = false;
+            const x = lng, y = lat;
+            for (let i = 0, j = boundaryPolygon.length - 1; i < boundaryPolygon.length; j = i++) {
+              const xi = boundaryPolygon[i][0], yi = boundaryPolygon[i][1];
+              const xj = boundaryPolygon[j][0], yj = boundaryPolygon[j][1];
+              const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+              if (intersect) inside = !inside;
+            }
+            return inside;
+          }
+
           function sendPin(lat, lng) {
             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pinMoved', lat, lng }));
           }
 
+          function sendOutOfBounds(prevLat, prevLng) {
+            // Snap back to last valid position
+            marker.setLatLng([prevLat, prevLng]);
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pinOutOfBounds' }));
+          }
+
+          let lastValidLat = ${barangayLat};
+          let lastValidLng = ${barangayLng};
+
           let marker = L.marker([${barangayLat}, ${barangayLng}], { draggable: true, icon: pinIcon }).addTo(map);
+
           marker.on('dragend', function() {
             const p = marker.getLatLng();
-            sendPin(p.lat, p.lng);
+            if (isInsideBoundary(p.lat, p.lng)) {
+              lastValidLat = p.lat;
+              lastValidLng = p.lng;
+              sendPin(p.lat, p.lng);
+            } else {
+              sendOutOfBounds(lastValidLat, lastValidLng);
+            }
           });
 
           map.on('click', function(e) {
-            marker.setLatLng(e.latlng);
-            sendPin(e.latlng.lat, e.latlng.lng);
+            if (isInsideBoundary(e.latlng.lat, e.latlng.lng)) {
+              marker.setLatLng(e.latlng);
+              lastValidLat = e.latlng.lat;
+              lastValidLng = e.latlng.lng;
+              sendPin(e.latlng.lat, e.latlng.lng);
+            } else {
+              sendOutOfBounds(lastValidLat, lastValidLng);
+            }
           });
 
           function movePin(lat, lng, recenter) {
-            marker.setLatLng([lat, lng]);
-            if (recenter) map.setView([lat, lng], 17, { animate: true });
-            sendPin(lat, lng);
+            if (isInsideBoundary(lat, lng)) {
+              marker.setLatLng([lat, lng]);
+              lastValidLat = lat;
+              lastValidLng = lng;
+              if (recenter) map.setView([lat, lng], 17, { animate: true });
+              sendPin(lat, lng);
+            } else {
+              sendOutOfBounds(lastValidLat, lastValidLng);
+            }
           }
 
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapReady' }));
@@ -236,7 +342,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
           </View>
         )}
 
-        {/* Coordinates badge — only when map is ready */}
+        {/* Coordinates badge */}
         {mapReady && !mapError && (
           <Animated.View style={[styles.coordsBadge, {
             opacity: cardAnim,
@@ -263,14 +369,13 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
       {/* Bottom panel */}
       <View style={styles.bottomPanel}>
 
-        {gpsError && (
+        {(gpsError || boundaryError) && (
           <View style={styles.errorRow}>
             <AlertCircle size={14} color="#DC2626" />
-            <Text style={styles.errorText}>{gpsError}</Text>
+            <Text style={styles.errorText}>{gpsError ?? boundaryError}</Text>
           </View>
         )}
 
-        {/* Top row: GPS + Reset buttons */}
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity
             onPress={handleUseCurrentLocation}
@@ -306,7 +411,6 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
           <View style={styles.dividerLine} />
         </View>
 
-        {/* Confirm */}
         <TouchableOpacity
           onPress={() => onConfirm(pinned.lat, pinned.lng)}
           style={[styles.confirmButton, { backgroundColor: THEME.primary, shadowColor: THEME.primary }, mapError && { opacity: 0.5 }]}

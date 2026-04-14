@@ -25,7 +25,7 @@ import { complaintApiClient } from '@/lib/client/complaint';
 import { InstructionsStep } from '@/components/complaint/complaint-proccess/InstructionStep';
 import { FormStep } from '@/components/complaint/complaint-proccess/FormStep';
 import { LocationStep } from '@/components/complaint/complaint-proccess/LocationStep';
-
+import { COMPLAINT_DETAILS_MAX_LENGTH, COMPLAINT_DETAILS_MIN_LENGTH } from '@/components/complaint/complaint-proccess/FormStep';
 
 
 // ─── Step type ────────────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ export default function ComplaintFormScreen() {
   // ── Message ─────────────────────────────────────────────────────────────────
   const [message, setMessage]           = useState('');
   const [messageError, setMessageError] = useState('');
-
+  const [messageWasTouched, setMessageWasTouched] = useState(false);
   // ── Submission ──────────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreview, setShowPreview]   = useState(false);
@@ -122,27 +122,35 @@ export default function ComplaintFormScreen() {
     if (text.trim()) setMessageError('');
   };
 
-  // ── Validation ───────────────────────────────────────────────────────────────
-  const validateForm = (): boolean => {
-    let valid = true;
-    if (!resolvedTitle) {
-      setTitleError(t('complaint_form.error.title_required'));
-      valid = false;
-    } else if (isOtherSelected && customTitle.trim().length < 3) {
-      setTitleError(t('complaint_form.error.title_too_short'));
-      valid = false;
-    } else {
-      setTitleError('');
-    }
-    if (!message.trim()) {
-      setMessageError(t('complaint_form.error.details_required'));
-      valid = false;
-    } else {
-      setMessageError('');
-    }
-    return valid;
-  };
+ // ── Validation ───────────────────────────────────────────────────────────────
+const validateForm = (): boolean => {
+  let valid = true;
+  if (!resolvedTitle) {
+    setTitleError(t('complaint_form.error.title_required'));
+    valid = false;
+  } else if (isOtherSelected && customTitle.trim().length < 3) {
+    setTitleError(t('complaint_form.error.title_too_short'));
+    valid = false;
+  } else {
+    setTitleError('');
+  }
 
+  if (!message.trim()) {
+    setMessageError(t('complaint_form.error.details_required'));
+    valid = false;
+  } else if (message.trim().length < COMPLAINT_DETAILS_MIN_LENGTH) {
+    setMessageError(`Description must be at least ${COMPLAINT_DETAILS_MIN_LENGTH} characters long.`);
+    valid = false;
+  } else if (message.trim().length > COMPLAINT_DETAILS_MAX_LENGTH) {
+    setMessageError(`Description must not exceed ${COMPLAINT_DETAILS_MAX_LENGTH} characters.`);
+    valid = false;
+  } else {
+    setMessageError('');
+  }
+
+  // ← remove the stray setMessageError('') that was here
+  return valid;
+};
   // ── Form "Next" → location step ──────────────────────────────────────────────
   const handleFormNext = () => {
     if (!validateForm()) return;
@@ -198,6 +206,9 @@ export default function ComplaintFormScreen() {
         longitude:           incidentLocation.longitude,
         category_id:         resolvedCategoryId,
       };
+
+
+      console.log('Submitting complaint with data:', complaintData, 'and attachments:', attachments);
 
       const formData = new FormData();
       formData.append('data', JSON.stringify(complaintData));
