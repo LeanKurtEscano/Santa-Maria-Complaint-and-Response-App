@@ -34,7 +34,10 @@ export function QuickAction({ Icon, label, onPress, delay = 0, badge }: Props) {
             elevation: 4,
           }}
         >
-          <View className="w-[58px] h-[58px] rounded-[18px] bg-primary-600 items-center justify-center">
+          <View
+            style={{ backgroundColor: THEME.primaryDark }}
+            className="w-[58px] h-[58px] rounded-[18px] items-center justify-center"
+          >
             <View
               style={{
                 position: 'absolute',
@@ -44,7 +47,7 @@ export function QuickAction({ Icon, label, onPress, delay = 0, badge }: Props) {
                 height: '50%',
                 borderTopLeftRadius: 18,
                 borderTopRightRadius: 18,
-                backgroundColor: 'rgba(255,255,255,0.12)',
+                backgroundColor: THEME.primary,
               }}
             />
             <Icon size={22} color="#fff" />

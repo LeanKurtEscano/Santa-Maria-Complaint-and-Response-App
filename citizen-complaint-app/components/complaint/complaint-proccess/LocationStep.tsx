@@ -1,9 +1,9 @@
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Platform, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
-import { ArrowLeft, MapPin, Navigation, LocateFixed, AlertCircle, Check } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Navigation, LocateFixed, AlertCircle, Check, WifiOff, RefreshCw } from 'lucide-react-native';
 import { StepDots } from './StepDots';
 import { THEME } from '@/constants/theme';
 
@@ -17,7 +17,12 @@ interface LocationStepProps {
 
 export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm, onBack }: LocationStepProps) {
   const webViewRef = useRef<WebView>(null);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [webViewKey, setWebViewKey] = useState(0);
   const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState(false);
+
   const [pinned, setPinned] = useState<{ lat: number; lng: number }>({
     lat: barangayLat,
     lng: barangayLng,
@@ -26,6 +31,37 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   const [gettingGps, setGettingGps] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const cardAnim = useRef(new Animated.Value(1)).current;
+
+  // ── Timeout: if mapReady never fires within 10s, show error ──
+  useEffect(() => {
+    if (!mapReady && !mapError) {
+      loadTimeoutRef.current = setTimeout(() => {
+        setMapError(true);
+      }, 10_000);
+    } else {
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
+    }
+    return () => {
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    };
+  }, [mapReady, mapError, webViewKey]);
+
+  const handleRetry = useCallback(() => {
+    setMapError(false);
+    setMapReady(false);
+    setWebViewKey((k) => k + 1);
+  }, []);
+
+  const handleWebViewError = useCallback(() => {
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+    setMapError(true);
+  }, []);
 
   const handleResetToBarangay = () => {
     setGpsError(null);
@@ -60,8 +96,10 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   const handleMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'mapReady') setMapReady(true);
-      else if (data.type === 'pinMoved') {
+      if (data.type === 'mapReady') {
+        setMapReady(true);
+        setMapError(false);
+      } else if (data.type === 'pinMoved') {
         setPinned({ lat: data.lat, lng: data.lng });
         setLocationMode('pin');
         setGpsError(null);
@@ -69,7 +107,6 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
     } catch {}
   };
 
-  // Use THEME.primary in the SVG pin — injected as a JS string so we use the value directly
   const pinColor = THEME.primary;
 
   const mapHTML = `
@@ -162,43 +199,65 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
       {/* Map */}
       <View style={{ flex: 1, position: 'relative' }}>
         <WebView
+          key={webViewKey}
           ref={webViewRef}
           originWhitelist={['*']}
           source={{ html: mapHTML }}
           style={{ flex: 1 }}
           onMessage={handleMessage}
+          onError={handleWebViewError}
+          onHttpError={handleWebViewError}
           javaScriptEnabled
           domStorageEnabled
         />
 
         {/* Loading overlay */}
-        {!mapReady && (
+        {!mapReady && !mapError && (
           <View style={styles.mapOverlay}>
             <ActivityIndicator size="large" color={THEME.primary} />
             <Text style={{ marginTop: 10, fontSize: 13, color: '#94A3B8' }}>Loading map…</Text>
           </View>
         )}
 
-        {/* Coordinates badge */}
-        <Animated.View style={[styles.coordsBadge, {
-          opacity: cardAnim,
-          transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }],
-        }]}>
-          <Navigation size={11} color={THEME.primary} />
-          <Text style={[styles.coordsText, { color: THEME.primary }]}>
-            {pinned.lat.toFixed(6)},  {pinned.lng.toFixed(6)}
-          </Text>
-          {locationMode === 'gps' && (
-            <View style={[styles.gpsBadge, { backgroundColor: '#DCFCE7' }]}>
-              <Text style={[styles.gpsBadgeText, { color: '#16A34A' }]}>GPS</Text>
-            </View>
-          )}
-          {locationMode === 'barangay' && (
-            <View style={[styles.gpsBadge, { backgroundColor: `${THEME.primary}20` }]}>
-              <Text style={[styles.gpsBadgeText, { color: THEME.primary }]}>BRY</Text>
-            </View>
-          )}
-        </Animated.View>
+        {/* Error / retry overlay */}
+        {mapError && (
+          <View style={styles.mapOverlay}>
+            <WifiOff size={44} color={THEME.primary} style={{ opacity: 0.85, marginBottom: 14 }} />
+            <Text style={styles.errorTitle}>Map failed to load</Text>
+            <Text style={styles.errorSubtitle}>Check your connection and try again.</Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: THEME.primary }]}
+              onPress={handleRetry}
+              activeOpacity={0.8}
+            >
+              <RefreshCw size={16} color="#fff" />
+              <Text style={styles.retryButtonText}>Reload Map</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Coordinates badge — only when map is ready */}
+        {mapReady && !mapError && (
+          <Animated.View style={[styles.coordsBadge, {
+            opacity: cardAnim,
+            transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) }],
+          }]}>
+            <Navigation size={11} color={THEME.primary} />
+            <Text style={[styles.coordsText, { color: THEME.primary }]}>
+              {pinned.lat.toFixed(6)},  {pinned.lng.toFixed(6)}
+            </Text>
+            {locationMode === 'gps' && (
+              <View style={[styles.gpsBadge, { backgroundColor: '#DCFCE7' }]}>
+                <Text style={[styles.gpsBadgeText, { color: '#16A34A' }]}>GPS</Text>
+              </View>
+            )}
+            {locationMode === 'barangay' && (
+              <View style={[styles.gpsBadge, { backgroundColor: `${THEME.primary}20` }]}>
+                <Text style={[styles.gpsBadgeText, { color: THEME.primary }]}>BRY</Text>
+              </View>
+            )}
+          </Animated.View>
+        )}
       </View>
 
       {/* Bottom panel */}
@@ -250,8 +309,9 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         {/* Confirm */}
         <TouchableOpacity
           onPress={() => onConfirm(pinned.lat, pinned.lng)}
-          style={[styles.confirmButton, { backgroundColor: THEME.primary, shadowColor: THEME.primary }]}
+          style={[styles.confirmButton, { backgroundColor: THEME.primary, shadowColor: THEME.primary }, mapError && { opacity: 0.5 }]}
           activeOpacity={0.85}
+          disabled={mapError}
         >
           <Check size={18} color="#ffffff" />
           <Text style={styles.confirmButtonText}>Confirm Location</Text>
@@ -269,7 +329,11 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 12, marginTop: 1 },
   strip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F1F5F9', paddingHorizontal: 16, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   stripText: { fontSize: 12, color: '#4B5563', flex: 1 },
-  mapOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  mapOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', zIndex: 10, paddingHorizontal: 32 },
+  errorTitle: { fontSize: 17, fontWeight: '700', color: '#0F172A', marginBottom: 6, textAlign: 'center' },
+  errorSubtitle: { fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 22, lineHeight: 19 },
+  retryButton: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12 },
+  retryButtonText: { fontSize: 14, fontWeight: '600', color: '#fff' },
   coordsBadge: { position: 'absolute', top: 12, left: 12, right: 12, backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
   coordsText: { flex: 1, fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontWeight: '600' },
   gpsBadge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },

@@ -16,12 +16,21 @@
  * with a notice instead of a route.
  */
 
-import React, { useMemo } from 'react';
-import { Modal, View, Text, TouchableOpacity, ActivityIndicator, StatusBar } from 'react-native';
+import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
+import {
+  Modal,
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  StatusBar,
+  StyleSheet,
+} from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useTranslation } from 'react-i18next';
-import { X, Navigation, Building2 } from 'lucide-react-native';
+import { X, Building2, WifiOff, RefreshCw } from 'lucide-react-native';
 import { isValidCoordinate } from '@/hooks/general/useReverseGeocode';
+import { THEME } from '@/constants/theme';
 
 interface EvacuationRouteModalProps {
   visible: boolean;
@@ -41,16 +50,17 @@ function buildMapHtml(
   userLat: number | null,
   userLng: number | null,
 ): string {
-  const hasUser = userLat !== null && userLng !== null &&
+  const hasUser =
+    userLat !== null &&
+    userLng !== null &&
     isValidCoordinate(userLat!, userLng!);
 
-  // Initial view: center on destination, or midpoint if user known
-  const viewLat = hasUser ? ((userLat! + destLat) / 2) : destLat;
-  const viewLng = hasUser ? ((userLng! + destLng) / 2) : destLng;
+  const viewLat = hasUser ? (userLat! + destLat) / 2 : destLat;
+  const viewLng = hasUser ? (userLng! + destLng) / 2 : destLng;
   const zoom = hasUser ? 13 : 15;
 
-  const userMarkerJs = hasUser ? `
-    // ── User marker (blue pulse) ──
+  const userMarkerJs = hasUser
+    ? `
     const userIcon = L.divIcon({
       className: '',
       html: \`<div style="
@@ -65,10 +75,11 @@ function buildMapHtml(
     L.marker([${userLat}, ${userLng}], { icon: userIcon })
       .addTo(map)
       .bindPopup('<b>Your Location</b>');
-  ` : '';
+  `
+    : '';
 
-  const routeJs = hasUser ? `
-    // ── Fetch OSRM route ──
+  const routeJs = hasUser
+    ? `
     const statusEl = document.getElementById('status');
     statusEl.style.display = 'flex';
 
@@ -81,16 +92,11 @@ function buildMapHtml(
       .then(r => r.json())
       .then(data => {
         statusEl.style.display = 'none';
-
-        if (!data.routes || data.routes.length === 0) {
-          showNoRoute();
-          return;
-        }
+        if (!data.routes || data.routes.length === 0) { showNoRoute(); return; }
 
         const route = data.routes[0];
         const coords = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
 
-        // Red route polyline
         const polyline = L.polyline(coords, {
           color: '#DC2626',
           weight: 5,
@@ -99,10 +105,8 @@ function buildMapHtml(
           lineCap: 'round',
         }).addTo(map);
 
-        // Fit map to route bounds with padding
         map.fitBounds(polyline.getBounds(), { padding: [48, 48] });
 
-        // Route summary chip
         const km = (route.distance / 1000).toFixed(1);
         const mins = Math.round(route.duration / 60);
         const chip = document.getElementById('routeChip');
@@ -118,8 +122,8 @@ function buildMapHtml(
       const el = document.getElementById('noRoute');
       if (el) el.style.display = 'flex';
     }
-  ` : `
-    // No user location — just show destination
+  `
+    : `
     const el = document.getElementById('noUser');
     if (el) el.style.display = 'flex';
   `;
@@ -141,7 +145,6 @@ function buildMapHtml(
       100% { box-shadow: 0 0 0 0   rgba(37,99,235,0);   }
     }
 
-    /* Floating overlays */
     .overlay {
       position: absolute;
       z-index: 1000;
@@ -196,16 +199,13 @@ function buildMapHtml(
 <body>
   <div id="map"></div>
 
-  <!-- Loading indicator -->
   <div id="status" class="overlay">
     <div class="spinner"></div>
     <span style="color:#475569;font-weight:600;">Finding best route…</span>
   </div>
 
-  <!-- Route summary chip -->
   <div id="routeChip" class="overlay"></div>
 
-  <!-- Fallbacks -->
   <div id="noRoute" class="overlay">⚠️ Route unavailable — navigate manually</div>
   <div id="noUser"  class="overlay">📍 Enable location to see route</div>
 
@@ -217,7 +217,6 @@ function buildMapHtml(
       maxZoom: 19,
     }).addTo(map);
 
-    // ── Destination marker (red) ──
     const destIcon = L.divIcon({
       className: '',
       html: \`<div style="
@@ -235,6 +234,11 @@ function buildMapHtml(
 
     ${userMarkerJs}
     ${routeJs}
+
+    // Notify RN that the map loaded successfully
+    window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
+      JSON.stringify({ type: 'mapLoaded' })
+    );
   </script>
 </body>
 </html>`;
@@ -253,18 +257,75 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
 }) => {
   const { t } = useTranslation();
 
+  const webViewRef = useRef<WebView>(null);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [webViewKey, setWebViewKey] = useState(0);
+  const [mapError, setMapError] = useState(false);
+  const [mapLoading, setMapLoading] = useState(true);
+
   const html = useMemo(
-    () => buildMapHtml(
-      centerName,
-      centerLat,
-      centerLng,
-      userLat ?? null,
-      userLng ?? null,
-    ),
-    // Recompute only when coords or name change, not on every render
+    () =>
+      buildMapHtml(
+        centerName,
+        centerLat,
+        centerLng,
+        userLat ?? null,
+        userLng ?? null,
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [centerName, centerLat, centerLng, userLat, userLng],
+    [centerName, centerLat, centerLng, userLat, userLng, webViewKey],
   );
+
+  // Reset state whenever the modal opens or is retried
+  useEffect(() => {
+    if (visible) {
+      setMapError(false);
+      setMapLoading(true);
+    }
+    return () => {
+      if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    };
+  }, [visible, webViewKey]);
+
+  // 12-second timeout — if mapLoaded never fires, show the error screen
+  useEffect(() => {
+    if (mapLoading && !mapError) {
+      loadTimeoutRef.current = setTimeout(() => {
+        setMapLoading(false);
+        setMapError(true);
+      }, 12_000);
+    } else {
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
+    }
+  }, [mapLoading, mapError]);
+
+  const handleWebViewMessage = useCallback((event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'mapLoaded') {
+        setMapLoading(false);
+        setMapError(false);
+      }
+    } catch (_) {}
+  }, []);
+
+  const handleWebViewError = useCallback(() => {
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+    setMapLoading(false);
+    setMapError(true);
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setMapError(false);
+    setMapLoading(true);
+    setWebViewKey((k) => k + 1); // remounts the WebView
+  }, []);
 
   return (
     <Modal
@@ -289,7 +350,6 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
           <Text className="text-[15px] font-bold text-slate-800" numberOfLines={1}>
             {centerName}
           </Text>
-          
         </View>
 
         <TouchableOpacity
@@ -324,23 +384,114 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
         </View>
       </View>
 
-      {/* ── Map ── */}
-      <WebView
-        className="flex-1"
-        source={{ html }}
-        originWhitelist={['*']}
-        javaScriptEnabled
-        domStorageEnabled
-        startInLoadingState
-        renderLoading={() => (
-          <View className="flex-1 items-center justify-center bg-slate-50 absolute inset-0">
-            <ActivityIndicator size="large" color="#2563EB" />
-            <Text className="text-slate-400 text-[13px] mt-3">
+      {/* ── Map area ── */}
+      <View style={styles.mapArea}>
+        {/* WebView — always mounted so it can load in background */}
+        <WebView
+          key={webViewKey}
+          ref={webViewRef}
+          style={[styles.webview, mapError && styles.hidden]}
+          source={{ html }}
+          originWhitelist={['*']}
+          javaScriptEnabled
+          domStorageEnabled
+          startInLoadingState={false}
+          onMessage={handleWebViewMessage}
+          onError={handleWebViewError}
+          onHttpError={handleWebViewError}
+        />
+
+        {/* Loading overlay */}
+        {mapLoading && !mapError && (
+          <View style={styles.overlay}>
+            <ActivityIndicator size="large" color={THEME.primary} />
+            <Text style={styles.loadingText}>
               {t('emergency.evacuation.routeModal.loadingMap')}
             </Text>
           </View>
         )}
-      />
+
+        {/* Error / retry overlay */}
+        {mapError && (
+          <View style={styles.overlay}>
+            <WifiOff size={48} color={THEME.primary} style={styles.errorIcon} />
+            <Text style={styles.errorTitle}>Map failed to load</Text>
+            <Text style={styles.errorSubtitle}>
+              Check your connection and try again.
+            </Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={handleRetry}
+              activeOpacity={0.8}
+            >
+              <RefreshCw size={16} color="#fff" />
+              <Text style={styles.retryButtonText}>Reload Map</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     </Modal>
   );
 };
+
+const styles = StyleSheet.create({
+  mapArea: {
+    flex: 1,
+    position: 'relative',
+    backgroundColor: '#F8FAFC',
+  },
+  webview: {
+    flex: 1,
+  },
+  hidden: {
+    // Keep WebView mounted but invisible during error so retry remount is clean
+    opacity: 0,
+    position: 'absolute',
+    width: 0,
+    height: 0,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#94A3B8',
+  },
+  errorIcon: {
+    marginBottom: 16,
+    opacity: 0.85,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: THEME.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+});

@@ -16,7 +16,7 @@ import {
   Bell,
   Check,
 } from 'lucide-react-native';
-
+import { THEME } from '@/constants/theme';
 export default function SettingsScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
@@ -36,7 +36,7 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-neutral-50" edges={["top", "bottom"]}>
       {/* Header */}
-      <View className="bg-primary-600 px-4 py-4">
+      <View style={{ backgroundColor: THEME.primaryDark }} className="px-4 py-4">
         <View className="flex-row items-center">
           <TouchableOpacity
             onPress={() => navigation.goBack()}

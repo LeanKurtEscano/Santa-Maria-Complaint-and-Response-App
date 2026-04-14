@@ -205,8 +205,8 @@ export function HeroHeader({
 
   return (
     <Animated.View
-      className="px-5 bg-primary-600 overflow-hidden"
-      style={{ paddingTop, paddingBottom }}
+      className="px-5  overflow-hidden"
+      style={{ paddingTop, paddingBottom, backgroundColor: THEME.primary }}
     >
       <ParallaxBlob scrollY={scrollY} size={200} top={-50} right={-50} speed={0.25} opacity={0.05} />
       <ParallaxBlob scrollY={scrollY} size={160} top={60}  left={-30}  speed={0.4}  opacity={0.04} />

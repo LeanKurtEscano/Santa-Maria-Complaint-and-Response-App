@@ -679,6 +679,7 @@ const resources = {
   "emptyTitle": "All caught up!",
   "emptySubtitle": "No notifications yet. We'll let you know when something happens.",
   "type": {
+     "rejected": "Rejected", 
  
     "update": "Update",
     "success": "Success",
@@ -688,7 +689,7 @@ const resources = {
     "info": "Existing Incident"
   },
   "title": {
-  
+      "rejected": "Complaint Rejected",
     "update": "Complaint Update",
     "success": "Success",
     "complaint_resolved": "Complaint Resolved",
@@ -703,6 +704,7 @@ const resources = {
     "complaint_resolved": "Your complaint '{{title}}' has been resolved.",
     "complaint_under_review": "Your complaint '{{title}}' is now under review.",
     "complaint_update": "Your complaint has been forwarded to the department for further processing.",
+    "rejected": "Your complaint regarding on '{{title}}' has been rejected.",
     "info": "Your complaint is already part of an existing incident. Similar complaints have already been submitted for this incident."
   }
 }
@@ -1385,6 +1387,7 @@ const resources = {
   "emptyTitle": "Wala kang bagong notification!",
   "emptySubtitle": "Walang mga notification pa. Inonotify ka namin kapag may nangyari.",
   "type": {
+    "rejected": "Rejected", 
   
     "update": "Update",
     "success": "Matagumpay",
@@ -1394,7 +1397,7 @@ const resources = {
     "info": "Kasalukuyang Insidente"
   },
   "title": {
-    
+    "rejected": "Reklamo ay Rejected",
     "update": "Update sa Reklamo",
     "success": "Matagumpay",
     "complaint_resolved": "Nalutas na ang Reklamo",
@@ -1403,6 +1406,7 @@ const resources = {
     "info": "Bahagi na ng Kasalukuyang Insidente"
   },
   "message": {
+    "rejected": "Ang iyong reklamo '{{title}}' ay hindi tinanggap. Mangyaring suriin ang mga detalye at subukan muli.",
    
     "update": "Na-update na ang iyong reklamo.",
     "success": "Ang iyong reklamo '{{title}}' ay matagumpay na naresolva.",

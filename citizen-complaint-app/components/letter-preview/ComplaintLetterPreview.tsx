@@ -67,7 +67,7 @@ export default function ComplaintLetterPreview({
     <SafeAreaView className="flex-1" style={{ backgroundColor: THEME.primary }}>
 
       {/* ── Top Bar ── */}
-      <View className="flex-row items-center justify-between px-4 py-3" style={{ backgroundColor: THEME.primary }}>
+      <View className="flex-row items-center justify-between  px-4 py-3" style={{ backgroundColor: THEME.primary }}>
         <TouchableOpacity
           onPress={onBack}
           className="flex-row items-center gap-1.5 py-2 px-3 rounded-lg bg-white"
@@ -98,7 +98,7 @@ export default function ComplaintLetterPreview({
 
         {/* ── Bond Paper Card ── */}
         <View
-          className="bg-white rounded-none border border-stone-200 px-7 py-8"
+          className="bg-white  border rounded-2xl border-stone-200 px-7 py-8"
           style={{
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 4 },

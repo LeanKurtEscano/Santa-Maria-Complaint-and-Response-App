@@ -87,14 +87,6 @@ const NotificationCard = React.memo(({
           item.is_read
             ? { backgroundColor: "#ffffff", borderWidth: 1, borderColor: "#f1f5f9" }
             : { backgroundColor: `${THEME.primary}0f`, borderWidth: 1, borderColor: `${THEME.primary}30` },
-          Platform.OS === "ios"
-            ? {
-                shadowColor: "#94A3B8",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.07,
-                shadowRadius: 8,
-              }
-            : isNew ? undefined : { elevation: 2 },
         ]}
       >
         {/* Unread dot */}
@@ -114,9 +106,9 @@ const NotificationCard = React.memo(({
         {/* Body */}
         <View className="flex-1 gap-1">
           <View className="flex-row items-center justify-between mb-0.5">
-            <View className={`px-2 py-0.5 rounded-full ${config.badgeClass}`}>
+            <View className={`px-2 py-0.5 border border-gray-100 rounded-full ${config.badgeClass}`}>
               <Text
-                className={`text-[10px] font-bold uppercase tracking-wider ${config.badgeTextClass}`}
+                className={`text-[10px] font-bold  uppercase tracking-wider ${config.badgeTextClass}`}
               >
                 {t(config.labelKey)}
               </Text>

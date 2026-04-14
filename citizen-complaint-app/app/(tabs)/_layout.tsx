@@ -25,17 +25,10 @@ export default function TabsLayout() {
   }, [isConnected, queryClient]);
 
   const bottomInset = insets.bottom > 0 ? insets.bottom : 8;
+  const tabBarHeight = 58 + bottomInset;
 
   return (
-    <View className="flex-1">
-      {isConnected === false && (
-        <View style={{ backgroundColor: THEME.primary }} className="py-3 px-4">
-          <Text className="text-white text-center font-semibold">
-            ⚠️ Please check your internet connection
-          </Text>
-        </View>
-      )}
-
+    <View style={{ flex: 1 }}>
       <Tabs
         screenOptions={{
           headerShown: false,
@@ -43,11 +36,11 @@ export default function TabsLayout() {
           tabBarInactiveTintColor: '#9CA3AF',
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
-            borderTopWidth: 1,
+            borderTopWidth: isConnected === false ? 0 : 1,
             borderTopColor: '#E5E7EB',
-            height: 58 + bottomInset,
+            height: tabBarHeight,
             paddingBottom: bottomInset,
-            paddingTop: 8,
+            paddingTop: isConnected === false ? 36 : 8, // push icons down to make room for banner
             elevation: 8,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: -2 },
@@ -62,6 +55,37 @@ export default function TabsLayout() {
           tabBarIconStyle: {
             marginTop: Platform.OS === 'android' ? 4 : 0,
           },
+          // Render the offline banner as the tab bar background
+          tabBarBackground: () =>
+            isConnected === false ? (
+              <View style={{ flex: 1 }}>
+                {/* Offline banner pinned to top of tab bar */}
+                <View
+                  style={{
+                    backgroundColor: '#EF4444',
+                    paddingVertical: 6,
+                    paddingHorizontal: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: '600',
+                      letterSpacing: 0.2,
+                    }}
+                  >
+                    ⚠️ Please fix your internet connection
+                  </Text>
+                </View>
+                {/* White fill for the rest of the tab bar */}
+                <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />
+              </View>
+            ) : (
+              <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />
+            ),
         }}
       >
         <Tabs.Screen
@@ -70,7 +94,7 @@ export default function TabsLayout() {
             title: "Home",
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
-            )
+            ),
           }}
         />
 
@@ -80,7 +104,7 @@ export default function TabsLayout() {
             title: "Complaints",
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? "document-text" : "document-text-outline"} size={24} color={color} />
-            )
+            ),
           }}
         />
 
@@ -90,7 +114,7 @@ export default function TabsLayout() {
             title: "Notif",
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? "notifications" : "notifications-outline"} size={24} color={color} />
-            )
+            ),
           }}
         />
 
@@ -100,15 +124,21 @@ export default function TabsLayout() {
             title: "Emergency",
             tabBarActiveTintColor: '#EF4444',
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? "warning" : "warning-outline"} size={24} color={focused ? '#EF4444' : color} />
+              <Ionicons
+                name={focused ? "warning" : "warning-outline"}
+                size={24}
+                color={focused ? '#EF4444' : color}
+              />
             ),
             tabBarLabel: ({ focused }) => (
-              <Text style={{
-                fontSize: 12,
-                fontWeight: '600',
-                color: focused ? '#EF4444' : '#9CA3AF',
-                marginBottom: Platform.OS === 'android' ? 4 : 0,
-              }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '600',
+                  color: focused ? '#EF4444' : '#9CA3AF',
+                  marginBottom: Platform.OS === 'android' ? 4 : 0,
+                }}
+              >
                 Emergency
               </Text>
             ),
@@ -121,7 +151,7 @@ export default function TabsLayout() {
             title: "Profile",
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
-            )
+            ),
           }}
         />
       </Tabs>

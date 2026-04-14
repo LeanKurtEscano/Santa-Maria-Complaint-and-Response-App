@@ -21,6 +21,7 @@ export interface SSENotificationData {
     | 'new_incident_forwarded_to_lgu'
     | 'new_incident_forwarded_to_department'
     | 'info'
+    | 'rejected'
     | 'announcement';
   [key: string]: any;
 }

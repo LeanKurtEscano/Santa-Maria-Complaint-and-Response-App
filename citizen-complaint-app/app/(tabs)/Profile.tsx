@@ -31,6 +31,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import GeneralToast from '@/components/Toast/GeneralToast';
 import { formatName } from '@/utils/general/name';
+import { THEME } from '@/constants/theme';
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
@@ -87,7 +88,7 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <View className="bg-primary-600 px-6 pt-6 pb-12">
+        <View style={{ backgroundColor: THEME.primary }} className=" px-6 pt-6 pb-12">
           <View className="flex-row items-center justify-between">
             <Text className="text-white text-2xl font-bold">{t('profile.title')}</Text>
             <TouchableOpacity
