@@ -11,7 +11,8 @@ import { useState, useMemo, useCallback, useRef } from 'react';
 import { Barangay } from '@/types/general/barangay';
 import { getBarangayCoords, DEFAULT_COORDS } from '@/constants/general/barangay';
 import { THEME } from '@/constants/theme';
-
+import GeneralToast from '@/components/Toast/GeneralToast';
+import useToastStore from '@/store/useGlobalModal';
 export default function ComplaintsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function ComplaintsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
+  const { setToastVisible,toastVisible, toastMessage, toastType, showToast } = useToastStore();
 
   const { data, isPending, error, refetch } = useQuery({
     queryKey: ['barangays'],
@@ -227,6 +229,12 @@ export default function ComplaintsScreen() {
           />
         </View>
       )}
+       <GeneralToast
+        visible={toastVisible}
+        onHide={() => setToastVisible(false)}
+        message={toastMessage}
+        type={toastType}
+      /> 
     </SafeAreaView>
   );
 }

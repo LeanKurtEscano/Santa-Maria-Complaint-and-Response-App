@@ -106,7 +106,12 @@ console.log('Is Reset Password:', isResetPassword);
     if (!canResend) return;
     clearErrors();
     try {
-      await authApiClient.post(otpResendRoute || '/register', { email: await getEmail() });
+      if(isResetPassword) {
+        await userApiClient.post(otpResendRoute || '/verify-reset-password-otp', { email: await getEmail() });
+      } else {
+         await authApiClient.post(otpResendRoute || '/register', { email: await getEmail() });
+      }
+     
       setResendTimer(60);
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);

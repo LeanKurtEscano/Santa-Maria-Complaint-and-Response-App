@@ -734,8 +734,10 @@ const resources = {
   "emptyTitle": "All caught up!",
   "emptySubtitle": "No notifications yet. We'll let you know when something happens.",
   "type": {
-     "rejected": "Rejected", 
- 
+    "rejected": "Rejected",
+    "rejected_by_lgu": "Rejected",
+    "rejected_by_department": "Rejected",
+    "rejected_by_barangay": "Rejected",
     "update": "Update",
     "success": "Success",
     "complaint_resolved": "Resolved",
@@ -744,7 +746,10 @@ const resources = {
     "info": "Existing Incident"
   },
   "title": {
-      "rejected": "Complaint Rejected",
+    "rejected": "Complaint Rejected",
+    "rejected_by_lgu": "Complaint Rejected",
+    "rejected_by_department": "Complaint Rejected",
+    "rejected_by_barangay": "Complaint Rejected",
     "update": "Complaint Update",
     "success": "Success",
     "complaint_resolved": "Complaint Resolved",
@@ -753,17 +758,18 @@ const resources = {
     "info": "Already Part of an Incident"
   },
   "message": {
- 
     "update": "Your complaint has been updated.",
-    "success":"Your complaint '{{title}}' has been successfully resolved.",
+    "success": "Your complaint '{{title}}' has been successfully resolved.",
     "complaint_resolved": "Your complaint '{{title}}' has been resolved.",
     "complaint_under_review": "Your complaint '{{title}}' is now under review.",
     "complaint_update": "Your complaint has been forwarded to the department for further processing.",
-    "rejected": "Your complaint regarding on '{{title}}' has been rejected.",
+    "rejected": "Your complaint regarding '{{title}}' has been rejected.",
+    "rejected_by_lgu": "Your complaint regarding '{{title}}' has been rejected by the LGU due to insufficient information or other reasons. Please review the details and consider resubmitting a new complaint.",
+    "rejected_by_department": "Your complaint regarding '{{title}}' has been rejected by the Department due to insufficient information or other reasons. Please review the details and consider resubmitting a new complaint.",
+    "rejected_by_barangay": "Your complaint regarding '{{title}}' has been rejected by the Barangay due to insufficient information or other reasons. Please review the details and consider resubmitting a new complaint.",
     "info": "Your complaint is already part of an existing incident. Similar complaints have already been submitted for this incident."
   }
 }
-
     
 
 
@@ -1498,27 +1504,34 @@ const resources = {
   "emptyTitle": "Wala kang bagong notification!",
   "emptySubtitle": "Walang mga notification pa. Inonotify ka namin kapag may nangyari.",
   "type": {
-    "rejected": "Rejected", 
-  
+   "rejected": "Rejected",
+    "rejected_by_lgu": "Rejected",
+    "rejected_by_department": "Rejected",
+    "rejected_by_barangay": "Rejected",
     "update": "Update",
     "success": "Matagumpay",
-    "complaint_resolved": "Nalutas na",
-    "complaint_under_review": "Sinusuri",
-    "complaint_update": "Ipinasa sa Departamento",
+    "complaint_resolved": "Nalutas",
+    "complaint_under_review": "Nirereview",
+    "complaint_update": "Ipinasa",
     "info": "Kasalukuyang Insidente"
   },
   "title": {
-    "rejected": "Reklamo ay Rejected",
+   "rejected": "Nireject ang Reklamo",
+    "rejected_by_lgu": "Nirejected ng LGU ang Reklamo",
+    "rejected_by_department": "Nirejected ng Department ang Reklamo",
+    "rejected_by_barangay": "Nirejected ng Barangay ang Reklamo",
     "update": "Update sa Reklamo",
     "success": "Matagumpay",
-    "complaint_resolved": "Nalutas na ang Reklamo",
-    "complaint_under_review": "Reklamo ay Sinusuri",
+    "complaint_resolved": "Nalutas ang Reklamo",
+    "complaint_under_review": "Reklamo ay Nirereview",
     "complaint_update": "Reklamo ay Ipinasa sa Departamento",
-    "info": "Bahagi na ng Kasalukuyang Insidente"
+    "info": "Bahagi na ng Isang Insidente"
   },
   "message": {
     "rejected": "Ang iyong reklamo '{{title}}' ay hindi tinanggap. Mangyaring suriin ang mga detalye at subukan muli.",
-   
+    "rejected_by_lgu": "Ang iyong reklamo '{{title}}' ay hindi tinanggap ng LGU. Mangyaring suriin ang mga detalye at subukan muli.",
+    "rejected_by_department": "Ang iyong reklamo '{{title}}' ay hindi tinanggap ng Department. Mangyaring suriin ang mga detalye at subukan muli.",
+    "rejected_by_barangay": "Ang iyong reklamo '{{title}}' ay hindi tinanggap ng Barangay. Mangyaring suriin ang mga detalye at subukan muli.",
     "update": "Na-update na ang iyong reklamo.",
     "success": "Ang iyong reklamo '{{title}}' ay matagumpay na naresolva.",
     "complaint_resolved": "Ang iyong reklamo na '{{title}}' ay nalutas na.",

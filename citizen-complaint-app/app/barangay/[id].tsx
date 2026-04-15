@@ -26,7 +26,7 @@ import { InstructionsStep } from '@/components/complaint/complaint-proccess/Inst
 import { FormStep } from '@/components/complaint/complaint-proccess/FormStep';
 import { LocationStep } from '@/components/complaint/complaint-proccess/LocationStep';
 import { COMPLAINT_DETAILS_MAX_LENGTH, COMPLAINT_DETAILS_MIN_LENGTH } from '@/components/complaint/complaint-proccess/FormStep';
-
+import useToastStore from '@/store/useGlobalModal';
 
 // ─── Step type ────────────────────────────────────────────────────────────────
 type Step = 'instructions' | 'form' | 'location';
@@ -50,7 +50,7 @@ export default function ComplaintFormScreen() {
 
   // ── Step ────────────────────────────────────────────────────────────────────
   const [step, setStep] = useState<Step>('instructions');
-
+  const { showToast:showGlobalToast } = useToastStore();
   // ── Title / category ────────────────────────────────────────────────────────
   const [selectedPreset, setSelectedPreset]   = useState<PresetTitle | null>(null);
   const [customTitle, setCustomTitle]         = useState('');
@@ -228,6 +228,7 @@ const validateForm = (): boolean => {
       if (response.status === 201) {
         showToast('Complaint submitted successfully!', 'success');
         // Reset all state
+        showGlobalToast('Complaint submitted successfully!', 'success');
         resetAttachments();
         setSelectedPreset(null);
         setCustomTitle('');

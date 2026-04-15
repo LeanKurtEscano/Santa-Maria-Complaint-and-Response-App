@@ -79,6 +79,7 @@ type ComplaintStatus =
   | "forwarded_to_department"
   | "reviewed_by_department"
   | "resolved_by_department"
+   | "rejected_by_barangay"
   | "rejected";
 
 type StepState = "completed" | "active" | "pending" | "rejected";
@@ -102,7 +103,7 @@ function getTrackerSteps(
     status === "resolved_by_lgu" ||
     status === "resolved_by_department";
 
-  const isRejectedByBarangay = status === "rejected";
+  const isRejectedByBarangay = status === "rejected" || status === "rejected_by_barangay";
 
   const statusOrder: Record<ComplaintStatus, number> = {
     submitted: 0,

@@ -91,9 +91,18 @@ export function formatDate(iso: string, options?: Intl.DateTimeFormatOptions) {
   });
 }
 
-export function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-PH", {
+export function formatTime(raw: string) {
+  // Convert "2026-04-15 15:15:19.162658" → "2026-04-15T15:15:19"
+  const isoLike = raw.replace(" ", "T").split(".")[0];
+
+  const date = new Date(isoLike);
+
+  if (isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("en-PH", {
+    timeZone: "Asia/Manila",
     hour: "2-digit",
     minute: "2-digit",
-  });
+    hour12: true,
+  }).format(date);
 }

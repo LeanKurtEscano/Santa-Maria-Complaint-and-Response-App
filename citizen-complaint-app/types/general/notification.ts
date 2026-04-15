@@ -8,7 +8,11 @@ export type NotificationType =
   | "complaint_update"
   | "complaint_resolved"
   | "complaint_under_review"
-  | "existing_incident";
+  | "existing_incident"
+  | "rejected_by_lgu"
+  | "rejected_by_department"
+  | "rejected_by_barangay";
+
 
 export interface Notification {
   id: number;
@@ -35,6 +39,9 @@ const EVENT_TO_TYPE: Record<string, NotificationType> = {
   complaint_update: "complaint_update",
   existing_incident: "existing_incident",
   message: "info",
+  rejected_by_lgu: "rejected_by_lgu",
+  rejected_by_department: "rejected_by_department",
+  rejected_by_barangay: "rejected_by_barangay",
 };
 
 // ─── Type config ──────────────────────────────────────────────────────────────
