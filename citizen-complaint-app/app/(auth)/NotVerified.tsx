@@ -2,7 +2,7 @@ import { View, Text, TouchableOpacity, ScrollView, RefreshControl } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
-import { MailCheck } from 'lucide-react-native';
+import { MailX } from 'lucide-react-native';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next'; // or your i18n hook
 
@@ -37,7 +37,7 @@ export default function NotVerifiedScreen() {
         }
       >
         <View className="flex-1 items-center justify-center px-8 py-12">
-          <MailCheck size={64} color="#10B981" />
+          <MailX size={64} color="#EF4444" />
           <Text className="text-2xl font-bold text-neutral-900 mt-6 mb-3 text-center">
             {t('notVerified.title')}
           </Text>

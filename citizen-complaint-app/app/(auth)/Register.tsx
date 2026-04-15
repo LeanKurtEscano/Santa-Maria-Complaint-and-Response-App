@@ -1557,5 +1557,5 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  );
+  ); 
 }

@@ -16,7 +16,8 @@ import { ArrowLeft, Mail, AlertCircle, CheckCircle, WifiOff, Clock, ShieldAlert 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApiClient } from '@/lib/client/user';
 import { THEME } from '@/constants/theme';
-
+import { useLocalSearchParams } from "expo-router";
+import { userApiClient } from '@/lib/client/user';
 interface OTPVerificationScreenProps {
   navigation?: any;
   route?: {
@@ -35,6 +36,7 @@ type ErrorType = 'invalid_otp' | 'expired_otp' | 'server' | 'validation' | 'gene
 export default function OTPVerificationScreen({ navigation, route }: OTPVerificationScreenProps) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { apiRoute, otpResendRoute } = useLocalSearchParams();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -42,12 +44,26 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
   const [networkError, setNetworkError] = useState('');
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
-
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const [email, setEmail] = useState('');
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
-  const email = route?.params?.email || '';
-  const apiRoute = route?.params?.apiRoute;
-  const isResetPassword = apiRoute === 'verify-reset-password-otp';
+ const getEmail = async () => {
+  const storedEmail = await AsyncStorage.getItem('resetEmail');
+
+  const email =
+    storedEmail && apiRoute === '/verify-reset-password-otp'
+      ? storedEmail
+      : route?.params?.email || '';
+
+  return email;
+};
+   
+// Update this line to handle both with and without leading slash
+
+const isResetPassword = apiRoute === 'verify-reset-password-otp' || apiRoute === '/verify-reset-password-otp';
+console.log('API Route:', apiRoute);
+console.log('Is Reset Password:', isResetPassword);
 
   useEffect(() => {
     if (resendTimer > 0) {
@@ -90,7 +106,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     if (!canResend) return;
     clearErrors();
     try {
-      await authApiClient.post(route?.params?.otpResendRoute || '/register', { email });
+      await authApiClient.post(otpResendRoute || '/register', { email: await getEmail() });
       setResendTimer(60);
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);
@@ -156,7 +172,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
     try {
       if (isResetPassword) {
-        const response = await authApiClient.post(`/${apiRoute}`, { email, otp: otpString });
+        const response = await userApiClient.post(`${apiRoute}`, { email: await getEmail(), otp: otpString });
         if (response.status !== 200) {
           setErrorMessage(t('otpVerificationFailed'));
           setErrorType('generic');
@@ -165,7 +181,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
         }
         router.push({
           pathname: '/(auth)/ResetPassword',
-          params: { email },
+          params: { email: await getEmail() },
         });
       } else {
         const registrationDataString = await AsyncStorage.getItem('registrationData');
@@ -230,9 +246,10 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
         if (response.status === 201) {
           await AsyncStorage.removeItem('registrationData');
+           router.push('/(auth)/NotVerified');
         }
 
-        router.push('/(auth)');
+       
       }
     } catch (err: any) {
       const status = err?.response?.status;
@@ -300,8 +317,9 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     return `${maskedUsername}@${domain}`;
   };
 
-  const getInputStyle = (digit: string) => {
+  const getInputStyle = (digit: string, isFocused: boolean) => {
     const hasOtpError = errorType === 'invalid_otp' || errorType === 'expired_otp';
+    
     if (hasOtpError) {
       return {
         borderColor: '#DC2626',
@@ -309,13 +327,23 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
         color: '#B91C1C',
       };
     }
-    if (digit) {
+    
+    if (isFocused) {
       return {
-        borderColor: THEME.primary[600],
-        backgroundColor: THEME.primary[50],
-        color: THEME.primary[700],
+        borderColor: THEME.primary,
+        backgroundColor: THEME.primary + '10',
+        color: THEME.primary,
       };
     }
+    
+    if (digit) {
+      return {
+        borderColor: THEME.primary,
+        backgroundColor: THEME.primary + '10',
+        color: THEME.primary,
+      };
+    }
+    
     return {
       borderColor: '#D1D5DB',
       backgroundColor: '#FFFFFF',
@@ -355,6 +383,22 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
       Icon: AlertCircle,
     },
   };
+
+
+  useEffect(() => {
+  const loadEmail = async () => {
+    const storedEmail = await AsyncStorage.getItem('resetEmail');
+
+    const finalEmail =
+      storedEmail && apiRoute === '/verify-reset-password-otp'
+        ? storedEmail
+        : route?.params?.email || '';
+
+    setEmail(finalEmail);
+  };
+
+  loadEmail();
+}, [apiRoute, route?.params?.email]);
 
   const activeError = errorType ? errorConfig[errorType] : null;
   const isAboveCardError = errorType === 'server' || errorType === 'validation';
@@ -444,10 +488,15 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
                     value={digit}
                     onChangeText={(value) => handleOtpChange(value, index)}
                     onKeyPress={(e) => handleKeyPress(e, index)}
+                    onFocus={() => setFocusedIndex(index)}
+                    onBlur={() => setFocusedIndex(null)}
                     keyboardType="number-pad"
                     maxLength={1}
                     className="w-12 h-14 border-2 rounded-xl text-center text-xl font-bold"
-                    style={[{ textAlignVertical: 'center', backgroundColor:THEME.primary }, getInputStyle(digit)]}
+                    style={[
+                      { textAlignVertical: 'center' },
+                      getInputStyle(digit, focusedIndex === index)
+                    ]}
                   />
                 ))}
               </View>
@@ -490,7 +539,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
             {/* Info notice */}
             <View
               className="rounded-xl p-4 mb-6"
-              style={{ backgroundColor: THEME.primary[50] }}
+              style={{ backgroundColor: THEME.primary + '20' }}
             >
               <View className="flex-row items-start">
                 <View
@@ -502,13 +551,13 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
                 <View className="flex-1">
                   <Text
                     className="text-sm font-semibold mb-1"
-                    style={{ color: THEME.primary[900] }}
+                    style={{ color: THEME.primary }}
                   >
                     {t('importantNotice')}
                   </Text>
                   <Text
                     className="text-sm leading-5"
-                    style={{ color: THEME.primary[800] }}
+                    style={{ color: THEME.primary }}
                   >
                     {t('otpVerificationNotice')}
                   </Text>

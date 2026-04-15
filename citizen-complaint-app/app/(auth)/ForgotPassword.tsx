@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, AlertCircle, WifiOff, ShieldAlert } from 'lucide-react-native';
 import { userApiClient } from '@/lib/client/user';
 import { THEME } from '@/constants/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 type ErrorType = 'not_found' | 'server' | 'validation' | 'generic' | null;
 
 export default function ForgotPassword() {
@@ -59,8 +60,15 @@ export default function ForgotPassword() {
 
     try {
       await userApiClient.post('/request-reset-password', { email: email.trim() });
+      AsyncStorage.setItem('resetEmail', email.trim());
 
-     router.replace({ pathname: '/(auth)/Otp', params: { email: email, apiRoute: '/verify-reset-password-otp' } });
+   router.push({
+  pathname: "/(auth)/Otp",
+  params: {
+    apiRoute: "/verify-reset-password-otp",
+    otpResendRoute: "/request-reset-password",
+  },
+});
     } catch (err: any) {
       const status = err?.response?.status;
 
