@@ -21,9 +21,9 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { THEME } from '@/constants/theme';
 
 // ─── Provider Interface ───────────────────────────────────────────────────────
-// Any map engine must satisfy this contract.
 
 export interface MapDisplayProps {
   latitude: number;
@@ -41,6 +41,13 @@ export interface MapProvider {
 
 export const LeafletProvider: MapProvider = {
   render: ({ latitude, longitude, zoom = 15, height = 200 }) => {
+    // Derive a darker shade for the marker stroke from THEME.primary.
+    // If THEME has a primaryDark token, prefer that; otherwise we just use
+    // the primary color for both fill and stroke (still looks great).
+    const markerFill = THEME.primary;
+    const markerStroke = (THEME as any).primaryDark ?? THEME.primary;
+    const markerInner = THEME.primary;
+
     const html = `
       <!DOCTYPE html>
       <html>
@@ -82,9 +89,9 @@ export const LeafletProvider: MapProvider = {
                 <svg width="36" height="42" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
                   <ellipse cx="20" cy="48" rx="8" ry="3" fill="rgba(0,0,0,0.2)"/>
                   <path d="M20 0C11.716 0 5 6.716 5 15c0 8.284 15 35 15 35s15-26.716 15-35C35 6.716 28.284 0 20 0z"
-                        fill="#2563EB" stroke="#1E40AF" stroke-width="1.5"/>
+                        fill="${markerFill}" stroke="${markerStroke}" stroke-width="1.5"/>
                   <circle cx="20" cy="15" r="6" fill="white"/>
-                  <circle cx="20" cy="15" r="3" fill="#2563EB"/>
+                  <circle cx="20" cy="15" r="3" fill="${markerInner}"/>
                 </svg>
               \`,
               iconSize: [36, 42],
@@ -111,7 +118,6 @@ export const LeafletProvider: MapProvider = {
 };
 
 // ─── MapDisplay Component ─────────────────────────────────────────────────────
-// Thin wrapper — all it does is delegate to the provider.
 
 interface Props extends MapDisplayProps {
   provider?: MapProvider;

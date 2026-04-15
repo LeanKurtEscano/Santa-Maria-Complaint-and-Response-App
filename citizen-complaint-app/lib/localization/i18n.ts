@@ -633,7 +633,11 @@ const resources = {
       "home": {
         "resident": "Resident",
         "stay_updated": "Stay updated with your community today.",
-        "weather_fair": "Fair"
+        "weather_fair": "Fair",
+
+        "errors" : {
+          "screenTitle": "Unable to Load Home Screen",
+        }
       },
 
 
@@ -1367,7 +1371,11 @@ const resources = {
       "home": {
         "resident": "Residente",
         "stay_updated": "Manatiling updated sa iyong komunidad ngayong araw.",
-        "weather_fair": "Maaliwalas"
+        "weather_fair": "Maaliwalas",
+
+           "errors" : {
+          "screenTitle": "Hindi Ma-load ang Home Screen",
+        }
       },
 
      "emergency": {

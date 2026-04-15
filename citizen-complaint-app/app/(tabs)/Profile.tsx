@@ -32,6 +32,7 @@ import { useRouter } from 'expo-router';
 import GeneralToast from '@/components/Toast/GeneralToast';
 import { formatName } from '@/utils/general/name';
 import { THEME } from '@/constants/theme';
+
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
@@ -60,7 +61,7 @@ export default function ProfileScreen() {
     return (
       <SafeAreaView className="flex-1 bg-white">
         <View className="flex-1 justify-center items-center">
-          <ActivityIndicator size="large" color="#10B981" />
+          <ActivityIndicator size="large" color={THEME.primary} />
           <Text className="text-neutral-600 mt-4">{t('profile.loadingProfile')}</Text>
         </View>
       </SafeAreaView>
@@ -88,7 +89,7 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <View style={{ backgroundColor: THEME.primary }} className=" px-6 pt-6 pb-12">
+        <View style={{ backgroundColor: THEME.primary }} className="px-6 pt-6 pb-12">
           <View className="flex-row items-center justify-between">
             <Text className="text-white text-2xl font-bold">{t('profile.title')}</Text>
             <TouchableOpacity
@@ -112,8 +113,11 @@ export default function ProfileScreen() {
                   className="w-24 h-24 rounded-full"
                 />
               ) : (
-                <View className="w-24 h-24 rounded-full bg-primary-100 items-center justify-center">
-                  <User size={40} color="#2563EB" />
+                <View
+                  style={{ backgroundColor: THEME.primary + '1A' }}
+                  className="w-24 h-24 rounded-full items-center justify-center"
+                >
+                  <User size={40} color={THEME.primary} />
                 </View>
               )}
               <Text className="text-xl font-bold text-neutral-900 mt-4">
@@ -141,9 +145,12 @@ export default function ProfileScreen() {
                   <TouchableOpacity
                     onPress={() => setShowLocationModal(true)}
                     disabled={updateLocationMutation.isPending}
-                    className={`rounded-lg py-2.5 items-center flex-row justify-center ${
-                      updateLocationMutation.isPending ? 'bg-amber-400' : 'bg-amber-600'
-                    }`}
+                    style={{
+                      backgroundColor: updateLocationMutation.isPending
+                        ? THEME.primary + 'AA'
+                        : THEME.primary,
+                    }}
+                    className="rounded-lg py-2.5 items-center flex-row justify-center"
                     activeOpacity={0.8}
                   >
                     {updateLocationMutation.isPending ? (
@@ -166,11 +173,15 @@ export default function ProfileScreen() {
                   <TouchableOpacity
                     onPress={() => setShowMapPicker(true)}
                     disabled={updateLocationMutation.isPending}
-                    className="bg-white border border-amber-600 rounded-lg py-2.5 items-center flex-row justify-center"
+                    style={{ borderColor: THEME.primary }}
+                    className="bg-white border rounded-lg py-2.5 items-center flex-row justify-center"
                     activeOpacity={0.8}
                   >
-                    <Map size={16} color="#D97706" />
-                    <Text className="text-amber-600 font-semibold text-sm ml-2">
+                    <Map size={16} color={THEME.primary} />
+                    <Text
+                      style={{ color: THEME.primary }}
+                      className="font-semibold text-sm ml-2"
+                    >
                       {t('profile.location.pinOnMap')}
                     </Text>
                   </TouchableOpacity>
@@ -178,7 +189,7 @@ export default function ProfileScreen() {
               </View>
             )}
 
-            {/* Location Status — Enabled (compact update button only, map is shown below) */}
+            {/* Location Status — Enabled */}
             {hasLocation && (
               <View className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
                 <View className="flex-row items-center mb-2">
@@ -195,7 +206,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ── Location Map Card (shown only when lat/lng exist) ── */}
+        {/* Location Map Card */}
         {hasLocation && (
           <View className="px-6 mt-6">
             <Text className="text-lg font-bold text-neutral-900 mb-4">
@@ -206,8 +217,6 @@ export default function ProfileScreen() {
               longitude={userData.longitude}
               onUpdatePress={() => setShowMapPicker(true)}
               updateLabel={t('profile.location.updateLocation')}
-              // To swap to Google Maps later:
-              // mapProvider={GoogleMapsProvider}
             />
           </View>
         )}
@@ -324,9 +333,6 @@ export default function ProfileScreen() {
           </Text>
 
           <View className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6">
-            
-            
-
             {userData.created_at && (
               <View>
                 <Text className="text-xs font-medium text-neutral-500 mb-2">

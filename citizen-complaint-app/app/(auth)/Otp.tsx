@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, AlertCircle, CheckCircle, WifiOff, Clock, ShieldAlert } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApiClient } from '@/lib/client/user';
+import { THEME } from '@/constants/theme';
 
 interface OTPVerificationScreenProps {
   navigation?: any;
@@ -155,7 +156,6 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
     try {
       if (isResetPassword) {
-        
         const response = await authApiClient.post(`/${apiRoute}`, { email, otp: otpString });
         if (response.status !== 200) {
           setErrorMessage(t('otpVerificationFailed'));
@@ -168,7 +168,6 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
           params: { email },
         });
       } else {
-       
         const registrationDataString = await AsyncStorage.getItem('registrationData');
         if (!registrationDataString) {
           setErrorMessage(t('otpRegistrationDataNotFound'));
@@ -235,7 +234,6 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
         router.push('/(auth)');
       }
-
     } catch (err: any) {
       const status = err?.response?.status;
 
@@ -247,43 +245,34 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
           setErrorType('expired_otp');
           setOtp(['', '', '', '', '', '']);
           setTimeout(() => inputRefs.current[0]?.focus(), 100);
-
         } else if (detail.includes('Invalid OTP')) {
           setErrorMessage(t('otpIncorrect'));
           setErrorType('invalid_otp');
-
         } else if (detail.includes('ID images')) {
           setErrorMessage(t('otpIdImagesRequired'));
           setErrorType('validation');
-
         } else if (detail.includes('birthdate') || detail.includes('datetime') || detail.includes('date')) {
           setErrorMessage(t('otpInvalidDate'));
           setErrorType('validation');
-
         } else {
           setErrorMessage(detail || t('otpVerificationFailed'));
           setErrorType('generic');
         }
-
       } else if (status === 422) {
         const detail = extractErrorMessage(err?.response?.data?.detail);
         setErrorMessage(detail || t('otpValidationError'));
         setErrorType('validation');
-
       } else if (status >= 500) {
         setErrorMessage(t('otpServerError'));
         setErrorType('server');
-
       } else if (
         err?.code === 'ECONNABORTED' ||
         err?.code === 'ERR_NETWORK' ||
         err?.message === 'Network Error'
       ) {
         setNetworkError(t('otpNetworkError'));
-
       } else if (err?.code === 'ETIMEDOUT') {
         setNetworkError(t('otpRequestTimeout'));
-
       } else {
         const msg = extractErrorMessage(
           err?.response?.data?.detail || err?.response?.data?.message
@@ -311,41 +300,57 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     return `${maskedUsername}@${domain}`;
   };
 
-  const getInputClassName = (digit: string) => {
+  const getInputStyle = (digit: string) => {
     const hasOtpError = errorType === 'invalid_otp' || errorType === 'expired_otp';
-    if (hasOtpError) return 'border-error-500 bg-error-50 text-error-700';
-    if (digit) return 'border-primary-600 bg-primary-50 text-primary-700';
-    return 'border-neutral-300 bg-white text-neutral-900';
+    if (hasOtpError) {
+      return {
+        borderColor: '#DC2626',
+        backgroundColor: '#FEF2F2',
+        color: '#B91C1C',
+      };
+    }
+    if (digit) {
+      return {
+        borderColor: THEME.primary[600],
+        backgroundColor: THEME.primary[50],
+        color: THEME.primary[700],
+      };
+    }
+    return {
+      borderColor: '#D1D5DB',
+      backgroundColor: '#FFFFFF',
+      color: '#111827',
+    };
   };
 
   const errorConfig = {
     invalid_otp: {
-      containerClass: 'bg-error-50 border-error-400',
-      textClass: 'text-error-800',
+      containerStyle: { backgroundColor: '#FEF2F2', borderColor: '#F87171' },
+      textStyle: { color: '#991B1B' },
       iconColor: '#DC2626',
       Icon: AlertCircle,
     },
     expired_otp: {
-      containerClass: 'bg-amber-50 border-amber-400',
-      textClass: 'text-amber-800',
+      containerStyle: { backgroundColor: '#FFFBEB', borderColor: '#FCD34D' },
+      textStyle: { color: '#92400E' },
       iconColor: '#D97706',
       Icon: Clock,
     },
     server: {
-      containerClass: 'bg-amber-50 border-amber-400',
-      textClass: 'text-amber-800',
+      containerStyle: { backgroundColor: '#FFFBEB', borderColor: '#FCD34D' },
+      textStyle: { color: '#92400E' },
       iconColor: '#D97706',
       Icon: ShieldAlert,
     },
     validation: {
-      containerClass: 'bg-orange-50 border-orange-400',
-      textClass: 'text-orange-800',
+      containerStyle: { backgroundColor: '#FFF7ED', borderColor: '#FB923C' },
+      textStyle: { color: '#9A3412' },
       iconColor: '#EA580C',
       Icon: AlertCircle,
     },
     generic: {
-      containerClass: 'bg-error-50 border-error-400',
-      textClass: 'text-error-800',
+      containerStyle: { backgroundColor: '#FEF2F2', borderColor: '#F87171' },
+      textStyle: { color: '#991B1B' },
       iconColor: '#DC2626',
       Icon: AlertCircle,
     },
@@ -383,7 +388,10 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
           <View className="px-6 flex-1">
             {/* Icon + title */}
             <View className="items-center mb-8">
-              <View className="bg-primary-600 rounded-full p-4 mb-4">
+              <View
+                className="rounded-full p-4 mb-4"
+                style={{ backgroundColor: THEME.primary }}
+              >
                 <Mail size={32} color="#FFFFFF" />
               </View>
               <Text className="text-neutral-900 text-2xl font-bold text-center mb-2">
@@ -392,7 +400,10 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
               <Text className="text-neutral-600 text-base text-center leading-6">
                 {t('otpSentMessage')}
               </Text>
-              <Text className="text-primary-600 text-base font-semibold text-center mt-1">
+              <Text
+                className="text-base font-semibold text-center mt-1"
+                style={{ color: THEME.primary }}
+              >
                 {maskEmail(email)}
               </Text>
             </View>
@@ -407,9 +418,12 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
             {/* Above-card errors (server / validation) */}
             {errorMessage && isAboveCardError && activeError ? (
-              <View className={`border rounded-xl p-4 mb-4 flex-row items-start ${activeError.containerClass}`}>
+              <View
+                className="border rounded-xl p-4 mb-4 flex-row items-start"
+                style={activeError.containerStyle}
+              >
                 <activeError.Icon size={18} color={activeError.iconColor} />
-                <Text className={`text-sm ml-2.5 flex-1 leading-5 ${activeError.textClass}`}>
+                <Text className="text-sm ml-2.5 flex-1 leading-5" style={activeError.textStyle}>
                   {errorMessage}
                 </Text>
               </View>
@@ -432,17 +446,20 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
                     onKeyPress={(e) => handleKeyPress(e, index)}
                     keyboardType="number-pad"
                     maxLength={1}
-                    className={`w-12 h-14 border-2 rounded-xl text-center text-xl font-bold ${getInputClassName(digit)}`}
-                    style={{ textAlignVertical: 'center' }}
+                    className="w-12 h-14 border-2 rounded-xl text-center text-xl font-bold"
+                    style={[{ textAlignVertical: 'center', backgroundColor:THEME.primary }, getInputStyle(digit)]}
                   />
                 ))}
               </View>
 
               {/* Inside-card errors (invalid_otp / expired_otp / generic) */}
               {errorMessage && isInsideCardError && activeError ? (
-                <View className={`flex-row items-start rounded-xl p-3.5 mb-4 border border-red-500 ${activeError.containerClass}`}>
+                <View
+                  className="flex-row items-start rounded-xl p-3.5 mb-4 border"
+                  style={activeError.containerStyle}
+                >
                   <activeError.Icon size={16} color={activeError.iconColor} style={{ marginTop: 1 }} />
-                  <Text className={`text-sm ml-2 flex-1 leading-5 ${activeError.textClass}`}>
+                  <Text className="text-sm ml-2 flex-1 leading-5" style={activeError.textStyle}>
                     {errorMessage}
                   </Text>
                 </View>
@@ -455,7 +472,10 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
                 </Text>
                 {canResend ? (
                   <TouchableOpacity onPress={handleResendOtp} activeOpacity={0.7}>
-                    <Text className="text-primary-600 text-sm font-semibold">
+                    <Text
+                      className="text-sm font-semibold"
+                      style={{ color: THEME.primary }}
+                    >
                       {t('resendOTP')}
                     </Text>
                   </TouchableOpacity>
@@ -468,16 +488,28 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
             </View>
 
             {/* Info notice */}
-            <View className="bg-primary-50 rounded-xl p-4 mb-6">
+            <View
+              className="rounded-xl p-4 mb-6"
+              style={{ backgroundColor: THEME.primary[50] }}
+            >
               <View className="flex-row items-start">
-                <View className="bg-primary-600 rounded-full p-1 mr-3 mt-0.5">
+                <View
+                  className="rounded-full p-1 mr-3 mt-0.5"
+                  style={{ backgroundColor: THEME.primary }}
+                >
                   <CheckCircle size={16} color="#FFFFFF" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-primary-900 text-sm font-semibold mb-1">
+                  <Text
+                    className="text-sm font-semibold mb-1"
+                    style={{ color: THEME.primary[900] }}
+                  >
                     {t('importantNotice')}
                   </Text>
-                  <Text className="text-primary-800 text-sm leading-5">
+                  <Text
+                    className="text-sm leading-5"
+                    style={{ color: THEME.primary[800] }}
+                  >
                     {t('otpVerificationNotice')}
                   </Text>
                 </View>
@@ -488,11 +520,13 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
             <TouchableOpacity
               onPress={handleVerifyOtp}
               disabled={isVerifying || otp.join('').length !== 6}
-              className={`rounded-xl py-4 items-center shadow-sm mb-6 ${
-                isVerifying || otp.join('').length !== 6
-                  ? 'bg-neutral-300'
-                  : 'bg-primary-600'
-              }`}
+              className="rounded-xl py-4 items-center shadow-sm mb-6"
+              style={{
+                backgroundColor:
+                  isVerifying || otp.join('').length !== 6
+                    ? '#D1D5DB'
+                    : THEME.primary,
+              }}
               activeOpacity={0.85}
             >
               {isVerifying ? (

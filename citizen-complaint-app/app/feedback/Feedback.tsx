@@ -14,6 +14,7 @@ import { useState } from 'react'
 import { Star, ChevronLeft, MessageSquarePlus, CheckCircle2 } from 'lucide-react-native'
 import { useTranslation } from 'react-i18next'
 import { feedbackApiClient } from '@/lib/client/feedback'
+import { THEME } from '@/constants/theme'
 
 export default function Feedback() {
   const router = useRouter()
@@ -32,7 +33,16 @@ export default function Feedback() {
     5: t('feedback.rating_excellent'),
   }
 
+  const handleRatingPress = (star: number) => {
+    // If the same star is pressed again, remove the rating (set to 0)
+    // Otherwise, set the rating to the selected star
+    setRating(star === rating ? 0 : star)
+    // Clear error when user interacts with rating
+    setError(null)
+  }
+
   const handleSubmit = async () => {
+    // Check if rating is required and not selected
     if (rating === 0) {
       setError(t('feedback.error_no_rating'))
       return
@@ -70,34 +80,34 @@ export default function Feedback() {
   // ── Success state ──────────────────────────────────────────────────────────
   if (submitted) {
     return (
-      <SafeAreaView className="flex-1 bg-slate-50" edges={['top', 'bottom']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
         {/* Header */}
-        <View className="flex-row items-center px-5 py-3.5 border-b border-slate-200 bg-white">
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', backgroundColor: '#FFFFFF' }}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={8} activeOpacity={0.7}>
-            <ChevronLeft size={24} color="#1E3A8A" />
+            <ChevronLeft size={24} color={THEME.primary} />
           </TouchableOpacity>
-          <Text className="flex-1 text-center font-extrabold text-base text-slate-900">
+          <Text style={{ flex: 1, textAlign: 'center', fontWeight: '800', fontSize: 16, color: '#0F172A' }}>
             {t('feedback.screen_title')}
           </Text>
-          <View className="w-6" />
+          <View style={{ width: 24 }} />
         </View>
 
-        <View className="flex-1 items-center justify-center px-8">
-          <View className="w-20 h-20 rounded-[28px] bg-green-100 items-center justify-center mb-5">
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+          <View style={{ width: 80, height: 80, borderRadius: 28, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
             <CheckCircle2 size={40} color="#16A34A" />
           </View>
-          <Text className="text-[22px] font-extrabold text-slate-900 mb-2 text-center">
+          <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', marginBottom: 8, textAlign: 'center' }}>
             {t('feedback.success_title')}
           </Text>
-          <Text className="text-sm text-slate-500 text-center leading-[22px]">
+          <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', lineHeight: 22 }}>
             {t('feedback.success_message')}
           </Text>
           <TouchableOpacity
             onPress={() => router.replace('/(tabs)')}
             activeOpacity={0.8}
-            className="mt-8 bg-blue-600 px-8 py-3.5 rounded-2xl"
+            style={{ marginTop: 32, backgroundColor: THEME.primary, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 16 }}
           >
-            <Text className="text-white font-bold text-[15px]">
+            <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 15 }}>
               {t('feedback.success_cta')}
             </Text>
           </TouchableOpacity>
@@ -108,56 +118,54 @@ export default function Feedback() {
 
   // ── Main form ──────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={['top', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
-        className="flex-1"
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         {/* Header */}
-        <View className="flex-row items-center px-5 py-3.5 border-b border-slate-200 bg-white">
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', backgroundColor: '#FFFFFF' }}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={8} activeOpacity={0.7}>
-            <ChevronLeft size={24} color="#1E3A8A" />
+            <ChevronLeft size={24} color={THEME.primary} />
           </TouchableOpacity>
-          <Text className="flex-1 text-center font-extrabold text-base text-slate-900">
+          <Text style={{ flex: 1, textAlign: 'center', fontWeight: '800', fontSize: 16, color: '#0F172A' }}>
             {t('feedback.screen_title')}
           </Text>
-          <View className="w-6" />
+          <View style={{ width: 24 }} />
         </View>
 
         <ScrollView
-          className="flex-1"
-          contentContainerClassName="p-5 pb-10"
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {/* Hero card */}
-          <View className="bg-blue-50 border border-blue-200 rounded-[20px] p-5 items-center mb-6">
-            <View className="w-14 h-14 rounded-[18px] bg-blue-600 items-center justify-center mb-3">
+          <View style={{ backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 20, padding: 20, alignItems: 'center', marginBottom: 24 }}>
+            <View style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: THEME.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
               <MessageSquarePlus size={26} color="#fff" />
             </View>
-            <Text className="text-[17px] font-extrabold text-blue-900 mb-1.5">
+            <Text style={{ fontSize: 17, fontWeight: '800', color: '#1E3A8A', marginBottom: 6 }}>
               {t('feedback.hero_title')}
             </Text>
-            <Text className="text-[13px] text-slate-600 text-center leading-5">
+            <Text style={{ fontSize: 13, color: '#475569', textAlign: 'center', lineHeight: 20 }}>
               {t('feedback.hero_subtitle')}
             </Text>
           </View>
 
-          {/* Rating label */}
-          <Text className="text-[13px] font-bold text-slate-700 mb-3">
-            {t('feedback.rating_label')}
+          {/* Rating label with required indicator */}
+          <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 12 }}>
+            {t('feedback.rating_label')}{' '}
+            <Text style={{ color: '#EF4444' }}>*</Text>
           </Text>
 
           {/* Star rating card */}
-          <View className="bg-white border border-slate-200 rounded-[20px] p-5 items-center mb-5">
-            <View className="flex-row gap-2.5 mb-2.5">
+          <View style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 20, padding: 20, alignItems: 'center', marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity
                   key={star}
-                  onPress={() => {
-                    setRating(star)
-                    setError(null)
-                  }}
+                  onPress={() => handleRatingPress(star)}
                   activeOpacity={0.7}
                   hitSlop={6}
                 >
@@ -170,22 +178,22 @@ export default function Feedback() {
               ))}
             </View>
             {rating > 0 && (
-              <Text className="text-[13px] font-semibold text-amber-500">
+              <Text style={{ fontSize: 13, fontWeight: '600', color: '#F59E0B' }}>
                 {RATING_LABELS[rating]}
               </Text>
             )}
           </View>
 
           {/* Message label */}
-          <Text className="text-[13px] font-bold text-slate-700 mb-3">
+          <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 12 }}>
             {t('feedback.message_label')}{' '}
-            <Text className="font-normal text-slate-400">
+            <Text style={{ fontWeight: '400', color: '#94A3B8' }}>
               {t('feedback.message_optional')}
             </Text>
           </Text>
 
           {/* Message input card */}
-          <View className="bg-white border border-slate-200 rounded-[20px] mb-5">
+          <View style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 20, marginBottom: 20 }}>
             <TextInput
               value={message}
               onChangeText={setMessage}
@@ -193,18 +201,17 @@ export default function Feedback() {
               placeholderTextColor="#94A3B8"
               multiline
               maxLength={500}
-              className="p-4 text-sm text-slate-900 min-h-[120px]"
-              style={{ textAlignVertical: 'top' }}
+              style={{ padding: 16, fontSize: 13, color: '#0F172A', minHeight: 120, textAlignVertical: 'top' }}
             />
-            <Text className="text-right text-[11px] text-slate-400 px-4 pb-2.5">
+            <Text style={{ textAlign: 'right', fontSize: 11, color: '#94A3B8', paddingHorizontal: 16, paddingBottom: 10 }}>
               {message.length}/500
             </Text>
           </View>
 
           {/* Error banner */}
           {error && (
-            <View className="bg-red-50 border border-red-200 rounded-2xl p-3.5 mb-5">
-              <Text className="text-[13px] text-red-600 font-semibold">{error}</Text>
+            <View style={{ backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 16, padding: 14, marginBottom: 20 }}>
+              <Text style={{ fontSize: 13, color: '#DC2626', fontWeight: '600' }}>{error}</Text>
             </View>
           )}
 
@@ -213,16 +220,22 @@ export default function Feedback() {
             onPress={handleSubmit}
             disabled={isSubmitting}
             activeOpacity={0.85}
-            className={`rounded-[18px] py-4 items-center flex-row justify-center gap-2 ${
-              isSubmitting ? 'bg-blue-300' : 'bg-blue-600'
-            }`}
+            style={{
+              borderRadius: 18,
+              paddingVertical: 16,
+              alignItems: 'center',
+              flexDirection: 'row',
+              justifyContent: 'center',
+              gap: 8,
+              backgroundColor: isSubmitting ? '#93C5FD' : THEME.primary,
+            }}
           >
             {isSubmitting ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <MessageSquarePlus size={18} color="#fff" />
             )}
-            <Text className="text-white font-extrabold text-[15px]">
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 15 }}>
               {isSubmitting ? t('feedback.submitting') : t('feedback.submit_button')}
             </Text>
           </TouchableOpacity>

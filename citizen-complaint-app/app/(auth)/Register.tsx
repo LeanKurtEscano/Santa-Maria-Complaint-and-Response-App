@@ -56,7 +56,7 @@ import {
 import { TAGALOG_MONTHS } from '@/constants/localization/date';
 
 import { THEME } from '@/constants/theme';
-
+import TermsAndAgreementModal from '@/components/modals/TermsAndAgreement';
 const SUFFIX_OPTIONS = ['Jr.', 'Sr.', 'II', 'III', 'IV'];
 
 // ─── reCAPTCHA Component ───────────────────────────────────────────────────
@@ -343,6 +343,7 @@ export default function RegisterScreen({ navigation }: any) {
     date.setFullYear(date.getFullYear() - 18);
     return date;
   });
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   const getMinDate = () => {
     const date = new Date();
@@ -1417,27 +1418,53 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
       </Modal>
 
       {/* Terms and Conditions */}
-      <View className="mb-4">
-        <Controller
-          control={control}
-          name="agreedToTerms"
-          rules={{ required: t('required') }}
-          render={({ field: { onChange, value } }) => (
-            <TouchableOpacity onPress={() => { onChange(!value); saveFormData(); }} className="flex-row items-start mb-2" activeOpacity={0.7}>
-              <View
-                style={value ? { backgroundColor: THEME.primary, borderColor: THEME.primary } : {}}
-                className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${!value ? (errors.agreedToTerms ? 'border-error-500' : 'border-neutral-300') : ''}`}
-              >
-                {value && <Check size={14} color="#FFFFFF" />}
-              </View>
-              <Text className="text-sm text-neutral-700 flex-1">{t('agreeTerms')}</Text>
-            </TouchableOpacity>
-          )}
-        />
-        <ErrorMessage message={errors.agreedToTerms?.message} />
-      </View>
+<View className="mb-4">
+  <Controller
+    control={control}
+    name="agreedToTerms"
+    rules={{ required: t('required') }}
+    render={({ field: { onChange, value } }) => (
+      <>
+        <TouchableOpacity
+          onPress={() => {
+            if (value) {
+              onChange(false);
+            } else {
+              setShowTermsModal(true);
+            }
+          }}
+          className="flex-row items-start mb-2"
+          activeOpacity={0.7}
+        >
+          <View
+            style={value ? { backgroundColor: THEME.primary, borderColor: THEME.primary } : {}}
+            className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${
+              !value ? (errors.agreedToTerms ? 'border-error-500' : 'border-neutral-300') : ''
+            }`}
+          >
+            {value && <Check size={14} color="#FFFFFF" />}
+          </View>
+          <Text className="text-sm text-neutral-700 flex-1">{t('agreeTerms')}</Text>
+        </TouchableOpacity>
 
-      {/* ── reCAPTCHA ── */}
+        <TermsAndAgreementModal
+          visible={showTermsModal}
+          onAccept={() => {
+            onChange(true);           // ✅ directly calls Controller's onChange
+            clearErrors('agreedToTerms');
+            setShowTermsModal(false);
+            saveFormData();
+          }}
+          onDecline={() => setShowTermsModal(false)}
+        />
+      </>
+    )}
+  />
+
+  <ErrorMessage message={errors.agreedToTerms?.message} />
+
+
+  {/* ── reCAPTCHA ── */}
       <View className="mb-6">
         <Recaptcha
           verified={recaptchaVerified}
@@ -1449,6 +1476,7 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
         />
       </View>
 
+
       {errors.root?.general && (
         <View className="bg-error-50 border border-error-200 rounded-xl p-4 mb-6">
           <View className="flex-row items-center">
@@ -1457,6 +1485,7 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
           </View>
         </View>
       )}
+
 
       <View className="flex-row gap-3">
         <TouchableOpacity onPress={() => setStep(2)} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
@@ -1472,7 +1501,14 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
           {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text className="text-white font-semibold text-base">{t('submit')}</Text>}
         </TouchableOpacity>
       </View>
+
+</View>
+
+     
     </View>
+
+
+
   );
   return (
     <SafeAreaView className="flex-1 bg-white">

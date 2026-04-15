@@ -20,12 +20,13 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { MapPin, Navigation, AlertTriangle, Globe } from 'lucide-react-native';
-import { MapDisplay,MapProvider } from './Mapdisplay';
+import { MapDisplay, MapProvider } from './Mapdisplay';
 import {
   useReverseGeocode,
   isInsidePhilippines,
   isValidCoordinate,
 } from '@/hooks/general/useReverseGeocode';
+import { THEME } from '@/constants/theme';
 
 interface LocationCardProps {
   latitude?: string | number | null;
@@ -92,7 +93,7 @@ export const LocationCard: React.FC<LocationCardProps> = ({
         provider={mapProvider}
       />
 
-      {/* Outside PH notice */}
+      {/* Outside PH notice — amber stays as semantic warning color */}
       {!isInPH && (
         <View className="flex-row items-center gap-2 px-4 py-2.5 bg-amber-50 border-b border-amber-100">
           <Globe size={14} color="#D97706" />
@@ -108,9 +109,12 @@ export const LocationCard: React.FC<LocationCardProps> = ({
         {/* Coordinates */}
         <View className="flex-row items-start">
           <View className="w-7 mt-0.5">
-            <Navigation size={16} color="#2563EB" />
+            <Navigation size={16} color={THEME.primary} />
           </View>
-          <Text className="flex-1 text-xs font-semibold text-primary-600 font-mono">
+          <Text
+            style={{ color: THEME.primary }}
+            className="flex-1 text-xs font-semibold font-mono"
+          >
             {lat.toFixed(6)}, {lng.toFixed(6)}
           </Text>
         </View>
@@ -149,11 +153,17 @@ export const LocationCard: React.FC<LocationCardProps> = ({
             <View className="h-px bg-neutral-100 my-3" />
             <TouchableOpacity
               onPress={onUpdatePress}
-              className="flex-row items-center justify-center gap-1.5 py-2 rounded-lg bg-primary-50"
+              style={{
+                backgroundColor: THEME.primary + '1A',
+                borderColor: THEME.primary + '33',
+              }}
+              className="flex-row items-center justify-center gap-1.5 py-2 rounded-lg border"
               activeOpacity={0.7}
             >
-              <MapPin size={14} color="#2563EB" />
-              <Text className="text-sm font-semibold text-primary-600">{updateLabel}</Text>
+              <MapPin size={14} color={THEME.primary} />
+              <Text style={{ color: THEME.primary }} className="text-sm font-semibold">
+                {updateLabel}
+              </Text>
             </TouchableOpacity>
           </>
         )}

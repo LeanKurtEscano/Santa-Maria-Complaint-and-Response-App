@@ -153,59 +153,8 @@ export default function SettingsScreen() {
                 />
               </View>
 
-              {/* Email Notifications */}
-              <View className="flex-row items-center justify-between py-4 border-b border-neutral-100">
-                <View className="flex-1 mr-4">
-                  <Text className="text-base text-neutral-900 font-medium">
-                    {t('settings.notifications.emailNotifications')}
-                  </Text>
-                  <Text className="text-xs text-neutral-500 mt-1">
-                    Get updates via email
-                  </Text>
-                </View>
-                <Switch
-                  value={emailNotifications}
-                  onValueChange={toggleEmailNotifications}
-                  trackColor={{ false: '#D1D5DB', true: `${THEME.primaryDark}60` }}
-                  thumbColor={emailNotifications ? THEME.primaryDark : '#F3F4F6'}
-                />
-              </View>
-
-              {/* Complaint Updates */}
-              <View className="flex-row items-center justify-between py-4 border-b border-neutral-100">
-                <View className="flex-1 mr-4">
-                  <Text className="text-base text-neutral-900 font-medium">
-                    {t('settings.notifications.complaintUpdates')}
-                  </Text>
-                  <Text className="text-xs text-neutral-500 mt-1">
-                    Status changes on your complaints
-                  </Text>
-                </View>
-                <Switch
-                  value={complaintUpdates}
-                  onValueChange={toggleComplaintUpdates}
-                  trackColor={{ false: '#D1D5DB', true: `${THEME.primaryDark}60` }}
-                  thumbColor={complaintUpdates ? THEME.primaryDark : '#F3F4F6'}
-                />
-              </View>
-
-              {/* News & Alerts */}
-              <View className="flex-row items-center justify-between py-4 mb-2">
-                <View className="flex-1 mr-4">
-                  <Text className="text-base text-neutral-900 font-medium">
-                    {t('settings.notifications.newsAlerts')}
-                  </Text>
-                  <Text className="text-xs text-neutral-500 mt-1">
-                    Community news and announcements
-                  </Text>
-                </View>
-                <Switch
-                  value={newsAlerts}
-                  onValueChange={toggleNewsAlerts}
-                  trackColor={{ false: '#D1D5DB', true: `${THEME.primaryDark}60` }}
-                  thumbColor={newsAlerts ? THEME.primaryDark : '#F3F4F6'}
-                />
-              </View>
+            
+              
             </View>
           </View>
         </View>

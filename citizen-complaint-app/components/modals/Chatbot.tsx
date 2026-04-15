@@ -57,7 +57,7 @@ function TypingDots() {
       {[d0, d1, d2].map((dot, i) => (
         <Animated.View
           key={i}
-          style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: THEME.primaryLight, transform: [{ translateY: dot }] }}
+          style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: THEME.primary, transform: [{ translateY: dot }] }}
         />
       ))}
     </View>
