@@ -17,21 +17,17 @@ import {
   Check,
 } from 'lucide-react-native';
 import { THEME } from '@/constants/theme';
-
+import { useCurrentUser } from '@/store/useCurrentUserStore';
 export default function SettingsScreen() {
+  const { userData } = useCurrentUser();
   const { t } = useTranslation();
   const navigation = useNavigation();
   const {
     currentLanguage,
     changeLanguage,
     pushNotifications,
-    emailNotifications,
-    complaintUpdates,
-    newsAlerts,
     togglePushNotifications,
-    toggleEmailNotifications,
-    toggleComplaintUpdates,
-    toggleNewsAlerts,
+   
   } = useSettingsLogic();
 
   return (

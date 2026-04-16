@@ -10,12 +10,12 @@ import { CalendarDays, MapPin, Clock, Search, ChevronLeft, ChevronRight, X, Arro
 import { eventApiClient } from '@/lib/client/event';
 import ErrorScreen from '@/screen/general/ErrorScreen';
 import { getEventErrorType } from '@/utils/event/eventError';
-
+import { THEME } from '@/constants/theme';
 interface EventMedia { id: number; media_url: string; media_type: string; uploaded_at: string; }
 interface EventData  { id: number; event_name: string; description?: string; date: string; location?: string; media: EventMedia[]; }
 
 const ACCENTS = [
-  { color: '#1D4ED8', dark: '#1E3A8A', text: '#BFDBFE' },
+  { color: THEME.primary, dark: THEME.primaryDark, text: '#BFDBFE' },
   { color: '#0E7490', dark: '#164E63', text: '#A5F3FC' },
   { color: '#6D28D9', dark: '#3B0764', text: '#DDD6FE' },
   { color: '#047857', dark: '#064E3B', text: '#A7F3D0' },
@@ -56,8 +56,8 @@ function MediaEventCard({ event, onPress }: { event: EventData; onPress: () => v
           <View className="absolute bottom-0 left-0 right-0 h-20" style={{ backgroundColor: 'rgba(0,0,0,0.55)' }} />
           <View className="absolute bottom-3 left-3 flex-row items-center gap-1.5 bg-white rounded-lg px-2.5 py-1.5"
             style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 2 }}>
-            <CalendarDays size={11} color="#1D4ED8" />
-            <Text style={{ color: '#1D4ED8', fontSize: 11, fontWeight: '700' }}>{monthShort} {day}</Text>
+            <CalendarDays size={11} color={THEME.primary} />
+            <Text style={{ color: THEME.primary, fontSize: 11, fontWeight: '700' }}>{monthShort} {day}</Text>
           </View>
           <View className="absolute bottom-3 right-3 flex-row items-center gap-1 rounded-lg px-2.5 py-1.5" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
             <Clock size={10} color="#fff" />
@@ -81,8 +81,8 @@ function MediaEventCard({ event, onPress }: { event: EventData; onPress: () => v
               </View>
             ) : <View className="flex-1" />}
             <View className="flex-row items-center gap-1">
-              <Text style={{ color: '#1D4ED8', fontSize: 11, fontWeight: '600' }}>View details</Text>
-              <ChevronRight size={12} color="#1D4ED8" />
+              <Text style={{ color: THEME.primary, fontSize: 11, fontWeight: '600' }}>View details</Text>
+              <ChevronRight size={12} color={THEME.primary} />
             </View>
           </View>
         </View>
@@ -190,13 +190,13 @@ export default function EventsScreen() {
             <Text style={{ color: '#64748B', fontSize: 12, marginTop: 1 }}>Community calendar</Text>
           </View>
           {!isLoading && !isError && (
-            <View style={{ backgroundColor: '#1E3A8A', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 }}>
+            <View style={{ backgroundColor: THEME.primaryDark, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 }}>
               <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{filtered.length}</Text>
             </View>
           )}
           {/* Subtle refetch spinner when background-refreshing */}
           {isFetching && !isLoading && (
-            <ActivityIndicator size="small" color="#1D4ED8" />
+            <ActivityIndicator size="small" color={THEME.primary} />
           )}
         </View>
 
@@ -205,9 +205,9 @@ export default function EventsScreen() {
           <View className="px-4 pb-3">
             <View
               className="flex-row items-center rounded-xl px-3 gap-2.5"
-              style={{ backgroundColor: focused ? '#fff' : '#F8FAFC', borderWidth: 1.5, borderColor: focused ? '#1D4ED8' : '#E2E8F0' }}
+              style={{ backgroundColor: focused ? '#fff' : '#F8FAFC', borderWidth: 1.5, borderColor: focused ? THEME.primary : '#E2E8F0' }}
             >
-              <Search size={15} color={focused ? '#1D4ED8' : '#94A3B8'} />
+              <Search size={15} color={focused ? THEME.primary : '#94A3B8'} />
               <TextInput
                 style={{ flex: 1, paddingVertical: 11, fontSize: 13, color: '#0F172A' }}
                 placeholder="Search events or locations…"
@@ -230,7 +230,7 @@ export default function EventsScreen() {
       {/* Content */}
       {isLoading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-          <ActivityIndicator color="#1D4ED8" size="large" />
+          <ActivityIndicator color={THEME.primary} size="large" />
           <Text style={{ color: '#64748B', fontSize: 13 }}>Loading events…</Text>
         </View>
       ) : isError ? (
@@ -256,7 +256,7 @@ export default function EventsScreen() {
             </Text>
           </View>
           {query ? (
-            <TouchableOpacity onPress={() => setQuery('')} style={{ backgroundColor: '#1D4ED8', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 }}>
+            <TouchableOpacity onPress={() => setQuery('')} style={{ backgroundColor: THEME.primary, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 }}>
               <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Clear Search</Text>
             </TouchableOpacity>
           ) : null}

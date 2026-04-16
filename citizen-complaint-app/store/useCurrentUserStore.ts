@@ -24,6 +24,7 @@ interface UserState {
   clearUser: () => Promise<void>;
   logout: () => Promise<void>;
   mapUserFromBackend: (data: any) => void;
+  setPushNotificationsEnabled: (enabled: boolean) => void; // Optional setter for push notification preference
   fetchCurrentUser: (background?: boolean) => Promise<void>;
   checkAuthStatus: () => Promise<void>;
 }
@@ -34,7 +35,19 @@ export const useCurrentUser = create<UserState>((set, get) => ({
   isAuthenticated: false,
 
   setUserData: (user) => set({ userData: user, isAuthenticated: !!user }),
+  
+  setPushNotificationsEnabled: (enabled: boolean) => {
+  const currentUser = get().userData;
 
+  if (!currentUser) return;
+
+  set({
+    userData: {
+      ...currentUser,
+      push_notifications_enabled: enabled,
+    },
+  });
+},
   setLoading: (loading) => set({ loading }),
 
   clearUser: async () => {
@@ -119,6 +132,7 @@ mapUserFromBackend: (data) => {
     back_id: data.back_id,
     selfie_with_id: data.selfie_with_id,
     is_verified: data.is_verified === true || data.is_verified === 1 || data.is_verified === "true",
+    push_notifications_enabled: data.push_notifications_enabled === true || data.push_notifications_enabled === 1 || data.push_notifications_enabled === "true",
   };
 
   set({ userData: mappedUser, loading: false, isAuthenticated: true });

@@ -8,6 +8,18 @@ import "../lib/localization/i18n";
 import queryClient from "@/lib/api/queryClient";
 import ErrorScreen from "@/screen/general/ErrorScreen";
 import { handleApiError } from "@/utils/general/errorHandler";
+import * as Notifications from "expo-notifications"; // 👈 add import
+
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,  // 👈 add
+    shouldShowList: true,    // 👈 add
+  }),
+});
 
 function RootLayoutNav() {
   const { userData, loading, checkAuthStatus } = useCurrentUser();
@@ -15,7 +27,7 @@ function RootLayoutNav() {
   const router = useRouter();
   const [initError, setInitError] = useState<any>(null);
   const [retrying, setRetrying] = useState(false);
-
+  
   useEffect(() => {
     initializeApp();
   }, []);

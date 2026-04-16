@@ -36,27 +36,25 @@ type ErrorType = 'invalid_otp' | 'expired_otp' | 'server' | 'validation' | 'gene
 export default function OTPVerificationScreen({ navigation, route }: OTPVerificationScreenProps) {
   const router = useRouter();
   const { t } = useTranslation();
-  const { apiRoute, otpResendRoute } = useLocalSearchParams();
+  const { email:registerEmail, apiRoute, otpResendRoute } = useLocalSearchParams();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [errorType, setErrorType] = useState<ErrorType>(null);
   const [networkError, setNetworkError] = useState('');
-  const [resendTimer, setResendTimer] = useState(60);
+  const [resendTimer, setResendTimer] = useState(300);
   const [canResend, setCanResend] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [email, setEmail] = useState('');
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
  const getEmail = async () => {
-  const storedEmail = await AsyncStorage.getItem('resetEmail');
+  if (isResetPassword) {
+    const storedEmail = await AsyncStorage.getItem('resetEmail');
+    return storedEmail || '';
+  }
 
-  const email =
-    storedEmail && apiRoute === '/verify-reset-password-otp'
-      ? storedEmail
-      : route?.params?.email || '';
-
-  return email;
+  return (registerEmail as string) || '';
 };
    
 // Update this line to handle both with and without leading slash
@@ -112,7 +110,7 @@ console.log('Is Reset Password:', isResetPassword);
          await authApiClient.post(otpResendRoute || '/register', { email: await getEmail() });
       }
      
-      setResendTimer(60);
+      setResendTimer(300);
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
@@ -121,14 +119,13 @@ console.log('Is Reset Password:', isResetPassword);
         setNetworkError(t('otpResendNetworkError'));
       } else if (err?.code === 'ETIMEDOUT') {
         setNetworkError(t('otpResendTimeout'));
-      } else {
-        setErrorMessage(
-          err?.response?.data?.detail ||
-          err?.response?.data?.message ||
-          t('otpResendFailed')
-        );
-        setErrorType('generic');
-      }
+     } else {
+  const msg = extractErrorMessage(
+    err?.response?.data?.detail || err?.response?.data?.message
+  );
+  setErrorMessage(msg || t('otpResendFailed'));
+  setErrorType('generic');
+}
     }
   };
 
@@ -390,20 +387,18 @@ console.log('Is Reset Password:', isResetPassword);
   };
 
 
-  useEffect(() => {
+ useEffect(() => {
   const loadEmail = async () => {
-    const storedEmail = await AsyncStorage.getItem('resetEmail');
-
-    const finalEmail =
-      storedEmail && apiRoute === '/verify-reset-password-otp'
-        ? storedEmail
-        : route?.params?.email || '';
-
-    setEmail(finalEmail);
+    if (isResetPassword) {
+      const storedEmail = await AsyncStorage.getItem('resetEmail');
+      setEmail(storedEmail || '');
+    } else {
+      setEmail((registerEmail as string) || '');
+    }
   };
 
   loadEmail();
-}, [apiRoute, route?.params?.email]);
+}, [isResetPassword, registerEmail]);
 
   const activeError = errorType ? errorConfig[errorType] : null;
   const isAboveCardError = errorType === 'server' || errorType === 'validation';
@@ -534,9 +529,9 @@ console.log('Is Reset Password:', isResetPassword);
                     </Text>
                   </TouchableOpacity>
                 ) : (
-                  <Text className="text-neutral-500 text-sm">
-                    {t('resendIn')} {resendTimer}s
-                  </Text>
+                 <Text className="text-neutral-500 text-sm">
+  {t('resendIn')} {Math.floor(resendTimer / 60)}:{String(resendTimer % 60).padStart(2, '0')}
+</Text>
                 )}
               </View>
             </View>

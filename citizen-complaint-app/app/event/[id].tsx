@@ -10,7 +10,7 @@ import { CalendarDays, MapPin, Clock, ChevronLeft, Image as ImageIcon } from 'lu
 import { eventApiClient } from '@/lib/client/event';
 import ErrorScreen from '@/screen/general/ErrorScreen';
 import { getEventErrorType } from '@/utils/event/eventError';
-
+import { THEME } from '@/constants/theme';
 const { width: SW } = Dimensions.get('window');
 
 interface EventMedia { id: number; media_url: string; media_type: string; uploaded_at: string; }
@@ -84,8 +84,8 @@ function MediaGallery({ media }: { media: EventMedia[] }) {
 function DetailRow({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
-      <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon size={15} color="#1D4ED8" />
+      <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: THEME.primary + '1A', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon size={15} color={THEME.primary} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 2 }}>{label}</Text>
@@ -125,7 +125,7 @@ export default function EventDetailScreen() {
       <StatusBar barStyle="dark-content" />
       <NavBar onBack={() => router.back()} title="Event Details" />
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-        <ActivityIndicator color="#1D4ED8" size="large" />
+        <ActivityIndicator color={THEME.primary} size="large" />
         <Text style={{ color: '#64748B', fontSize: 13 }}>Loading event…</Text>
       </View>
     </View>
@@ -164,7 +164,7 @@ export default function EventDetailScreen() {
         {/* Hero block */}
         <View style={{ backgroundColor: '#fff', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <View style={{ backgroundColor: '#1E3A8A', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ backgroundColor: THEME.primary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <CalendarDays size={12} color="#fff" />
               <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>{weekday}, {monthShort} {day}, {year}</Text>
             </View>
@@ -174,7 +174,7 @@ export default function EventDetailScreen() {
           </Text>
           {event.location && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <MapPin size={13} color="#1D4ED8" />
+              <MapPin size={13} color={THEME.primary} />
               <Text style={{ color: '#475569', fontSize: 13, fontWeight: '500' }}>{event.location}</Text>
             </View>
           )}

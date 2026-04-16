@@ -20,7 +20,7 @@ export function getFaqReply(input: string): string {
     return '🕗 Oras ng Munisipalidad ng Santa Maria:\n\n📅 Lunes – Biyernes: 8:00 AM – 5:00 PM\n❌ Sarado: Sabado, Linggo, at pista opisyal\n\nMga 24/7 na serbisyo:\n🚨 Emergency hotlines\n🌊 MDRRMO (disaster response)\n\nPara sa espesyal na schedule, makipag-ugnayan sa opisina. 📞';
   }
   if (l.includes('contact') || l.includes('hotline') || l.includes('numero') || l.includes('telepono') || l.includes('makausap')) {
-    return '📞 Mga contact ng Santa Maria, Laguna:\n\n🏛️ Munisipyo → "Hotlines" tab sa app\n🚒 BFP (Fire) → 911\n👮 PNP (Pulisya) → 911\n🌊 MDRRMO → 24/7 hotline\n🏥 RHU → sa loob ng munisipyo\n\nPara sa kumpletong listahan, buksan ang "Hotlines" tab. 📱';
+    return '📞 Mga contact ng Santa Maria, Laguna:\n\n🏛️ Munisipyo → "Emergency" tab sa app\n🚒 BFP (Fire) → 09278028353\n👮 PNP (Pulisya) → 09156021629\n🌊 MDRRMO → 0930234234\n🏥 RHU → sa loob ng munisipyo\n\nPara sa kumpletong listahan, buksan ang "Hotlines" tab. 📱';
   }
   if (l.includes('serbisyo') || l.includes('services') || l.includes('available')) {
     return '🏛️ Mga serbisyo ng Munisipalidad ng Santa Maria:\n\n📋 Pagsasampa ng reklamo\n📄 Mga dokumento at permit\n💊 Pangunahing kalusugan (RHU)\n🌊 Disaster response (MDRRMO)\n🏗️ Engineering at imprastraktura\n📚 Social welfare (MSWDO)\n💼 Business permit at licensing\n🌿 Agricultural support (MAO)\n👶 Day care at programa para kabataan';

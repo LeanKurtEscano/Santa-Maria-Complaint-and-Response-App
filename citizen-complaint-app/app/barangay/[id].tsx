@@ -21,13 +21,13 @@ import { PRESET_TITLE_KEYS, OTHER_KEY, PresetTitle } from '@/constants/localizat
 import { getBarangayCoords,DEFAULT_COORDS } from '@/constants/general/barangay';
 import ComplaintLetterPreview from '@/components/letter-preview/ComplaintLetterPreview';
 import { complaintApiClient } from '@/lib/client/complaint';
-
+import { askForNotificationPermission } from '@/hooks/general/usePushNotifications';
 import { InstructionsStep } from '@/components/complaint/complaint-proccess/InstructionStep';
 import { FormStep } from '@/components/complaint/complaint-proccess/FormStep';
 import { LocationStep } from '@/components/complaint/complaint-proccess/LocationStep';
 import { COMPLAINT_DETAILS_MAX_LENGTH, COMPLAINT_DETAILS_MIN_LENGTH } from '@/components/complaint/complaint-proccess/FormStep';
 import useToastStore from '@/store/useGlobalModal';
-
+import { userApiClient } from '@/lib/client/user';
 // ─── Step type ────────────────────────────────────────────────────────────────
 type Step = 'instructions' | 'form' | 'location';
 
@@ -225,18 +225,53 @@ const validateForm = (): boolean => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      if (response.status === 201) {
-        showToast('Complaint submitted successfully!', 'success');
-        // Reset all state
-        showGlobalToast('Complaint submitted successfully!', 'success');
-        resetAttachments();
-        setSelectedPreset(null);
-        setCustomTitle('');
-        setMessage('');
-        setIncidentLocation(null);
-        setShowPreview(false);
-        router.push('/(tabs)/Complaints');
-      }
+       if (response.status === 201) {
+    showGlobalToast('Complaint submitted successfully!', 'success');
+    resetAttachments();
+    setSelectedPreset(null);
+    setCustomTitle('');
+    setMessage('');
+    setIncidentLocation(null);
+    setShowPreview(false);
+
+    if(!userData?.push_notifications_enabled) { 
+       // Don't prompt if user has already disabled notifications
+    Alert.alert(
+      '🔔 Stay Updated',
+      'Do you want to receive notifications about your complaint status?',
+      [
+        {
+          text: 'No Thanks',
+          style: 'cancel',
+          onPress: () => router.replace('/(tabs)/Complaints'),
+        },
+        {
+          text: 'Yes, Notify Me',
+          onPress: async () => {
+            try {
+              const token = await askForNotificationPermission(); // ← just call it here
+              if (!token) {
+                showGlobalToast('Permission denied for notifications.', 'error');
+                router.push('/(tabs)/Complaints');
+                return;
+              }
+              await userApiClient.post('/push-token', { token });
+              await userApiClient.post('/enable-push-notifications', { enabled: true });
+              fetchCurrentUser(true); // Refresh user data to update notification preference in store
+              showGlobalToast('Notifications enabled!', 'success');
+            } catch (err) {
+              showGlobalToast('Failed to enable notifications.', 'error');
+            } finally {
+              router.replace('/(tabs)/Complaints');
+            }
+          },
+        },
+      ]
+    );
+  } else {
+    router.replace('/(tabs)/Complaints');
+  }
+}
     } catch (error: any) {
       // Stay on the preview screen — just show the toast so the user
       // can retry without losing their filled-in form or pinned location.
