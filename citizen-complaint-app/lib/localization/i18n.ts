@@ -475,7 +475,31 @@ const resources = {
         "proceed_to_form": "I Understand — Proceed to Form"
       },
 
+
+      "postIncidentFeedback": {
+  "title": "Complaint Feedback",
+  "heading": "How was your experience?",
+  "subheading": "Your feedback helps us improve how complaints are handled in your community.",
+  "ratingPrompt": "Rate the overall complaint process",
+  "ratingLabels": {
+    "terrible": "Terrible",
+    "bad": "Bad",
+    "okay": "Okay",
+    "good": "Good",
+    "excellent": "Excellent!"
+  },
+  "commentLabel": "Additional Comments",
+  "commentPlaceholder": "Tell us more about your experience (optional)...",
+  "submit": "Submit Feedback",
+  "successTitle": "Feedback Submitted",
+  "successMessage": "Thank you! Your feedback has been recorded.",
+  "done": "Done",
+  "errorTitle": "Submission Failed",
+  "errorMessage": "Something went wrong. Please try again."
+},
+
       complaintDetail: {
+        "feedbackButton": "Submit Feedback",
     loading: "Loading complaint details…",
  
     error: {
@@ -1180,7 +1204,8 @@ const resources = {
    
    
    complaintDetail: {
-    loading: "Kino-load ang detalye ng reklamo…",
+    loading: "Nino-load ang detalye ng reklamo…",
+     "feedbackButton": "Mag-submit ng Feedback",
  
     error: {
       title: "May nangyaring mali",
@@ -1499,6 +1524,29 @@ const resources = {
   "error_no_internet": "Walang internet connection. Pakisuri ang inyong network at subukan ulit.",
   "error_generic": "May naganap na hindi inaasahang error. Subukan ulit."
   },
+
+
+"postIncidentFeedback": {
+  "title": "Feedback sa Reklamo",
+  "heading": "Kumusta ang iyong karanasan?",
+  "subheading": "Ang iyong feedback ay tumutulong sa amin na mapabuti ang paraan ng paghawak ng mga reklamo sa inyong komunidad.",
+  "ratingPrompt": "I-rate ang kabuuang proseso ng reklamo",
+  "ratingLabels": {
+    "terrible": "Napakasama",
+    "bad": "Masama",
+    "okay": "Katamtaman",
+    "good": "Maganda",
+    "excellent": "Napakagaling!"
+  },
+  "commentLabel": "Karagdagang Komento",
+  "commentPlaceholder": "Sabihin pa ang higit pa tungkol sa iyong karanasan (opsyonal)...",
+  "submit": "I-submit ang Feedback",
+  "successTitle": "Naisumite ang Feedback",
+  "successMessage": "Salamat! Naitala na ang iyong feedback.",
+  "done": "Tapos na",
+  "errorTitle": "Hindi Naisumite",
+  "errorMessage": "May nangyaring mali. Pakisubukang muli."
+},
 
 "notifications": {
   "emptyTitle": "Wala kang bagong notification!",

@@ -1276,6 +1276,49 @@ export default function ComplaintDetail() {
           <ResponsesSection incidentLinks={data.incident_links!} />
         )}
       </ScrollView>
+
+
+      {/* ── Floating Feedback Button (resolved only) ── */}
+{isResolved && (
+  <View
+    style={{
+      position: "absolute",
+      bottom: 32,
+      left: 16,
+      right: 16,
+      zIndex: 10,
+    }}
+  >
+    <TouchableOpacity
+      onPress={() =>
+        router.push({
+          pathname: "/feedback/PostIncident",
+          params: { incidentId: data.id, complaintTitle: data.title },
+        })
+      }
+      style={{
+        backgroundColor: THEME.primary,
+        borderRadius: 18,
+        paddingVertical: 17,
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "row",
+        gap: 10,
+        shadowColor: THEME.primary,
+        shadowOpacity: 0.35,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 8,
+      }}
+      activeOpacity={0.85}
+    >
+      <MessageCircle size={20} color="#fff" strokeWidth={2.5} />
+      <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>
+        {t("complaintDetail.feedbackButton")}
+      </Text>
+    </TouchableOpacity>
+  </View>
+)}
     </View>
   );
 }
