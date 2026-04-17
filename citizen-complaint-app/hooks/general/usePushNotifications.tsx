@@ -1,9 +1,19 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 export const askForNotificationPermission = async (): Promise<string | null> => {
-  if (!Device.isDevice) return null; // silently skip on emulator
+  if (!Device.isDevice) return null;
+
+  // ✅ Updated check (no deprecation)
+  const isExpoGo =
+    Constants.executionEnvironment === 'storeClient';
+
+  if (Platform.OS === 'android' && isExpoGo) {
+    console.log('Push notifications skipped on Android in Expo Go');
+    return null;
+  }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;

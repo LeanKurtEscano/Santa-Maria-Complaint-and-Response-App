@@ -20,6 +20,12 @@
     },
     "android": {
       "googleServicesFile": "./google-services.json",
+        "notification": {       
+    "icon": "./assets/images/santamarialogo.jpg",
+    "color": "#346739",
+    "androidMode": "default"
+  },
+      
       "adaptiveIcon": {
         "backgroundColor": "#10B981",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -50,7 +56,8 @@
         "expo-notifications",
         {
           "icon": "./assets/images/notification-icon.png",
-          "color": "#346739"
+          "color": "#346739",
+           "sounds": []
         }
       ],
       "./plugins/greenTheme",
