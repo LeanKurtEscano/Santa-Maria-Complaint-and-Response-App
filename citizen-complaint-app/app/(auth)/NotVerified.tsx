@@ -2,14 +2,14 @@ import { View, Text, TouchableOpacity, ScrollView, RefreshControl } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
-import { MailX } from 'lucide-react-native';
+import { MailCheck } from 'lucide-react-native';
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next'; // or your i18n hook
+import { useTranslation } from 'react-i18next';
 
 export default function NotVerifiedScreen() {
   const router = useRouter();
   const { logout, fetchCurrentUser } = useCurrentUser();
-  const { t } = useTranslation(); // adjust namespace if needed, e.g., useTranslation('common')
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = useState(false);
 
   const handleGoBack = async () => {
@@ -19,7 +19,7 @@ export default function NotVerifiedScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchCurrentUser(); // Re-fetch user data to check if verified
+    await fetchCurrentUser();
     setRefreshing(false);
   };
 
@@ -37,12 +37,12 @@ export default function NotVerifiedScreen() {
         }
       >
         <View className="flex-1 items-center justify-center px-8 py-12">
-          <MailX size={64} color="#EF4444" />
+          <MailCheck size={64} color="#10B981" />
           <Text className="text-2xl font-bold text-neutral-900 mt-6 mb-3 text-center">
             {t('notVerified.title')}
           </Text>
           <Text className="text-sm text-neutral-500 text-center leading-6 mb-10">
-            {t('notVerified.message')}
+            We are reviewing your account. Please check your email within 24 hours.
           </Text>
           <TouchableOpacity
             onPress={handleGoBack}
