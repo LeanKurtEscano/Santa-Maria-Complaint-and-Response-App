@@ -9,6 +9,7 @@ import queryClient from "@/lib/api/queryClient";
 import ErrorScreen from "@/screen/general/ErrorScreen";
 import { handleApiError } from "@/utils/general/errorHandler";
 import * as Notifications from "expo-notifications"; // 👈 add import
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
 Notifications.setNotificationHandler({
@@ -28,9 +29,7 @@ function RootLayoutNav() {
   const [initError, setInitError] = useState<any>(null);
   const [retrying, setRetrying] = useState(false);
   
-  useEffect(() => {
-    initializeApp();
-  }, []);
+ 
 
   const initializeApp = async () => {
     try {
@@ -63,7 +62,7 @@ function RootLayoutNav() {
 
   // ❌ Not authenticated
   if (!userData && !inAuthGroup) {
-    router.replace("/(auth)");
+    router.replace("/(auth)/Login");
     return;
   }
 

@@ -19,6 +19,7 @@ import {
   User,
   MapPin,
   Mail,
+  Phone,
   Calendar,
   Home,
   CheckCircle,
@@ -81,6 +82,15 @@ export default function ProfileScreen() {
     );
   }
 
+  // Derive a display identifier — prefer email, fall back to phone number
+  const displayIdentifier = userData.email?.trim() || userData.phone_number?.trim() || null;
+
+  // Safe full name — guard against both fields being undefined/null
+  const fullName = [userData.first_name, userData.last_name]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+
   return (
     <SafeAreaView className="flex-1 bg-neutral-50" edges={['top']}>
       <ScrollView
@@ -120,10 +130,18 @@ export default function ProfileScreen() {
                   <User size={40} color={THEME.primary} />
                 </View>
               )}
-              <Text className="text-xl font-bold text-neutral-900 mt-4">
-                {formatName(`${userData.first_name} ${userData.last_name}`)}
-              </Text>
-              <Text className="text-neutral-600 text-sm mt-1">{userData.email}</Text>
+
+              {/* Name — only render if we actually have something */}
+              {!!fullName && (
+                <Text className="text-xl font-bold text-neutral-900 mt-4">
+                  {formatName(fullName)}
+                </Text>
+              )}
+
+              {/* Identifier (email or phone) — only render if present */}
+              {!!displayIdentifier && (
+                <Text className="text-neutral-600 text-sm mt-1">{displayIdentifier}</Text>
+              )}
             </View>
 
             {/* Location Status — Not Enabled */}
@@ -228,36 +246,56 @@ export default function ProfileScreen() {
           </Text>
 
           <View className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6">
-            {/* Email */}
-            <View className="mb-4">
-              <View className="flex-row items-center mb-2">
-                <Mail size={16} color="#6B7280" />
-                <Text className="text-xs font-medium text-neutral-500 ml-2">
-                  {t('profile.personalInfo.email')}
-                </Text>
-              </View>
-              <Text className="text-base text-neutral-900">{userData.email}</Text>
-            </View>
+            {/* Email — only show if the user has one */}
+            {!!userData.email?.trim() && (
+              <>
+                <View className="mb-4">
+                  <View className="flex-row items-center mb-2">
+                    <Mail size={16} color="#6B7280" />
+                    <Text className="text-xs font-medium text-neutral-500 ml-2">
+                      {t('profile.personalInfo.email')}
+                    </Text>
+                  </View>
+                  <Text className="text-base text-neutral-900">{userData.email}</Text>
+                </View>
+                <View className="h-px bg-neutral-200 my-4" />
+              </>
+            )}
 
-            <View className="h-px bg-neutral-200 my-4" />
+            {/* Phone Number — only show if the user has one */}
+            {!!userData.phone_number?.trim() && (
+              <>
+                <View className="mb-4">
+                  <View className="flex-row items-center mb-2">
+                    <Phone size={16} color="#6B7280" />
+                    <Text className="text-xs font-medium text-neutral-500 ml-2">
+                      {t('profile.personalInfo.phoneNumber')}
+                    </Text>
+                  </View>
+                  <Text className="text-base text-neutral-900">{userData.phone_number}</Text>
+                </View>
+                <View className="h-px bg-neutral-200 my-4" />
+              </>
+            )}
 
-            {/* Full Name */}
-            <View className="mb-4">
-              <View className="flex-row items-center mb-2">
-                <User size={16} color="#6B7280" />
-                <Text className="text-xs font-medium text-neutral-500 ml-2">
-                  {t('profile.personalInfo.fullName')}
-                </Text>
-              </View>
-              <Text className="text-base text-neutral-900">
-                {formatName(`${userData.first_name} ${userData.last_name}`)}
-              </Text>
-            </View>
-
-            <View className="h-px bg-neutral-200 my-4" />
+            {/* Full Name — only show if we have something */}
+            {!!fullName && (
+              <>
+                <View className="mb-4">
+                  <View className="flex-row items-center mb-2">
+                    <User size={16} color="#6B7280" />
+                    <Text className="text-xs font-medium text-neutral-500 ml-2">
+                      {t('profile.personalInfo.fullName')}
+                    </Text>
+                  </View>
+                  <Text className="text-base text-neutral-900">{formatName(fullName)}</Text>
+                </View>
+                <View className="h-px bg-neutral-200 my-4" />
+              </>
+            )}
 
             {/* Age */}
-            {userData.age && (
+            {!!userData.age && (
               <>
                 <View className="mb-4">
                   <View className="flex-row items-center mb-2">
@@ -275,7 +313,7 @@ export default function ProfileScreen() {
             )}
 
             {/* Gender */}
-            {userData.gender && (
+            {!!userData.gender?.trim() && (
               <>
                 <View className="mb-4">
                   <View className="flex-row items-center mb-2">
@@ -293,7 +331,7 @@ export default function ProfileScreen() {
             )}
 
             {/* Barangay */}
-            {userData.barangay && (
+            {!!userData.barangay?.trim() && (
               <>
                 <View className="mb-4">
                   <View className="flex-row items-center mb-2">
@@ -309,7 +347,7 @@ export default function ProfileScreen() {
             )}
 
             {/* Full Address */}
-            {userData.full_address && (
+            {!!userData.full_address?.trim() && (
               <View>
                 <View className="flex-row items-center mb-2">
                   <Home size={16} color="#6B7280" />
@@ -319,7 +357,7 @@ export default function ProfileScreen() {
                 </View>
                 <Text className="text-base text-neutral-900">
                   {userData.full_address}
-                  {userData.zip_code && `, ${userData.zip_code}`}
+                  {!!userData.zip_code?.trim() && `, ${userData.zip_code}`}
                 </Text>
               </View>
             )}
@@ -333,7 +371,7 @@ export default function ProfileScreen() {
           </Text>
 
           <View className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6">
-            {userData.created_at && (
+            {!!userData.created_at && (
               <View>
                 <Text className="text-xs font-medium text-neutral-500 mb-2">
                   {t('profile.accountInfo.memberSince')}

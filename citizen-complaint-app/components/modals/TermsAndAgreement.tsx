@@ -10,6 +10,7 @@ import {
   NativeScrollEvent,
 } from 'react-native';
 import { X, Check, AlertCircle, Info } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
 import { THEME } from '@/constants/theme';
 
 interface TermsAndAgreementModalProps {
@@ -23,6 +24,7 @@ export default function TermsAndAgreementModal({
   onAccept,
   onDecline,
 }: TermsAndAgreementModalProps) {
+  const { t } = useTranslation();
   const [hasRead, setHasRead] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -58,13 +60,17 @@ export default function TermsAndAgreementModal({
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>LGU</Text>
+                <Text style={styles.badgeText}>
+                  {t('termsModal.badge')}
+                </Text>
               </View>
               <View>
                 <Text style={styles.municipality}>
-                  Municipality of Santa Maria
+                  {t('termsModal.municipality')}
                 </Text>
-                <Text style={styles.province}>Laguna, Philippines</Text>
+                <Text style={styles.province}>
+                  {t('termsModal.province')}
+                </Text>
               </View>
             </View>
             <TouchableOpacity onPress={handleDecline} activeOpacity={0.7}>
@@ -72,11 +78,10 @@ export default function TermsAndAgreementModal({
             </TouchableOpacity>
           </View>
 
+          {/* ── Title Block ── */}
           <View style={styles.titleBlock}>
-            <Text style={styles.title}>Terms and Agreement</Text>
-            <Text style={styles.subtitle}>
-              Effective date: January 1, 2025 · Version 1.0
-            </Text>
+            <Text style={styles.title}>{t('termsModal.title')}</Text>
+            <Text style={styles.subtitle}>{t('termsModal.subtitle')}</Text>
           </View>
 
           {/* ── Body ── */}
@@ -91,126 +96,82 @@ export default function TermsAndAgreementModal({
             <View style={styles.introBox}>
               <Info size={14} color="#1a4f2e" style={{ marginTop: 2 }} />
               <Text style={styles.introText}>
-                Please read these terms carefully before using the{' '}
-                <Text style={styles.bold}>
-                  Santa Maria Laguna Complaint Management System
-                </Text>
-                . By registering, you agree to be legally bound by the
-                following provisions.
+                {t('termsModal.intro', {
+                  appName: t('termsModal.appName'),
+                })}
               </Text>
             </View>
 
-            <Section title="1. Purpose of the system">
-              This platform is operated by the{' '}
-              <Text style={styles.bold}>
-                Municipality of Santa Maria, Laguna
-              </Text>{' '}
-              to facilitate the filing, tracking, and resolution of complaints
-              from residents and stakeholders. It is intended solely for
-              legitimate civic concerns within the jurisdiction of Santa Maria.
+            {/* Section 1 */}
+            <Section title={t('termsModal.sections.s1Title')}>
+              {t('termsModal.sections.s1Body', {
+                lgu: t('termsModal.municipality'),
+              })}
             </Section>
 
-            <Section title="2. Eligibility">
-              Use of this system is open to residents, business owners, and
-              stakeholders within Santa Maria, Laguna. You must be at least 18
-              years of age and provide truthful, accurate information during
-              registration. The LGU reserves the right to verify your identity.
+            {/* Section 2 */}
+            <Section title={t('termsModal.sections.s2Title')}>
+              {t('termsModal.sections.s2Body')}
             </Section>
 
-            <Section title="3. Accuracy of information">
-              You agree to submit complaints that are truthful and based on
-              factual events. Filing false, malicious, or frivolous complaints
-              is prohibited and may be subject to applicable laws of the
-              Philippines, including the{' '}
-              <Text style={styles.bold}>Revised Penal Code</Text> provisions on
-              perjury and grave oral defamation.
+            {/* Section 3 */}
+            <Section title={t('termsModal.sections.s3Title')}>
+              {t('termsModal.sections.s3Body', {
+                law: t('termsModal.sections.s3Law'),
+              })}
             </Section>
 
-            <Section title="4. Data privacy">
-              Your personal data is collected and processed in accordance with
-              the{' '}
-              <Text style={styles.bold}>
-                Republic Act No. 10173 (Data Privacy Act of 2012)
-              </Text>
-              . The Municipality of Santa Maria, Laguna is the data controller and
-              commits to:
+            {/* Section 4 */}
+            <Section title={t('termsModal.sections.s4Title')}>
+              {t('termsModal.sections.s4Body', {
+                law: t('termsModal.sections.s4Law'),
+              })}
               {'\n\n'}
-              <BulletItem>
-                Collecting only data necessary for complaint processing
-              </BulletItem>
-              <BulletItem>
-                Not sharing your personal information with unauthorized third
-                parties
-              </BulletItem>
-              <BulletItem>
-                Storing data securely and retaining it only as long as required
-                by law
-              </BulletItem>
-              <BulletItem>
-                Allowing you to request access, correction, or deletion of your
-                records
-              </BulletItem>
+              <BulletItem>{t('termsModal.sections.s4Bullet1')}</BulletItem>
+              <BulletItem>{t('termsModal.sections.s4Bullet2')}</BulletItem>
+              <BulletItem>{t('termsModal.sections.s4Bullet3')}</BulletItem>
+              <BulletItem>{t('termsModal.sections.s4Bullet4')}</BulletItem>
             </Section>
 
-            <Section title="5. Complaint handling">
-              Complaints submitted through this system will be reviewed by
-              authorized LGU personnel. The LGU does not guarantee a specific
-              resolution timeline but will endeavor to act on complaints in
-              accordance with the{' '}
-              <Text style={styles.bold}>Citizen's Charter</Text> and{' '}
-              <Text style={styles.bold}>
-                Anti-Red Tape Act (RA 11032)
-              </Text>
-              . Anonymous complaints may be given lower processing priority.
+            {/* Section 5 */}
+            <Section title={t('termsModal.sections.s5Title')}>
+              {t('termsModal.sections.s5Body', {
+                charter: t('termsModal.sections.s5Charter'),
+                law: t('termsModal.sections.s5Law'),
+              })}
             </Section>
 
-            <Section title="6. Prohibited conduct">
-              Users are strictly prohibited from:
+            {/* Section 6 */}
+            <Section title={t('termsModal.sections.s6Title')}>
+              {t('termsModal.sections.s6Body')}
               {'\n\n'}
-              <BulletItem>
-                Submitting fabricated or misleading complaints
-              </BulletItem>
-              <BulletItem>
-                Impersonating another person or public official
-              </BulletItem>
-              <BulletItem>
-                Using the system for political harassment or personal vendetta
-              </BulletItem>
-              <BulletItem>
-                Attempting to access, alter, or disrupt the system
-              </BulletItem>
-              <BulletItem>
-                Uploading obscene, defamatory, or illegal content
-              </BulletItem>
+              <BulletItem>{t('termsModal.sections.s6Bullet1')}</BulletItem>
+              <BulletItem>{t('termsModal.sections.s6Bullet2')}</BulletItem>
+              <BulletItem>{t('termsModal.sections.s6Bullet3')}</BulletItem>
+              <BulletItem>{t('termsModal.sections.s6Bullet4')}</BulletItem>
+              <BulletItem>{t('termsModal.sections.s6Bullet5')}</BulletItem>
             </Section>
 
-            <Section title="7. Account suspension">
-              The LGU reserves the right to suspend or permanently revoke
-              access to any account found in violation of these terms, without
-              prior notice, and to refer the matter to the appropriate
-              authorities where warranted.
+            {/* Section 7 */}
+            <Section title={t('termsModal.sections.s7Title')}>
+              {t('termsModal.sections.s7Body')}
             </Section>
 
-            <Section title="8. Limitation of liability">
-              The Municipality of Santa Maria, Laguna shall not be held liable for any
-              indirect or consequential damages arising from your use of this
-              system, including but not limited to delays in complaint
-              processing caused by force majeure, system downtime, or
-              circumstances beyond the LGU's reasonable control.
+            {/* Section 8 */}
+            <Section title={t('termsModal.sections.s8Title')}>
+              {t('termsModal.sections.s8Body')}
             </Section>
 
-            <Section title="9. Amendments">
-              These terms may be updated from time to time by the LGU.
-              Continued use of the system after any amendment constitutes
-              acceptance of the revised terms. Significant changes will be
-              communicated through the system's notification feature.
+            {/* Section 9 */}
+            <Section title={t('termsModal.sections.s9Title')}>
+              {t('termsModal.sections.s9Body')}
             </Section>
 
-            <Section title="10. Governing law">
-              These terms are governed by the laws of the{' '}
-              <Text style={styles.bold}>Republic of the Philippines</Text>. Any
-              dispute arising from the use of this system shall be subject to
-              the jurisdiction of the proper courts in the Province of Laguna.
+            {/* Section 10 */}
+            <Section title={t('termsModal.sections.s10Title')}>
+              {t('termsModal.sections.s10Body', {
+                country: t('termsModal.sections.s10Country'),
+              })}
             </Section>
 
             <View style={{ height: 16 }} />
@@ -231,8 +192,8 @@ export default function TermsAndAgreementModal({
                 ]}
               >
                 {hasRead
-                  ? 'You have read all the terms'
-                  : 'Scroll to read all terms before accepting'}
+                  ? t('termsModal.footer.hasRead')
+                  : t('termsModal.footer.notRead')}
               </Text>
             </View>
 
@@ -242,7 +203,9 @@ export default function TermsAndAgreementModal({
                 style={styles.declineBtn}
                 activeOpacity={0.7}
               >
-                <Text style={styles.declineBtnText}>Decline</Text>
+                <Text style={styles.declineBtnText}>
+                  {t('termsModal.footer.decline')}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -255,7 +218,9 @@ export default function TermsAndAgreementModal({
                 ]}
               >
                 <Check size={15} color="#FFFFFF" />
-                <Text style={styles.acceptBtnText}>I agree to the terms</Text>
+                <Text style={styles.acceptBtnText}>
+                  {t('termsModal.footer.accept')}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

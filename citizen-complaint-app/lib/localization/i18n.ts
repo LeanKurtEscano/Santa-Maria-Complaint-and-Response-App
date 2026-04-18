@@ -89,7 +89,8 @@ const resources = {
 
   "passwordRequirements": "Password Requirements",
   "passwordRequirementsDetail": "Must be at least 8 characters long.",
-
+    registerWithEmail: 'Register with Email',
+    registerWithPhone: 'Register with Phone Number',
   "resetPasswordNewRequired": "Please enter a new password.",
   "resetPasswordConfirmRequired": "Please confirm your new password.",
   "resetPasswordTooShort": "Password must be at least 8 characters.",
@@ -138,6 +139,69 @@ const resources = {
   "title": "Stay updated on Santa Maria's local ordinances",
   "subtitle": "Access official municipal laws and regulations of Santa Maria, Laguna — anytime, anywhere.",
   "cta": "View Ordinances"
+},
+
+"termsModal": {
+  "badge": "LGU",
+  "municipality": "Municipality of Santa Maria",
+  "province": "Laguna, Philippines",
+  "title": "Terms and Agreement",
+  "subtitle": "Effective date: January 1, 2025 · Version 1.0",
+  "intro": "Please read these terms carefully before using the {{appName}}. By registering, you agree to be legally bound by the following provisions.",
+  "appName": "Santa Maria Laguna Complaint Management System",
+
+  "sections": {
+    "s1Title": "1. Purpose of the system",
+    "s1Body": "This platform is operated by the {{lgu}} to facilitate the filing, tracking, and resolution of complaints from residents and stakeholders. It is intended solely for legitimate civic concerns within the jurisdiction of Santa Maria.",
+
+    "s2Title": "2. Eligibility",
+    "s2Body": "Use of this system is open to residents, business owners, and stakeholders within Santa Maria, Laguna. You must be at least 18 years of age and provide truthful, accurate information during registration. The LGU reserves the right to verify your identity.",
+
+    "s3Title": "3. Accuracy of information",
+    "s3Body": "You agree to submit complaints that are truthful and based on factual events. Filing false, malicious, or frivolous complaints is prohibited and may be subject to applicable laws of the Philippines, including the {{law}} provisions on perjury and grave oral defamation.",
+    "s3Law": "Revised Penal Code",
+
+    "s4Title": "4. Data privacy",
+    "s4Body": "Your personal data is collected and processed in accordance with the {{law}}. The Municipality of Santa Maria, Laguna is the data controller and commits to:",
+    "s4Law": "Republic Act No. 10173 (Data Privacy Act of 2012)",
+    "s4Bullet1": "Collecting only data necessary for complaint processing",
+    "s4Bullet2": "Not sharing your personal information with unauthorized third parties",
+    "s4Bullet3": "Storing data securely and retaining it only as long as required by law",
+    "s4Bullet4": "Allowing you to request access, correction, or deletion of your records",
+
+    "s5Title": "5. Complaint handling",
+    "s5Body": "Complaints submitted through this system will be reviewed by authorized LGU personnel. The LGU does not guarantee a specific resolution timeline but will endeavor to act on complaints in accordance with the {{charter}} and {{law}}. Anonymous complaints may be given lower processing priority.",
+    "s5Charter": "Citizen's Charter",
+    "s5Law": "Anti-Red Tape Act (RA 11032)",
+
+    "s6Title": "6. Prohibited conduct",
+    "s6Body": "Users are strictly prohibited from:",
+    "s6Bullet1": "Submitting fabricated or misleading complaints",
+    "s6Bullet2": "Impersonating another person or public official",
+    "s6Bullet3": "Using the system for political harassment or personal vendetta",
+    "s6Bullet4": "Attempting to access, alter, or disrupt the system",
+    "s6Bullet5": "Uploading obscene, defamatory, or illegal content",
+
+    "s7Title": "7. Account suspension",
+    "s7Body": "The LGU reserves the right to suspend or permanently revoke access to any account found in violation of these terms, without prior notice, and to refer the matter to the appropriate authorities where warranted.",
+
+    "s8Title": "8. Limitation of liability",
+    "s8Body": "The Municipality of Santa Maria, Laguna shall not be held liable for any indirect or consequential damages arising from your use of this system, including but not limited to delays in complaint processing caused by force majeure, system downtime, or circumstances beyond the LGU's reasonable control.",
+
+    "s9Title": "9. Amendments",
+    "s9Body": "These terms may be updated from time to time by the LGU. Continued use of the system after any amendment constitutes acceptance of the revised terms. Significant changes will be communicated through the system's notification feature.",
+
+    "s10Title": "10. Governing law",
+    "s10Body": "These terms are governed by the laws of the {{country}}. Any dispute arising from the use of this system shall be subject to the jurisdiction of the proper courts in the Province of Laguna.",
+    "s10Country": "Republic of the Philippines"
+  },
+
+  "footer": {
+    "notRead": "Scroll to read all terms before accepting",
+    "hasRead": "You have read all the terms",
+    "decline": "Decline",
+    "accept": "I agree to the terms"
+  }
 },
 
  "errors": {
@@ -991,7 +1055,8 @@ const resources = {
       continue: 'Magpatuloy',
       back: 'Bumalik',
       tapToUpload: 'I-tap upang mag-upload',
-
+      registerWithEmail: 'Magrehistro gamit ang Email',
+      registerWithPhone: 'Magrehistro gamit ang Phone Number',
       // Messages
       welcome: 'Maligayang pagdating',
       welcomeMessage: 'Magsumite ng reklamo at mga alalahanin sa inyong Barangay',
@@ -1042,6 +1107,69 @@ const resources = {
       whatsNext3: "Kapag naaprubahan na, maaari ka nang mag-log in gamit ang iyong mga credentials",
       backToLogin: "Bumalik sa Login",
       verificationHelpText: "Kailangan ng tulong? Kontakin ang aming support team sa support@barangay.gov.ph",
+
+      "termsModal": {
+  "badge": "LGU",
+  "municipality": "Munisipalidad ng Santa Maria",
+  "province": "Laguna, Pilipinas",
+  "title": "Mga Tuntunin at Kasunduan",
+  "subtitle": "Petsa ng bisa: Enero 1, 2025 · Bersyon 1.0",
+  "intro": "Pakibasa nang mabuti ang mga tuntuning ito bago gamitin ang {{appName}}. Sa pag-rehistro, sumasang-ayon ka na legal na nakatali sa mga sumusunod na probisyon.",
+  "appName": "Santa Maria Laguna Complaint Management System",
+
+  "sections": {
+    "s1Title": "1. Layunin ng sistema",
+    "s1Body": "Ang platform na ito ay pinapatakbo ng {{lgu}} upang tulungan ang pag-file, pagsubaybay, at resolusyon ng mga reklamo mula sa mga residente at stakeholder. Ito ay para lamang sa mga lehitimong alalahanin ng mga mamamayan sa loob ng hurisdiksyon ng Santa Maria.",
+
+    "s2Title": "2. Kwalipikasyon",
+    "s2Body": "Ang paggamit ng sistema ay bukas sa mga residente, may-ari ng negosyo, at stakeholder sa loob ng Santa Maria, Laguna. Dapat kang hindi bababa sa 18 taong gulang at magbigay ng totoong impormasyon sa panahon ng pagpaparehistro. Ang LGU ay may karapatang i-verify ang iyong pagkakakilanlan.",
+
+    "s3Title": "3. Katumpakan ng impormasyon",
+    "s3Body": "Sumasang-ayon ka na magsumite ng mga reklamo na totoo at batay sa mga tunay na pangyayari. Ang pag-file ng mga pekeng, mapanlinlang, o walang basehang reklamo ay ipinagbabawal at maaaring mapailalim sa mga batas ng Pilipinas, kasama na ang {{law}} sa usapin ng perjury at malubhang paninirang-puri.",
+    "s3Law": "Revised Penal Code",
+
+    "s4Title": "4. Proteksyon ng datos",
+    "s4Body": "Ang iyong personal na datos ay kinokolekta at pinoproseso alinsunod sa {{law}}. Ang Munisipalidad ng Santa Maria, Laguna ang data controller at nangangako na:",
+    "s4Law": "Republic Act No. 10173 (Data Privacy Act of 2012)",
+    "s4Bullet1": "Mangolekta lamang ng datos na kailangan para sa pagpoproseso ng reklamo",
+    "s4Bullet2": "Hindi ibabahagi ang iyong personal na impormasyon sa mga hindi awtorisadong third party",
+    "s4Bullet3": "Ligtas na itatago ang datos at iingatan lamang ito hangga't kinakailangan ng batas",
+    "s4Bullet4": "Papayagan kang humiling ng access, pagwawasto, o pagbubura ng iyong mga rekord",
+
+    "s5Title": "5. Paghawak ng reklamo",
+    "s5Body": "Ang mga reklamo na isinumite sa sistema ay susuriin ng mga awtorisadong tauhan ng LGU. Hindi ginagarantiyahan ng LGU ang isang partikular na takdang panahon ng resolusyon ngunit magsisikap na kumilos sa mga reklamo alinsunod sa {{charter}} at {{law}}. Ang mga anonymous na reklamo ay maaaring bigyang mas mababang priyoridad.",
+    "s5Charter": "Citizen's Charter",
+    "s5Law": "Anti-Red Tape Act (RA 11032)",
+
+    "s6Title": "6. Mga ipinagbabawal na gawi",
+    "s6Body": "Mahigpit na ipinagbabawal sa mga gumagamit ang:",
+    "s6Bullet1": "Magsumite ng mga pekeng o mapanlinlang na reklamo",
+    "s6Bullet2": "Magpanggap bilang ibang tao o opisyal ng gobyerno",
+    "s6Bullet3": "Gamitin ang sistema para sa political harassment o personal na pakikipagtalo",
+    "s6Bullet4": "Subukang i-access, baguhin, o sirain ang sistema",
+    "s6Bullet5": "Mag-upload ng obscene, mapanirang-puri, o ilegal na nilalaman",
+
+    "s7Title": "7. Pagsuspinde ng account",
+    "s7Body": "Ang LGU ay may karapatang suspindihin o permanenteng bawiin ang access ng anumang account na natuklasang lumalabag sa mga tuntuning ito, nang walang paunang abiso, at i-refer ang usapin sa mga naaangkop na awtoridad kung kinakailangan.",
+
+    "s8Title": "8. Limitasyon ng pananagutan",
+    "s8Body": "Ang Munisipalidad ng Santa Maria, Laguna ay hindi mananagot sa anumang hindi direkta o kaugnay na pinsala mula sa iyong paggamit ng sistema, kasama na ang mga pagkaantala sa pagpoproseso ng reklamo dahil sa force majeure, pagkatigil ng sistema, o mga pangyayaring wala sa kontrol ng LGU.",
+
+    "s9Title": "9. Mga pagbabago",
+    "s9Body": "Ang mga tuntuning ito ay maaaring ma-update paminsan-minsan ng LGU. Ang patuloy na paggamit ng sistema pagkatapos ng anumang pagbabago ay nangangahulugang tinanggap mo ang binagong mga tuntunin. Ang malalaking pagbabago ay ipaaalam sa pamamagitan ng notification feature ng sistema.",
+
+    "s10Title": "10. Namamahalang batas",
+    "s10Body": "Ang mga tuntuning ito ay pinamamahalaan ng mga batas ng {{country}}. Anumang hindi pagkakaunawaan na nagmumula sa paggamit ng sistema ay mapapailalim sa hurisdiksyon ng mga tamang korte sa Lalawigan ng Laguna.",
+    "s10Country": "Republika ng Pilipinas"
+  },
+
+  "footer": {
+    "notRead": "Mag-scroll para mabasa ang lahat ng tuntunin bago tanggapin",
+    "hasRead": "Nabasa mo na ang lahat ng tuntunin",
+    "decline": "Tanggihan",
+    "accept": "Sumasang-ayon ako sa mga tuntunin"
+  }
+},
 
       // Common
       common: {
@@ -1241,7 +1369,10 @@ const resources = {
           "screenTitle": "Hindi Ma-retrieve ang mga Barangay"
         }
       },
-   
+    
+
+    
+
    
    complaintDetail: {
     loading: "Nino-load ang detalye ng reklamo…",

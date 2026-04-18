@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import {
   View,
   Text,
@@ -54,9 +54,10 @@ import {
   validatePassword,
 } from '@/utils/validation/register';
 import { TAGALOG_MONTHS } from '@/constants/localization/date';
-
+import { useLocalSearchParams } from 'expo-router';
 import { THEME } from '@/constants/theme';
 import TermsAndAgreementModal from '@/components/modals/TermsAndAgreement';
+
 const SUFFIX_OPTIONS = ['Jr.', 'Sr.', 'II', 'III', 'IV'];
 
 // ─── reCAPTCHA Component ───────────────────────────────────────────────────
@@ -77,7 +78,6 @@ const Recaptcha = ({ verified, onVerify, error }: RecaptchaProps) => {
 
   const handleVerify = () => {
     setChecking(true);
-    // Simulate a brief verification delay for UX realism
     setTimeout(() => {
       setChecking(false);
       setShowModal(false);
@@ -95,7 +95,6 @@ const Recaptcha = ({ verified, onVerify, error }: RecaptchaProps) => {
           error ? styles.recaptchaBoxError : styles.recaptchaBoxDefault,
         ]}
       >
-        {/* Checkbox */}
         <View
           style={[
             styles.recaptchaCheckbox,
@@ -104,10 +103,7 @@ const Recaptcha = ({ verified, onVerify, error }: RecaptchaProps) => {
         >
           {verified && <Check size={14} color="#FFFFFF" />}
         </View>
-
         <Text style={styles.recaptchaLabel}>I'm not a robot</Text>
-
-        {/* reCAPTCHA branding */}
         <View style={styles.recaptchaBrand}>
           <Shield size={22} color={THEME.primary} />
           <Text style={[styles.recaptchaBrandText, { color: THEME.primary }]}>reCAPTCHA</Text>
@@ -122,7 +118,6 @@ const Recaptcha = ({ verified, onVerify, error }: RecaptchaProps) => {
         </View>
       ) : null}
 
-      {/* Verification Modal */}
       <Modal
         visible={showModal}
         transparent
@@ -131,7 +126,6 @@ const Recaptcha = ({ verified, onVerify, error }: RecaptchaProps) => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.recaptchaModal}>
-            {/* Header */}
             <View style={[styles.recaptchaModalHeader, { backgroundColor: THEME.primary }]}>
               <ShieldCheck size={24} color="#FFFFFF" />
               <Text style={styles.recaptchaModalTitle}>Security Check</Text>
@@ -143,13 +137,10 @@ const Recaptcha = ({ verified, onVerify, error }: RecaptchaProps) => {
                 <X size={20} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-
             <View style={styles.recaptchaModalBody}>
               <Text style={styles.recaptchaModalSubtitle}>
                 Please confirm you are not a robot
               </Text>
-
-              {/* Big clickable verify button */}
               <TouchableOpacity
                 onPress={handleVerify}
                 disabled={checking}
@@ -165,12 +156,9 @@ const Recaptcha = ({ verified, onVerify, error }: RecaptchaProps) => {
                   </View>
                 )}
               </TouchableOpacity>
-
               <View style={styles.recaptchaFooter}>
                 <Shield size={14} color="#9CA3AF" />
-                <Text style={styles.recaptchaFooterText}>
-                  Protected by reCAPTCHA
-                </Text>
+                <Text style={styles.recaptchaFooterText}>Protected by reCAPTCHA</Text>
               </View>
             </View>
           </View>
@@ -180,7 +168,6 @@ const Recaptcha = ({ verified, onVerify, error }: RecaptchaProps) => {
   );
 };
 
-// ─── StyleSheet (for components that need THEME.primary dynamically) ──────────
 const styles = StyleSheet.create({
   recaptchaBox: {
     flexDirection: 'row',
@@ -192,13 +179,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     marginBottom: 4,
   },
-  recaptchaBoxDefault: {
-    borderColor: '#E5E7EB',
-  },
-  recaptchaBoxError: {
-    borderColor: '#EF4444',
-    backgroundColor: '#FEF2F2',
-  },
+  recaptchaBoxDefault: { borderColor: '#E5E7EB' },
+  recaptchaBoxError: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
   recaptchaCheckbox: {
     width: 22,
     height: 22,
@@ -208,34 +190,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
-  recaptchaCheckboxUnchecked: {
-    borderColor: '#D1D5DB',
-    backgroundColor: '#FFFFFF',
-  },
-  recaptchaCheckboxChecked: {
-    borderColor: THEME.primary,
-    backgroundColor: THEME.primary,
-  },
-  recaptchaLabel: {
-    flex: 1,
-    fontSize: 15,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  recaptchaBrand: {
-    alignItems: 'center',
-  },
-  recaptchaBrandText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginTop: 2,
-  },
-  recaptchaPrivacy: {
-    fontSize: 8,
-    color: '#9CA3AF',
-    marginTop: 1,
-  },
+  recaptchaCheckboxUnchecked: { borderColor: '#D1D5DB', backgroundColor: '#FFFFFF' },
+  recaptchaCheckboxChecked: { borderColor: THEME.primary, backgroundColor: THEME.primary },
+  recaptchaLabel: { flex: 1, fontSize: 15, color: '#374151', fontWeight: '500' },
+  recaptchaBrand: { alignItems: 'center' },
+  recaptchaBrandText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginTop: 2 },
+  recaptchaPrivacy: { fontSize: 8, color: '#9CA3AF', marginTop: 1 },
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
@@ -261,25 +221,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 10,
   },
-  recaptchaModalTitle: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  recaptchaModalClose: {
-    padding: 4,
-  },
-  recaptchaModalBody: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  recaptchaModalSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
+  recaptchaModalTitle: { flex: 1, color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  recaptchaModalClose: { padding: 4 },
+  recaptchaModalBody: { padding: 24, alignItems: 'center' },
+  recaptchaModalSubtitle: { fontSize: 14, color: '#6B7280', marginBottom: 20, textAlign: 'center' },
   recaptchaVerifyBtn: {
     borderRadius: 12,
     paddingVertical: 16,
@@ -288,40 +233,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  recaptchaVerifyBtnContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  recaptchaVerifyBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  recaptchaFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  recaptchaFooterText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  errorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  errorText: {
-    color: '#EF4444',
-    fontSize: 12,
-    marginLeft: 4,
-  },
+  recaptchaVerifyBtnContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  recaptchaVerifyBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+  recaptchaFooter: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  recaptchaFooterText: { fontSize: 12, color: '#9CA3AF' },
+  errorRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  errorText: { color: '#EF4444', fontSize: 12, marginLeft: 4 },
 });
 
 export default function RegisterScreen({ navigation }: any) {
   const router = useRouter();
+  const { apiRoute } = useLocalSearchParams();
   const { t, i18n } = useTranslation();
+
+  // ── Derive registration mode from apiRoute ────────────────────────────────
+  // isPhoneMode = true  → show phone only, hide email
+  // isPhoneMode = false → show email only, hide phone
+  const isPhoneMode = apiRoute === '/register-phone-number';
+
   const [step, setStep] = useState(1);
   const [showGenderModal, setShowGenderModal] = useState(false);
   const [showBarangayModal, setShowBarangayModal] = useState(false);
@@ -440,12 +369,8 @@ export default function RegisterScreen({ navigation }: any) {
     }
   };
 
-  const toProperCase = (text: string): string => {
-    return text
-      .split(' ')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
+  const toProperCase = (text: string): string =>
+    text.split(' ').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
   const handlePhoneNumberChange = (text: string, onChange: (val: string) => void) => {
     let digits = text.replace(/\D/g, '');
@@ -477,11 +402,11 @@ export default function RegisterScreen({ navigation }: any) {
     setCurrentImageField(null);
   };
 
-const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
-  setValue(field, '' as any, { shouldValidate: false, shouldDirty: true });
-  clearErrors(field);
-  await saveFormData();
-};
+  const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
+    setValue(field, '' as any, { shouldValidate: false, shouldDirty: true });
+    clearErrors(field);
+    await saveFormData();
+  };
 
   const getFileName = (uri: string | undefined) => {
     if (!uri) return '';
@@ -495,7 +420,13 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
       data.selfieImage ? convertImageToBase64(data.selfieImage) : null,
     ]);
     try {
-      await AsyncStorage.setItem('registrationData', JSON.stringify({ ...data, idFrontImage: idFrontBase64, idBackImage: idBackBase64, selfieImage: selfieBase64, age }));
+      await AsyncStorage.setItem('registrationData', JSON.stringify({
+        ...data,
+        idFrontImage: idFrontBase64,
+        idBackImage: idBackBase64,
+        selfieImage: selfieBase64,
+        age,
+      }));
     } catch (error) {
       throw error;
     }
@@ -505,38 +436,21 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
     try { await AsyncStorage.removeItem('registrationFormData'); } catch (error) { console.error('Error clearing saved form data:', error); }
   };
 
-  const getPasswordStrength = (password: string): { label: string; color: string; width: string } => {
-    if (!password) return { label: '', color: 'bg-neutral-200', width: 'w-0' };
-    let score = 0;
-    if (password.length >= 8) score++;
-    if (password.length >= 12) score++;
-    if (/[0-9]/.test(password)) score++;
-    if (/[^A-Za-z0-9]/.test(password)) score++;
-    if (score <= 1) return { label: t('registerValidation.passwordWeak'), color: 'bg-red-500', width: 'w-1/3' };
-    if (score <= 2) return { label: t('registerValidation.passwordMedium'), color: 'bg-yellow-400', width: 'w-2/3' };
-    return { label: t('registerValidation.passwordStrong'), color: 'bg-green-500', width: 'w-full' };
-  };
-
   const onSubmit = async (data: RegistrationFormData) => {
     setNetworkError(null);
 
     // ── Step 1 validation ────────────────────────────────────────────────
     const step1Errors: { field: keyof RegistrationFormData; message: string }[] = [];
-
     const firstNameError = validateFirstName(data.firstName, t);
     if (firstNameError) step1Errors.push({ field: 'firstName', message: firstNameError });
-
     if (data.middleName) {
       const middleNameError = validateMiddleName(data.middleName, t);
       if (middleNameError) step1Errors.push({ field: 'middleName', message: middleNameError });
     }
-
     const lastNameError = validateLastName(data.lastName, t);
     if (lastNameError) step1Errors.push({ field: 'lastName', message: lastNameError });
-
     if (!data.dateOfBirth) step1Errors.push({ field: 'dateOfBirth', message: t('required') });
     if (!data.gender) step1Errors.push({ field: 'gender', message: t('required') });
-
     if (step1Errors.length > 0) {
       step1Errors.forEach(({ field, message }) => setError(field, { type: 'manual', message }));
       setStep(1);
@@ -546,20 +460,24 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
     // ── Step 2 validation ────────────────────────────────────────────────
     const step2Errors: { field: keyof RegistrationFormData; message: string }[] = [];
 
-    const emailError = validateEmail(data.email, t);
-    if (emailError) step2Errors.push({ field: 'email', message: emailError });
+    // Only validate email if it's email mode
+    if (!isPhoneMode) {
+      const emailError = validateEmail(data.email, t);
+      if (emailError) step2Errors.push({ field: 'email', message: emailError });
+    }
 
-    const stripped = data.phoneNumber.startsWith('0') ? data.phoneNumber.slice(1) : data.phoneNumber;
-    const phoneError = validateContactNumber(stripped, t);
-    if (phoneError) step2Errors.push({ field: 'phoneNumber', message: phoneError });
+    // Only validate phone if it's phone mode
+    if (isPhoneMode) {
+      const stripped = data.phoneNumber.startsWith('0') ? data.phoneNumber.slice(1) : data.phoneNumber;
+      const phoneError = validateContactNumber(stripped, t);
+      if (phoneError) step2Errors.push({ field: 'phoneNumber', message: phoneError });
+    }
 
     const passwordError = validatePassword(data.password, t);
     if (passwordError) step2Errors.push({ field: 'password', message: passwordError });
-
     if (data.password !== data.confirmPassword) {
       step2Errors.push({ field: 'confirmPassword', message: t('passwordMismatch') });
     }
-
     if (step2Errors.length > 0) {
       step2Errors.forEach(({ field, message }) => setError(field, { type: 'manual', message }));
       setStep(2);
@@ -568,14 +486,12 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
 
     // ── Step 3 validation ────────────────────────────────────────────────
     const step3Errors: { field: keyof RegistrationFormData; message: string }[] = [];
-
     if (!data.idType) step3Errors.push({ field: 'idType', message: t('required') });
     if (!data.idNumber) step3Errors.push({ field: 'idNumber', message: t('required') });
     if (!data.idFrontImage) step3Errors.push({ field: 'idFrontImage', message: t('required') });
     if (!data.selfieImage) step3Errors.push({ field: 'selfieImage', message: t('required') });
     if (!data.agreedToTerms) step3Errors.push({ field: 'agreedToTerms', message: t('required') });
 
-    // ── reCAPTCHA validation ─────────────────────────────────────────────
     if (!recaptchaVerified) {
       setRecaptchaError('Please complete the reCAPTCHA verification.');
       setStep(3);
@@ -591,27 +507,70 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
     setIsLoading(true);
     try {
       await saveFormData();
-      const response = await authApiClient.post('/register', { email: data.email, phone_number: data.phoneNumber });
+
+      // ── Use the correct API route based on mode ───────────────────────
+      const endpoint = isPhoneMode ? '/register-phone-number' : '/register';
+      const payload = isPhoneMode
+        ? { phone_number: data.phoneNumber }
+        : { email: data.email, phone_number: data.phoneNumber };
+
+      const response = await authApiClient.post(endpoint, payload);
       if (!response || !response.data) throw new Error('Invalid response from server');
+
       await storeRegistrationData(data);
       setSubmittedEmail(data.email);
       await clearSavedFormData();
-      router.replace({ pathname: '/(auth)/Otp', params: { email: data.email, apiRoute: '/verify-otp', otpResendRoute: '/resend-otp' } });
+      
+
+
+ 
+      if(isPhoneMode) {
+
+        router.replace({
+        pathname: '/(auth)/Otp',
+        params: {
+          phone: data.phoneNumber ,
+          apiRoute: '/verify-phone-number-otp',
+          otpResendRoute: '/resend-phone-otp',
+        },
+      });
+
+      } else {
+
+        router.replace({
+        pathname: '/(auth)/Otp',
+        params: {
+          email: data.email,
+          
+          apiRoute: '/verify-otp',
+          otpResendRoute: '/resend-otp',
+        },
+      });
+
+      }
+      
     } catch (error: any) {
       if (error?.response?.status === 400) {
         const detail = error?.response?.data?.detail || '';
-        if (detail.toLowerCase().includes('phone')) {
+        if (isPhoneMode || detail.toLowerCase().includes('phone')) {
           setError('phoneNumber', { type: 'server', message: detail || 'Phone number already registered' });
         } else {
           setError('email', { type: 'server', message: detail || 'Email already registered' });
         }
         setStep(2);
-      } else if (error?.code === 'ECONNABORTED' || error?.code === 'ERR_NETWORK' || error?.message === 'Network Error' || error?.message?.includes('Network request failed')) {
+      } else if (
+        error?.code === 'ECONNABORTED' ||
+        error?.code === 'ERR_NETWORK' ||
+        error?.message === 'Network Error' ||
+        error?.message?.includes('Network request failed')
+      ) {
         setNetworkError('Network error. Please check your connection and try again.');
       } else if (error?.code === 'ETIMEDOUT') {
         setNetworkError('Request timed out. Please try again.');
       } else if (error?.response?.data?.errors) {
-        Object.entries(error.response.data.errors).forEach(([key, message]) => setError(key as keyof RegistrationFormData, { type: 'server', message: message as string }));
+        Object.entries(error.response.data.errors).forEach(([key, message]) =>
+          setError(key as keyof RegistrationFormData, { type: 'server', message: message as string })
+        );
       } else {
         setNetworkError(error?.response?.data?.message || error?.message || 'Registration failed. Please try again.');
       }
@@ -640,10 +599,7 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
         <Controller
           control={control}
           name="firstName"
-          rules={{
-            required: t('required'),
-            validate: (value) => validateFirstName(value, t) || true,
-          }}
+          rules={{ required: t('required'), validate: (value) => validateFirstName(value, t) || true }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.firstName ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
               <User size={20} color="#6B7280" />
@@ -714,10 +670,7 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
         <Controller
           control={control}
           name="lastName"
-          rules={{
-            required: t('required'),
-            validate: (value) => validateLastName(value, t) || true,
-          }}
+          rules={{ required: t('required'), validate: (value) => validateLastName(value, t) || true }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.lastName ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
               <User size={20} color="#6B7280" />
@@ -741,7 +694,7 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
         <ErrorMessage message={errors.lastName?.message} />
       </View>
 
-      {/* Suffix — picker modal */}
+      {/* Suffix */}
       <View className="mb-4">
         <Text className="text-sm font-medium text-neutral-700 mb-2">{t('suffix')}</Text>
         <Controller
@@ -946,7 +899,7 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
     </View>
   );
 
-  // ─── Step 2: Contact & Address Info ───────────────────────────────────────
+  // ─── Step 2: Contact Info ──────────────────────────────────────────────────
   const renderStep2 = () => (
     <View>
       <Text className="text-2xl font-bold text-neutral-900 mb-6">{t('contactInfo')}</Text>
@@ -958,85 +911,89 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
         </View>
       )}
 
-      {/* Email */}
-      <View className="mb-4">
-        <Text className="text-sm font-medium text-neutral-700 mb-2">{t('email')} *</Text>
-        <Controller
-          control={control}
-          name="email"
-          rules={{
-            required: t('required'),
-            validate: (value) => {
-              const err = validateEmail(value, t);
-              return err ? err : true;
-            },
-          }}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.email ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
-              <Mail size={20} color={errors.email ? '#EF4444' : '#6B7280'} />
-              <TextInput
-                className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
-                onBlur={() => {
-                  onBlur();
-                  const err = validateEmail(value, t);
-                  if (err) setError('email', { type: 'manual', message: err });
-                  else clearErrors('email');
-                }}
-                onChangeText={(text) => { onChange(text); clearErrors('email'); setNetworkError(null); }}
-                value={value}
-                placeholder="juan.delacruz@gmail.com"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-          )}
-        />
-        <ErrorMessage message={errors.email?.message} />
-      </View>
-
-      {/* Phone Number with +63 prefix */}
-      <View className="mb-4">
-        <Text className="text-sm font-medium text-neutral-700 mb-2">{t('phoneNumber')} *</Text>
-        <Controller
-          control={control}
-          name="phoneNumber"
-          rules={{
-            required: t('required'),
-            validate: (value) => {
-              const stripped = value.startsWith('0') ? value.slice(1) : value;
-              const err = validateContactNumber(stripped, t);
-              return err || true;
-            },
-          }}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
-              <Phone size={20} color="#6B7280" />
-              <View className="ml-3 mr-1 border-r border-neutral-300 pr-3">
-                <Text className="text-base text-neutral-700 py-2.5">+63</Text>
+      {/* ── Email — shown only in email mode ── */}
+      {!isPhoneMode && (
+        <View className="mb-4">
+          <Text className="text-sm font-medium text-neutral-700 mb-2">{t('email')} *</Text>
+          <Controller
+            control={control}
+            name="email"
+            rules={{
+              required: t('required'),
+              validate: (value) => {
+                const err = validateEmail(value, t);
+                return err ? err : true;
+              },
+            }}
+            render={({ field: { onChange, onBlur, value } }) => (
+              <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.email ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+                <Mail size={20} color={errors.email ? '#EF4444' : '#6B7280'} />
+                <TextInput
+                  className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
+                  onBlur={() => {
+                    onBlur();
+                    const err = validateEmail(value, t);
+                    if (err) setError('email', { type: 'manual', message: err });
+                    else clearErrors('email');
+                  }}
+                  onChangeText={(text) => { onChange(text); clearErrors('email'); setNetworkError(null); }}
+                  value={value}
+                  placeholder="juan.delacruz@gmail.com"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
               </View>
-              <TextInput
-                className="flex-1 ml-2 text-base text-neutral-900 py-2.5"
-                onBlur={() => {
-                  onBlur();
-                  const stripped = value.startsWith('0') ? value.slice(1) : value;
-                  const err = validateContactNumber(stripped, t);
-                  if (err) setError('phoneNumber', { type: 'manual', message: err });
-                  else clearErrors('phoneNumber');
-                }}
-                onChangeText={(text) => handlePhoneNumberChange(text, onChange)}
-                value={value}
-                placeholder="9123456789"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="phone-pad"
-                maxLength={11}
-              />
-            </View>
-          )}
-        />
-        <Text className="text-xs text-neutral-500 mt-1">Enter your 11-digit number (e.g. 09123456789)</Text>
-        <ErrorMessage message={errors.phoneNumber?.message} />
-      </View>
+            )}
+          />
+          <ErrorMessage message={errors.email?.message} />
+        </View>
+      )}
+
+      {/* ── Phone Number — shown only in phone mode ── */}
+      {isPhoneMode && (
+        <View className="mb-4">
+          <Text className="text-sm font-medium text-neutral-700 mb-2">{t('phoneNumber')} *</Text>
+          <Controller
+            control={control}
+            name="phoneNumber"
+            rules={{
+              required: t('required'),
+              validate: (value) => {
+                const stripped = value.startsWith('0') ? value.slice(1) : value;
+                const err = validateContactNumber(stripped, t);
+                return err || true;
+              },
+            }}
+            render={({ field: { onChange, onBlur, value } }) => (
+              <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+                <Phone size={20} color="#6B7280" />
+                <View className="ml-3 mr-1 border-r border-neutral-300 pr-3">
+                  <Text className="text-base text-neutral-700 py-2.5">+63</Text>
+                </View>
+                <TextInput
+                  className="flex-1 ml-2 text-base text-neutral-900 py-2.5"
+                  onBlur={() => {
+                    onBlur();
+                    const stripped = value.startsWith('0') ? value.slice(1) : value;
+                    const err = validateContactNumber(stripped, t);
+                    if (err) setError('phoneNumber', { type: 'manual', message: err });
+                    else clearErrors('phoneNumber');
+                  }}
+                  onChangeText={(text) => handlePhoneNumberChange(text, onChange)}
+                  value={value}
+                  placeholder="9123456789"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                />
+              </View>
+            )}
+          />
+          <Text className="text-xs text-neutral-500 mt-1">Enter your 11-digit number (e.g. 09123456789)</Text>
+          <ErrorMessage message={errors.phoneNumber?.message} />
+        </View>
+      )}
 
       {/* Password */}
       <View className="mb-4">
@@ -1044,43 +1001,33 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
         <Controller
           control={control}
           name="password"
-          rules={{
-            required: t('required'),
-            validate: (value) => validatePassword(value, t) || true,
-          }}
-          render={({ field: { onChange, onBlur, value } }) => {
-            return (
-              <>
-                <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.password ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
-                  <Lock size={20} color="#6B7280" />
-                  <TextInput
-                    className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
-                    maxLength={128}
-                    onBlur={() => {
-                      onBlur();
-                      const err = validatePassword(value, t);
-                      if (err) setError('password', { type: 'manual', message: err });
-                      else clearErrors('password');
-                    }}
-                    onChangeText={(text) => {
-                      onChange(text.replace(/\s/g, ''));
-                      clearErrors('password');
-                    }}
-                    value={value}
-                    placeholder="••••••••"
-                    placeholderTextColor="#9CA3AF"
-                    secureTextEntry={!showPassword}
-                  />
-                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-1" activeOpacity={0.7}>
-                    {showPassword ? <EyeOff size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
-                  </TouchableOpacity>
-                </View>
-                <Text className="text-xs text-neutral-500 mt-1">
-                  {t('registerValidation.passwordHint')}
-                </Text>
-              </>
-            );
-          }}
+          rules={{ required: t('required'), validate: (value) => validatePassword(value, t) || true }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <>
+              <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.password ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+                <Lock size={20} color="#6B7280" />
+                <TextInput
+                  className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
+                  maxLength={128}
+                  onBlur={() => {
+                    onBlur();
+                    const err = validatePassword(value, t);
+                    if (err) setError('password', { type: 'manual', message: err });
+                    else clearErrors('password');
+                  }}
+                  onChangeText={(text) => { onChange(text.replace(/\s/g, '')); clearErrors('password'); }}
+                  value={value}
+                  placeholder="••••••••"
+                  placeholderTextColor="#9CA3AF"
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-1" activeOpacity={0.7}>
+                  {showPassword ? <EyeOff size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
+                </TouchableOpacity>
+              </View>
+              <Text className="text-xs text-neutral-500 mt-1">{t('registerValidation.passwordHint')}</Text>
+            </>
+          )}
         />
         <ErrorMessage message={errors.password?.message} />
       </View>
@@ -1113,7 +1060,7 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
         <ErrorMessage message={errors.confirmPassword?.message} />
       </View>
 
-      {/* Barangay modal (kept for when re-enabled) */}
+      {/* Barangay modal */}
       <Modal visible={showBarangayModal} transparent animationType="slide" onRequestClose={() => setShowBarangayModal(false)}>
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-3xl p-6 max-h-[70%]">
@@ -1155,7 +1102,6 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
   );
 
   // ─── Step 3: ID Verification ───────────────────────────────────────────────
-// ─── Step 3: ID Verification ───────────────────────────────────────────────
   const renderStep3 = () => (
     <View>
       <Text className="text-2xl font-bold text-neutral-900 mb-2">{t('idVerification')}</Text>
@@ -1250,18 +1196,10 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
                       <Text className="ml-2 text-sm text-neutral-700 flex-1" numberOfLines={1}>{getFileName(value)}</Text>
                     </View>
                     <View className="flex-row" style={{ gap: 8 }}>
-                      <TouchableOpacity
-                        onPress={() => handleImagePick('idFrontImage')}
-                        className="bg-primary-100 rounded-lg p-2"
-                        activeOpacity={0.7}
-                      >
+                      <TouchableOpacity onPress={() => handleImagePick('idFrontImage')} className="bg-primary-100 rounded-lg p-2" activeOpacity={0.7}>
                         <Camera size={16} color={THEME.primary} />
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => removeImage('idFrontImage')}
-                        className="bg-error-100 rounded-lg p-2"
-                        activeOpacity={0.7}
-                      >
+                      <TouchableOpacity onPress={() => removeImage('idFrontImage')} className="bg-error-100 rounded-lg p-2" activeOpacity={0.7}>
                         <X size={16} color="#EF4444" />
                       </TouchableOpacity>
                     </View>
@@ -1290,29 +1228,21 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
         <Controller
           control={control}
           name="idBackImage"
-           rules={{ required: t('required') }}
+          rules={{ required: t('required') }}
           render={({ field: { value } }) => (
             <>
               {value && value !== '' ? (
-             <View className={`border-2 rounded-xl p-4 bg-white ${errors.idBackImage ? 'border-error-500' : 'border-neutral-200'}`}>
+                <View className={`border-2 rounded-xl p-4 bg-white ${errors.idBackImage ? 'border-error-500' : 'border-neutral-200'}`}>
                   <View className="flex-row items-center justify-between">
                     <View className="flex-row items-center flex-1">
                       <ImageIcon size={20} color="#10B981" />
                       <Text className="ml-2 text-sm text-neutral-700 flex-1" numberOfLines={1}>{getFileName(value)}</Text>
                     </View>
                     <View className="flex-row" style={{ gap: 8 }}>
-                      <TouchableOpacity
-                        onPress={() => handleImagePick('idBackImage')}
-                        className="bg-primary-100 rounded-lg p-2"
-                        activeOpacity={0.7}
-                      >
+                      <TouchableOpacity onPress={() => handleImagePick('idBackImage')} className="bg-primary-100 rounded-lg p-2" activeOpacity={0.7}>
                         <Camera size={16} color={THEME.primary} />
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => removeImage('idBackImage')}
-                        className="bg-error-100 rounded-lg p-2"
-                        activeOpacity={0.7}
-                      >
+                      <TouchableOpacity onPress={() => removeImage('idBackImage')} className="bg-error-100 rounded-lg p-2" activeOpacity={0.7}>
                         <X size={16} color="#EF4444" />
                       </TouchableOpacity>
                     </View>
@@ -1352,18 +1282,10 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
                       <Text className="ml-2 text-sm text-neutral-700 flex-1" numberOfLines={1}>{getFileName(value)}</Text>
                     </View>
                     <View className="flex-row" style={{ gap: 8 }}>
-                      <TouchableOpacity
-                        onPress={() => handleImagePick('selfieImage')}
-                        className="bg-primary-100 rounded-lg p-2"
-                        activeOpacity={0.7}
-                      >
+                      <TouchableOpacity onPress={() => handleImagePick('selfieImage')} className="bg-primary-100 rounded-lg p-2" activeOpacity={0.7}>
                         <Camera size={16} color={THEME.primary} />
                       </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => removeImage('selfieImage')}
-                        className="bg-error-100 rounded-lg p-2"
-                        activeOpacity={0.7}
-                      >
+                      <TouchableOpacity onPress={() => removeImage('selfieImage')} className="bg-error-100 rounded-lg p-2" activeOpacity={0.7}>
                         <X size={16} color="#EF4444" />
                       </TouchableOpacity>
                     </View>
@@ -1418,98 +1340,73 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
       </Modal>
 
       {/* Terms and Conditions */}
-<View className="mb-4">
-  <Controller
-    control={control}
-    name="agreedToTerms"
-    rules={{ required: t('required') }}
-    render={({ field: { onChange, value } }) => (
-      <>
-        <TouchableOpacity
-          onPress={() => {
-            if (value) {
-              onChange(false);
-            } else {
-              setShowTermsModal(true);
-            }
-          }}
-          className="flex-row items-start mb-2"
-          activeOpacity={0.7}
-        >
-          <View
-            style={value ? { backgroundColor: THEME.primary, borderColor: THEME.primary } : {}}
-            className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${
-              !value ? (errors.agreedToTerms ? 'border-error-500' : 'border-neutral-300') : ''
-            }`}
-          >
-            {value && <Check size={14} color="#FFFFFF" />}
-          </View>
-          <Text className="text-sm text-neutral-700 flex-1">{t('agreeTerms')}</Text>
-        </TouchableOpacity>
+      <View className="mb-4">
+        <Controller
+          control={control}
+          name="agreedToTerms"
+          rules={{ required: t('required') }}
+          render={({ field: { onChange, value } }) => (
+            <>
+              <TouchableOpacity
+                onPress={() => { if (value) { onChange(false); } else { setShowTermsModal(true); } }}
+                className="flex-row items-start mb-2"
+                activeOpacity={0.7}
+              >
+                <View
+                  style={value ? { backgroundColor: THEME.primary, borderColor: THEME.primary } : {}}
+                  className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${!value ? (errors.agreedToTerms ? 'border-error-500' : 'border-neutral-300') : ''}`}
+                >
+                  {value && <Check size={14} color="#FFFFFF" />}
+                </View>
+                <Text className="text-sm text-neutral-700 flex-1">{t('agreeTerms')}</Text>
+              </TouchableOpacity>
 
-        <TermsAndAgreementModal
-          visible={showTermsModal}
-          onAccept={() => {
-            onChange(true);           // ✅ directly calls Controller's onChange
-            clearErrors('agreedToTerms');
-            setShowTermsModal(false);
-            saveFormData();
-          }}
-          onDecline={() => setShowTermsModal(false)}
+              <TermsAndAgreementModal
+                visible={showTermsModal}
+                onAccept={() => { onChange(true); clearErrors('agreedToTerms'); setShowTermsModal(false); saveFormData(); }}
+                onDecline={() => setShowTermsModal(false)}
+              />
+            </>
+          )}
         />
-      </>
-    )}
-  />
+        <ErrorMessage message={errors.agreedToTerms?.message} />
 
-  <ErrorMessage message={errors.agreedToTerms?.message} />
-
-
-  {/* ── reCAPTCHA ── */}
-      <View className="mb-6">
-        <Recaptcha
-          verified={recaptchaVerified}
-          onVerify={() => {
-            setRecaptchaVerified(true);
-            setRecaptchaError(undefined);
-          }}
-          error={recaptchaError}
-        />
-      </View>
-
-
-      {errors.root?.general && (
-        <View className="bg-error-50 border border-error-200 rounded-xl p-4 mb-6">
-          <View className="flex-row items-center">
-            <AlertCircle size={20} color="#EF4444" />
-            <Text className="text-error-700 font-medium ml-2">{errors.root.general.message}</Text>
-          </View>
+        {/* reCAPTCHA */}
+        <View className="mb-6 mt-2">
+          <Recaptcha
+            verified={recaptchaVerified}
+            onVerify={() => { setRecaptchaVerified(true); setRecaptchaError(undefined); }}
+            error={recaptchaError}
+          />
         </View>
-      )}
 
+        {errors.root?.general && (
+          <View className="bg-error-50 border border-error-200 rounded-xl p-4 mb-6">
+            <View className="flex-row items-center">
+              <AlertCircle size={20} color="#EF4444" />
+              <Text className="text-error-700 font-medium ml-2">{errors.root.general.message}</Text>
+            </View>
+          </View>
+        )}
 
-      <View className="flex-row gap-3">
-        <TouchableOpacity onPress={() => setStep(2)} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
-          <Text className="text-neutral-700 font-semibold text-base">{t('back')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleSubmit(onSubmit)}
-          disabled={isLoading}
-          style={{ backgroundColor: THEME.primary }}
-          className="flex-1 rounded-xl py-4 items-center shadow-sm"
-          activeOpacity={0.85}
-        >
-          {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text className="text-white font-semibold text-base">{t('submit')}</Text>}
-        </TouchableOpacity>
+        <View className="flex-row gap-3">
+          <TouchableOpacity onPress={() => setStep(2)} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
+            <Text className="text-neutral-700 font-semibold text-base">{t('back')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleSubmit(onSubmit)}
+            disabled={isLoading}
+            style={{ backgroundColor: THEME.primary }}
+            className="flex-1 rounded-xl py-4 items-center shadow-sm"
+            activeOpacity={0.85}
+          >
+            {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text className="text-white font-semibold text-base">{t('submit')}</Text>}
+          </TouchableOpacity>
+        </View>
       </View>
-
-</View>
-
-     
     </View>
-
-
-
   );
+
   return (
     <SafeAreaView className="flex-1 bg-white">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
@@ -1533,7 +1430,7 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
 
           <Text className="text-3xl font-bold text-neutral-900 mb-8">{t('register')}</Text>
 
-          {/* Progress Indicator — 3 steps */}
+          {/* Progress Indicator */}
           <View className="flex-row mb-8 gap-2">
             {[1, 2, 3].map((s) => (
               <View
@@ -1557,5 +1454,5 @@ const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage'
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
-  ); 
+  );
 }
