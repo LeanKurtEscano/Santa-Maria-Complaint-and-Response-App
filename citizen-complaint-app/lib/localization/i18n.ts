@@ -133,6 +133,46 @@ const resources = {
     "error_generic": "An unexpected error occurred. Please try again."
   },
 
+  "ordinance": {
+  "badge": "Official Records",
+  "title": "Stay updated on Santa Maria's local ordinances",
+  "subtitle": "Access official municipal laws and regulations of Santa Maria, Laguna — anytime, anywhere.",
+  "cta": "View Ordinances"
+},
+
+ "errors": {
+    "retryLabel": "Try Again",
+    "retryingLabel": "Retrying...",
+    "network": {
+      "title": "No Internet Connection",
+      "message": "Please check your internet connection and try again."
+    },
+    "server": {
+      "title": "Something Went Wrong",
+      "message": "We encountered an issue on our end. Please try again later."
+    },
+    "notFound": {
+      "title": "Not Found",
+      "message": "The content you are looking for could not be found."
+    },
+    "unauthorized": {
+      "title": "Unauthorized",
+      "message": "You need to sign in to access this content."
+    },
+    "forbidden": {
+      "title": "Access Denied",
+      "message": "You do not have permission to access this content."
+    },
+    "timeout": {
+      "title": "Request Timeout",
+      "message": "The request took too long to complete. Please try again."
+    },
+    "generic": {
+      "title": "Error",
+      "message": "An unexpected error occurred. Please try again."
+    }
+  },
+
       // Registration
       personalInfo: 'Personal Information',
       firstName: 'First Name',
@@ -1298,6 +1338,39 @@ const resources = {
       showLess: "Ipakita ang Mas Kaunti",
     },
   },
+
+   "errors": {
+    "retryLabel": "Subukang Muli",
+    "retryingLabel": "Sinusubukan...",
+    "network": {
+      "title": "Walang Koneksyon sa Internet",
+      "message": "Pakitingnan ang iyong koneksyon sa internet at subukang muli."
+    },
+    "server": {
+      "title": "May Nangyaring Mali",
+      "message": "Nakatagpo kami ng problema sa aming panig. Pakisubukan muli mamaya."
+    },
+    "notFound": {
+      "title": "Hindi Mahanap",
+      "message": "Ang nilalaman na hinahanap mo ay hindi mahanap."
+    },
+    "unauthorized": {
+      "title": "Hindi Awtorisado",
+      "message": "Kailangan mong mag-sign in upang ma-access ang nilalamang ito."
+    },
+    "forbidden": {
+      "title": "Tinanggihan ang Access",
+      "message": "Wala kang pahintulot na ma-access ang nilalamang ito."
+    },
+    "timeout": {
+      "title": "Nag-timeout ang Kahilingan",
+      "message": "Masyadong matagal ang kahilingan. Pakisubukan muli."
+    },
+    "generic": {
+      "title": "Error",
+      "message": "Nagkaroon ng hindi inaasahang error. Pakisubukan muli."
+    }
+  },
       "complaint_form": {
         "screen_title": "Maghain ng Reklamo",
         "title_label": "Kategorya ng Reklamo",
@@ -1448,6 +1521,13 @@ const resources = {
       }
     }
   }, 
+
+  "ordinance": {
+  "badge": "Opisyal na Rekord",
+  "title": "Manatiling updated sa mga ordinansa ng Santa Maria",
+  "subtitle": "Tingnan ang mga opisyal na batas at regulasyon ng Munisipalidad ng Santa Maria, Laguna — kahit saan, kahit kailan.",
+  "cta": "Tingnan ang mga Ordinansa"
+},
   "registerValidation": {
   "firstNameRequired": "Kailangan ang pangalan.",
   "firstNameMinLength": "Ang pangalan ay dapat hindi mas maikli sa 2 karakter.",

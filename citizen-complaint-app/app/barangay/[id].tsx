@@ -97,9 +97,10 @@ export default function ComplaintFormScreen() {
 
   // ── Derived values ───────────────────────────────────────────────────────────
   const isOtherSelected   = selectedPreset?.key === OTHER_KEY;
-  const resolvedTitle     = isOtherSelected
-    ? customTitle.trim()
-    : selectedPreset?.key ? t(selectedPreset.key) : '';
+const resolvedTitle = isOtherSelected
+  ? customTitle.trim()
+  : selectedPreset?.key ? t(selectedPreset.key, { lng: 'en' }) : '';
+
   const resolvedCategoryId = selectedPreset?.category_id ?? null;
   const hasProfileLocation = !!(userData?.latitude && userData?.longitude);
 

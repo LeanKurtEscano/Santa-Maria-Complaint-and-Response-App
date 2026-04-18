@@ -80,10 +80,14 @@ export function getCategoryLabel(categoryKey: string, fallback?: string): string
   return CATEGORY_LABELS[categoryKey] ?? fallback ?? categoryKey;
 }
 
-// ─── Date Helpers ─────────────────────────────────────────────────────────────
-
 export function formatDate(iso: string, options?: Intl.DateTimeFormatOptions) {
-  return new Date(iso).toLocaleDateString("en-PH", {
+  const normalized = iso.includes("T") ? iso : iso.replace(" ", "T");
+  const withTz = normalized.includes("+") || normalized.includes("Z")
+    ? normalized
+    : normalized + "+08:00";          // treat as Manila time if no tz info
+
+  return new Date(withTz).toLocaleDateString("en-PH", {
+    timeZone: "Asia/Manila",
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -92,11 +96,12 @@ export function formatDate(iso: string, options?: Intl.DateTimeFormatOptions) {
 }
 
 export function formatTime(raw: string) {
-  // Convert "2026-04-15 15:15:19.162658" → "2026-04-15T15:15:19"
-  const isoLike = raw.replace(" ", "T").split(".")[0];
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const withTz = normalized.includes("+") || normalized.includes("Z")
+    ? normalized
+    : normalized + "+08:00";          // ← this was the bug, date was parsed as UTC
 
-  const date = new Date(isoLike);
-
+  const date = new Date(withTz);
   if (isNaN(date.getTime())) return "";
 
   return new Intl.DateTimeFormat("en-PH", {

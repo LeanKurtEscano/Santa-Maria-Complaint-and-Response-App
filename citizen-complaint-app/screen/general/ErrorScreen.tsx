@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import {
   WifiOff,
   AlertCircle,
@@ -20,8 +21,8 @@ export enum ErrorType {
 }
 
 export interface ErrorScreenConfig {
-  title: string;
-  message: string;
+  titleKey: string;
+  messageKey: string;
   icon: React.ReactNode;
   showRetry: boolean;
 }
@@ -31,27 +32,27 @@ interface ErrorScreenProps {
    * Type of error to display
    */
   type?: ErrorType;
-  
+
   /**
    * Custom title (overrides default)
    */
   title?: string;
-  
+
   /**
    * Custom message (overrides default)
    */
   message?: string;
-  
+
   /**
    * Custom icon (overrides default)
    */
   icon?: React.ReactNode;
-  
+
   /**
    * Callback function when retry button is pressed
    */
   onRetry?: () => void;
-  
+
   /**
    * Optional secondary action button
    */
@@ -59,27 +60,27 @@ interface ErrorScreenProps {
     label: string;
     onPress: () => void;
   };
-  
+
   /**
    * Show loading state on retry button
    */
   retryLoading?: boolean;
-  
+
   /**
    * Custom retry button label
    */
   retryLabel?: string;
-  
+
   /**
    * Use full screen mode (includes SafeAreaView)
    */
   fullScreen?: boolean;
-  
+
   /**
    * Custom background color
    */
   backgroundColor?: string;
-  
+
   /**
    * Hide retry button
    */
@@ -88,44 +89,44 @@ interface ErrorScreenProps {
 
 const ERROR_CONFIGS: Record<ErrorType, ErrorScreenConfig> = {
   [ErrorType.NETWORK]: {
-    title: 'No Internet Connection',
-    message: 'Please check your internet connection and try again.',
+    titleKey: 'errors.network.title',
+    messageKey: 'errors.network.message',
     icon: <WifiOff size={64} color="#EF4444" />,
     showRetry: true,
   },
   [ErrorType.SERVER]: {
-    title: 'Something Went Wrong',
-    message: 'We encountered an issue on our end. Please try again later.',
+    titleKey: 'errors.server.title',
+    messageKey: 'errors.server.message',
     icon: <ServerCrash size={64} color="#EF4444" />,
     showRetry: true,
   },
   [ErrorType.NOT_FOUND]: {
-    title: 'Not Found',
-    message: 'The content you are looking for could not be found.',
+    titleKey: 'errors.notFound.title',
+    messageKey: 'errors.notFound.message',
     icon: <AlertCircle size={64} color="#F59E0B" />,
     showRetry: false,
   },
   [ErrorType.UNAUTHORIZED]: {
-    title: 'Unauthorized',
-    message: 'You need to sign in to access this content.',
+    titleKey: 'errors.unauthorized.title',
+    messageKey: 'errors.unauthorized.message',
     icon: <XCircle size={64} color="#EF4444" />,
     showRetry: false,
   },
   [ErrorType.FORBIDDEN]: {
-    title: 'Access Denied',
-    message: 'You do not have permission to access this content.',
+    titleKey: 'errors.forbidden.title',
+    messageKey: 'errors.forbidden.message',
     icon: <XCircle size={64} color="#EF4444" />,
     showRetry: false,
   },
   [ErrorType.TIMEOUT]: {
-    title: 'Request Timeout',
-    message: 'The request took too long to complete. Please try again.',
+    titleKey: 'errors.timeout.title',
+    messageKey: 'errors.timeout.message',
     icon: <AlertCircle size={64} color="#F59E0B" />,
     showRetry: true,
   },
   [ErrorType.GENERIC]: {
-    title: 'Error',
-    message: 'An unexpected error occurred. Please try again.',
+    titleKey: 'errors.generic.title',
+    messageKey: 'errors.generic.message',
     icon: <AlertCircle size={64} color="#EF4444" />,
     showRetry: true,
   },
@@ -139,16 +140,18 @@ export const ErrorScreen: React.FC<ErrorScreenProps> = ({
   onRetry,
   secondaryAction,
   retryLoading = false,
-  retryLabel = 'Try Again',
+  retryLabel,
   fullScreen = true,
   backgroundColor = '#FFFFFF',
   hideRetry = false,
 }) => {
-  // Get default config and merge with custom props
+  const { t } = useTranslation();
+
   const defaultConfig = ERROR_CONFIGS[type];
-  const finalTitle = title || defaultConfig.title;
-  const finalMessage = message || defaultConfig.message;
+  const finalTitle = title || t(defaultConfig.titleKey);
+  const finalMessage = message || t(defaultConfig.messageKey);
   const finalIcon = icon || defaultConfig.icon;
+  const finalRetryLabel = retryLabel || t('errors.retryLabel');
   const showRetryButton = !hideRetry && (defaultConfig.showRetry && onRetry);
 
   const ContentView = (
@@ -185,14 +188,14 @@ export const ErrorScreen: React.FC<ErrorScreenProps> = ({
               <>
                 <RefreshCw size={20} color="#FFFFFF" className="animate-spin" />
                 <Text className="text-white font-semibold text-base ml-2">
-                  Retrying...
+                  {t('errors.retryingLabel')}
                 </Text>
               </>
             ) : (
               <>
                 <RefreshCw size={20} color="#FFFFFF" />
                 <Text className="text-white font-semibold text-base ml-2">
-                  {retryLabel}
+                  {finalRetryLabel}
                 </Text>
               </>
             )}
