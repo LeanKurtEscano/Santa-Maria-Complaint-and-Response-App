@@ -5,6 +5,7 @@ import {
   Easing,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   StatusBar,
@@ -14,7 +15,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Bot, HelpCircle, Send, Sparkles, Square, User, Zap } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { ArrowLeft, Bot, ClipboardList, FileText, HelpCircle, Send, Sparkles, Square, User, Zap } from 'lucide-react-native';
 import { chatbotApiClient } from '@/lib/client/chatbot';
 import { getFaqReply } from '@/utils/general/chat';
 import { SUGGESTIONS } from '@/constants/general/chat';
@@ -27,8 +29,141 @@ const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight ?
 const formatTime = (d: Date) =>
   d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-let _id = 0;
-const uid = () => String(++_id);
+const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+// ─────────────────────────────────────────────
+// Intent detection helpers
+// ─────────────────────────────────────────────
+
+/**
+ * Returns which CTA actions to show based on bot reply text.
+ * Handles both English and Tagalog keywords, and supports
+ * multiple intents in one message.
+ */
+type ActionIntent = 'track' | 'file';
+
+const TRACK_PATTERNS = [
+  /track\b.*complaint/i,
+  /status\b.*complaint/i,
+  /complaint\b.*status/i,
+  /suriin\b.*reklamo/i,
+  /tingnan\b.*reklamo/i,
+  /status\b.*ng\b.*reklamo/i,
+  /reklamo\b.*status/i,
+  /alamin\b.*status/i,
+  /makita\b.*reklamo/i,
+  /i-track/i,
+  /i-check\b.*reklamo/i,
+];
+
+const FILE_PATTERNS = [
+  /how\b.*file\b.*complaint/i,
+  /submit\b.*complaint/i,
+  /make\b.*complaint/i,
+  /lodge\b.*complaint/i,
+  /mag-reklamo/i,
+  /paano\b.*magreklamo/i,
+  /paano\b.*mag.reklamo/i,
+  /mag-file\b.*ng\b.*reklamo/i,
+  /i-file\b.*reklamo/i,
+  /isumite\b.*reklamo/i,
+  /magsumite\b.*ng\b.*reklamo/i,
+  /magsampa\b.*ng\b.*reklamo/i,
+];
+
+function detectIntents(text: string): ActionIntent[] {
+  const intents: ActionIntent[] = [];
+  if (TRACK_PATTERNS.some((p) => p.test(text))) intents.push('track');
+  if (FILE_PATTERNS.some((p) => p.test(text))) intents.push('file');
+  return intents;
+}
+
+// ─────────────────────────────────────────────
+// Rich text parser — splits text into runs of
+// plain text, bold (**text**), or URLs.
+// ─────────────────────────────────────────────
+
+type TextRun =
+  | { type: 'text';  value: string }
+  | { type: 'bold';  value: string }
+  | { type: 'url';   value: string };
+
+// Matches **bold** or a URL — whichever comes first
+const RICH_REGEX = /\*\*(.+?)\*\*|https?:\/\/[^\s<>"')\]]+/g;
+
+function parseTextRuns(text: string): TextRun[] {
+  const runs: TextRun[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  RICH_REGEX.lastIndex = 0;
+
+  while ((match = RICH_REGEX.exec(text)) !== null) {
+    if (match.index > last) {
+      runs.push({ type: 'text', value: text.slice(last, match.index) });
+    }
+    if (match[1] !== undefined) {
+      // Captured group 1 = bold content inside ** **
+      runs.push({ type: 'bold', value: match[1] });
+    } else {
+      runs.push({ type: 'url', value: match[0] });
+    }
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) {
+    runs.push({ type: 'text', value: text.slice(last) });
+  }
+  return runs;
+}
+
+// ─────────────────────────────────────────────
+// Action CTA button rendered below a bot bubble
+// ─────────────────────────────────────────────
+
+interface ActionButtonProps {
+  intent: ActionIntent;
+  onPress: () => void;
+}
+
+function ActionButton({ intent, onPress }: ActionButtonProps) {
+  const isTrack = intent === 'track';
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.78}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 6,
+        alignSelf: 'flex-start',
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 12,
+        backgroundColor: isTrack ? THEME.primaryMuted : '#FFF7ED',
+        borderWidth: 1.5,
+        borderColor: isTrack ? THEME.primary + '55' : '#FED7AA',
+      }}
+    >
+      {isTrack
+        ? <ClipboardList size={14} color={THEME.primary} />
+        : <FileText size={14} color="#F97316" />
+      }
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: '700',
+          color: isTrack ? THEME.primary : '#EA580C',
+        }}
+      >
+        {isTrack ? 'Track My Complaint' : 'File a Complaint'}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Typing animation
+// ─────────────────────────────────────────────
 
 function TypingDots() {
   const d0 = useRef(new Animated.Value(0)).current;
@@ -57,14 +192,32 @@ function TypingDots() {
       {[d0, d1, d2].map((dot, i) => (
         <Animated.View
           key={i}
-          style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: THEME.primary, transform: [{ translateY: dot }] }}
+          style={{
+            width: 7, height: 7, borderRadius: 4,
+            backgroundColor: THEME.primary,
+            transform: [{ translateY: dot }],
+          }}
         />
       ))}
     </View>
   );
 }
 
-function MessageBubble({ msg, showAvatar, isLast }: { msg: Message; showAvatar: boolean; isLast: boolean }) {
+// ─────────────────────────────────────────────
+// Message bubble
+// ─────────────────────────────────────────────
+
+function MessageBubble({
+  msg,
+  showAvatar,
+  isLast,
+  onAction,
+}: {
+  msg: Message;
+  showAvatar: boolean;
+  isLast: boolean;
+  onAction: (intent: ActionIntent) => void;
+}) {
   const isUser = msg.role === 'user';
   const slideAnim = useRef(new Animated.Value(isUser ? 18 : -18)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -74,8 +227,15 @@ function MessageBubble({ msg, showAvatar, isLast }: { msg: Message; showAvatar: 
   const streamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [cursorVisible, setCursorVisible] = useState(true);
 
+  // Detect intents only on bot messages once streaming is done
+  const [intents, setIntents] = useState<ActionIntent[]>([]);
+
   useEffect(() => {
-    if (!msg.streaming) { setDisplayedText(msg.text); return; }
+    if (!msg.streaming) {
+      setDisplayedText(msg.text);
+      if (!isUser) setIntents(detectIntents(msg.text));
+      return;
+    }
     let i = 0;
     const tick = () => {
       i++;
@@ -104,13 +264,63 @@ function MessageBubble({ msg, showAvatar, isLast }: { msg: Message; showAvatar: 
     ]).start();
   }, []);
 
-  const textToShow = msg.streaming
-    ? displayedText + (cursorVisible ? '▍' : ' ')
-    : displayedText;
+  // Render plain text OR rich text with links
+  const renderContent = () => {
+    const textToShow = msg.streaming
+      ? displayedText + (cursorVisible ? '▍' : ' ')
+      : displayedText;
+
+    const textColor = isUser ? '#FFFFFF' : '#1E293B';
+
+    if (isUser || msg.streaming) {
+      // Plain text while streaming or for user bubbles
+      return (
+        <Text style={{ fontSize: 15, lineHeight: 22, color: textColor, fontWeight: '400' }}>
+          {textToShow}
+        </Text>
+      );
+    }
+
+    // Bot message: parse URLs out of text
+    const runs = parseTextRuns(textToShow);
+    return (
+      <Text style={{ fontSize: 15, lineHeight: 22, color: textColor, fontWeight: '400' }}>
+        {runs.map((run, idx) => {
+          if (run.type === 'url') {
+            return (
+              <Text
+                key={idx}
+                onPress={() => Linking.openURL(run.value)}
+                style={{ color: '#2563EB', textDecorationLine: 'underline', fontWeight: '500' }}
+              >
+                {run.value}
+              </Text>
+            );
+          }
+          if (run.type === 'bold') {
+            return (
+              <Text key={idx} style={{ fontWeight: '700', color: textColor }}>
+                {run.value}
+              </Text>
+            );
+          }
+          return <Text key={idx}>{run.value}</Text>;
+        })}
+      </Text>
+    );
+  };
 
   return (
     <Animated.View
-      style={{ opacity: fadeAnim, transform: [{ translateX: slideAnim }, { scale: scaleAnim }], flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, justifyContent: isUser ? 'flex-end' : 'flex-start', marginBottom: isLast ? 12 : 3 }}
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateX: slideAnim }, { scale: scaleAnim }],
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        paddingHorizontal: 16,
+        justifyContent: isUser ? 'flex-end' : 'flex-start',
+        marginBottom: isLast ? 12 : 3,
+      }}
     >
       {!isUser && (
         <View style={{ width: 32, height: 32, flexShrink: 0, marginRight: 8, marginBottom: 2 }}>
@@ -123,6 +333,7 @@ function MessageBubble({ msg, showAvatar, isLast }: { msg: Message; showAvatar: 
       )}
 
       <View style={{ maxWidth: '75%', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
+        {/* Bubble */}
         <View
           style={isUser ? {
             backgroundColor: THEME.primary,
@@ -137,10 +348,18 @@ function MessageBubble({ msg, showAvatar, isLast }: { msg: Message; showAvatar: 
             shadowColor: '#94a3b8', shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
           }}
         >
-          <Text style={{ fontSize: 15, lineHeight: 22, color: isUser ? '#FFFFFF' : '#1E293B', fontWeight: '400' }}>
-            {textToShow}
-          </Text>
+          {renderContent()}
         </View>
+
+        {/* Action CTA buttons — rendered below bubble, only for bot + not streaming */}
+        {!isUser && !msg.streaming && intents.length > 0 && (
+          <View style={{ marginTop: 2, gap: 4 }}>
+            {intents.map((intent) => (
+              <ActionButton key={intent} intent={intent} onPress={() => onAction(intent)} />
+            ))}
+          </View>
+        )}
+
         {isLast && !msg.streaming && (
           <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 4, marginHorizontal: 2 }}>
             {formatTime(msg.timestamp)}
@@ -156,6 +375,10 @@ function MessageBubble({ msg, showAvatar, isLast }: { msg: Message; showAvatar: 
     </Animated.View>
   );
 }
+
+// ─────────────────────────────────────────────
+// Supporting UI
+// ─────────────────────────────────────────────
 
 function SuggestionChip({ text, onPress, disabled }: { text: string; onPress: () => void; disabled?: boolean }) {
   return (
@@ -209,15 +432,26 @@ function BotInfo() {
   );
 }
 
-const INITIAL_MESSAGES: Message[] = [
+// ─────────────────────────────────────────────
+// Initial messages
+// ─────────────────────────────────────────────
+
+// Factory — called once per mount via useState lazy initializer.
+// A static array with a hardcoded id causes duplicate-key errors on
+// hot reload / re-mount because the same id collides with ids already in state.
+const makeInitialMessages = (): Message[] => [
   {
-    id: 'bot-welcome',
+    id: uid(),
     role: 'bot',
     text: 'Kamusta! Ako si SantaBot 👋\n\nAng iyong FAQ assistant para sa Munisipalidad ng Santa Maria, Laguna.\n\nAno ang maipaglilingkod ko sa iyo?',
     timestamp: new Date(),
     streaming: false,
   },
 ];
+
+// ─────────────────────────────────────────────
+// Main modal
+// ─────────────────────────────────────────────
 
 interface ChatbotModalProps {
   visible: boolean;
@@ -226,8 +460,9 @@ interface ChatbotModalProps {
 
 export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
-  const [messages,    setMessages]   = useState<Message[]>(INITIAL_MESSAGES);
+  const [messages,    setMessages]   = useState<Message[]>(makeInitialMessages);
   const [input,       setInput]      = useState('');
   const [isTyping,    setIsTyping]   = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -248,6 +483,31 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     }
   }, [visible]);
 
+  // ── Action handler ────────────────────────────────────────────────────────
+  /**
+   * Closes the modal first, then navigates — the modal sits on top of the
+   * entire screen so router.push alone won't make the destination visible.
+   * New intents can be added here in the future without touching
+   * the detection logic or UI layer.
+   */
+  const handleAction = useCallback((intent: ActionIntent) => {
+    const routes: Record<ActionIntent, string> = {
+      track: '/complaints/UserComplaints',
+      file: '/(tabs)/Complaints',
+      // Future intents: 'schedule': '/(tabs)/Schedule', etc.
+    };
+
+    const route = routes[intent];
+    if (!route) return;
+
+    // Close the modal, wait for the slide-out animation to finish, then navigate
+    onClose();
+    setTimeout(() => {
+      router.push(route as any);
+    }, 320); // matches the 300ms slide-out animation + small buffer
+  }, [router, onClose]);
+
+  // ── Cancel stream ─────────────────────────────────────────────────────────
   const handleCancel = useCallback(() => {
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
     if (streamFinishRef.current) { clearTimeout(streamFinishRef.current); streamFinishRef.current = null; }
@@ -257,6 +517,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     isSendingRef.current = false; // 🔓 Release lock on manual cancel
   }, []);
 
+  // ── Send message ──────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (text: string, isSuggestion = false) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -368,7 +629,14 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                 const next = messages[index + 1];
                 const isLast = !next || next.role !== item.role;
                 const showAvatar = item.role === 'bot' && isLast;
-                return <MessageBubble msg={item} showAvatar={showAvatar} isLast={isLast} />;
+                return (
+                  <MessageBubble
+                    msg={item}
+                    showAvatar={showAvatar}
+                    isLast={isLast}
+                    onAction={handleAction}
+                  />
+                );
               }}
               ListFooterComponent={
                 isTyping ? (
@@ -426,7 +694,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                   onPress={() => sendMessage(input)}
                   disabled={!input.trim()}
                   activeOpacity={0.8}
-                  style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: input.trim() ? THEME.primary : '#E2E8F0', shadowColor: input.trim() ? THEME.primaryDark : 'transparent', shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: input.trim() ? 4 : 0 }}
+                  style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: input.trim() ? THEME.primary : '#E2E8F0', shadowColor: input.trim() ? THEME.primaryDark : 'transparent', shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: input.trim() ? 4 : 4 }}
                 >
                   <Send size={18} color={input.trim() ? '#FFFFFF' : '#94A3B8'} style={{ marginLeft: 2 }} />
                 </TouchableOpacity>
