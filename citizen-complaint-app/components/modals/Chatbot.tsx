@@ -264,25 +264,24 @@ function MessageBubble({
     ]).start();
   }, []);
 
-  // Render plain text OR rich text with links
+  // Render plain text (user) OR rich text with live bold+links (bot, including while streaming)
   const renderContent = () => {
-    const textToShow = msg.streaming
-      ? displayedText + (cursorVisible ? '▍' : ' ')
-      : displayedText;
-
     const textColor = isUser ? '#FFFFFF' : '#1E293B';
 
-    if (isUser || msg.streaming) {
-      // Plain text while streaming or for user bubbles
+    // User bubbles: always plain text
+    if (isUser) {
       return (
         <Text style={{ fontSize: 15, lineHeight: 22, color: textColor, fontWeight: '400' }}>
-          {textToShow}
+          {displayedText}
         </Text>
       );
     }
 
-    // Bot message: parse URLs out of text
-    const runs = parseTextRuns(textToShow);
+    // Bot bubbles: parse rich text even mid-stream so ** ** renders bold immediately.
+    // Append cursor separately so the regex never sees it and misreads partial ** markers.
+    const cursor = msg.streaming ? (cursorVisible ? '▍' : ' ') : '';
+    const runs = parseTextRuns(displayedText);
+
     return (
       <Text style={{ fontSize: 15, lineHeight: 22, color: textColor, fontWeight: '400' }}>
         {runs.map((run, idx) => {
@@ -306,6 +305,7 @@ function MessageBubble({
           }
           return <Text key={idx}>{run.value}</Text>;
         })}
+        {cursor ? <Text style={{ color: textColor }}>{cursor}</Text> : null}
       </Text>
     );
   };
