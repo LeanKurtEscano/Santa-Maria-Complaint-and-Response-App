@@ -139,3 +139,19 @@ export const validatePassword = (password: string, t: TFunction): string => {
   if (password.length > 128) return t('registerValidation.passwordMaxLength');
   return "";
 };
+
+
+export const validateIdNumber = (value: string, t: any): string | undefined => {
+  if (!value) return t('required');
+  
+  // Only allow alphanumeric and hyphens
+  if (!/^[a-zA-Z0-9-]+$/.test(value)) {
+    return t('registerValidation.idNumberInvalidChars');
+  }
+  
+  // Length: 6–20 characters
+  if (value.length < 6) return t('registerValidation.idNumberTooShort');
+  if (value.length > 20) return t('registerValidation.idNumberTooLong');
+  
+  return undefined;
+};

@@ -819,6 +819,9 @@ const resources = {
   "firstNameRepeatedChars": "First name must not contain repeated characters.",
   "firstNameRepeatedWords": "First name must not contain repeated words.",
   "firstNameSingleLetters": "First name must not consist of single letters.",
+    "idNumberInvalidChars": "ID number may only contain letters, numbers, and hyphens",
+  "idNumberTooShort": "ID number must be at least 6 characters",
+  "idNumberTooLong": "ID number must not exceed 20 characters",
 
   "middleNameMinLength": "Middle name must be at least 2 characters long.",
   "middleNameMaxLength": "Middle name must be at most {{max}} characters long.",
@@ -1668,6 +1671,10 @@ const resources = {
   "firstNameRepeatedChars": "Ang pangalan ay hindi dapat may paulit-ulit na karakter.",
   "firstNameRepeatedWords": "Ang pangalan ay hindi dapat may paulit-ulit na salita.",
   "firstNameSingleLetters": "Ang pangalan ay hindi dapat binubuo ng iisang letra.",
+   "idNumberInvalidChars": "Ang ID number ay maaari lamang maglaman ng mga titik, numero, at gitling",
+  "idNumberTooShort": "Ang ID number ay dapat na hindi bababa sa 6 na karakter",
+  "idNumberTooLong": "Ang ID number ay hindi dapat lumagpas sa 20 na karakter",
+  
 
   "middleNameMinLength": "Ang gitnang pangalan ay dapat hindi mas maikli sa 2 karakter.",
   "middleNameMaxLength": "Ang gitnang pangalan ay dapat hindi hihigit sa {{max}} karakter.",

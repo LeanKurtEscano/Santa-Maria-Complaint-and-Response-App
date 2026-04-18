@@ -29,7 +29,12 @@ function RootLayoutNav() {
   const [initError, setInitError] = useState<any>(null);
   const [retrying, setRetrying] = useState(false);
   
- 
+  useEffect(() => {
+    initializeApp();
+
+   
+    
+  }, []);
 
   const initializeApp = async () => {
     try {
