@@ -31,9 +31,12 @@ function RootLayoutNav() {
   
   useEffect(() => {
     initializeApp();
-
-   
     
+    {/*   async function clearOnboarding() {
+      await AsyncStorage.removeItem('hasSeenOnboarding');
+    }
+    clearOnboarding(); */}
+  
   }, []);
 
   const initializeApp = async () => {

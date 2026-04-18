@@ -52,6 +52,7 @@ import {
   validateContactNumber,
   validateEmail,
   validatePassword,
+  validateIdNumber,
 } from '@/utils/validation/register';
 import { TAGALOG_MONTHS } from '@/constants/localization/date';
 import { useLocalSearchParams } from 'expo-router';
@@ -337,14 +338,14 @@ export default function RegisterScreen({ navigation }: any) {
           setSelectedDate(date);
         }
       }
-    } catch (error) {}
+    } catch (error) { }
   };
 
   const saveFormData = async () => {
     try {
       const currentData = watch();
       await AsyncStorage.setItem('registrationFormData', JSON.stringify({ ...currentData, age }));
-    } catch (error) {}
+    } catch (error) { }
   };
 
   const changeLanguage = (lang: string) => i18n.changeLanguage(lang);
@@ -520,35 +521,35 @@ export default function RegisterScreen({ navigation }: any) {
       await storeRegistrationData(data);
       setSubmittedEmail(data.email);
       await clearSavedFormData();
-      
 
 
- 
-      if(isPhoneMode) {
+
+
+      if (isPhoneMode) {
 
         router.replace({
-        pathname: '/(auth)/Otp',
-        params: {
-          phone: data.phoneNumber ,
-          apiRoute: '/verify-phone-number-otp',
-          otpResendRoute: '/resend-phone-otp',
-        },
-      });
+          pathname: '/(auth)/Otp',
+          params: {
+            phone: data.phoneNumber,
+            apiRoute: '/verify-phone-number-otp',
+            otpResendRoute: '/resend-phone-otp',
+          },
+        });
 
       } else {
 
         router.replace({
-        pathname: '/(auth)/Otp',
-        params: {
-          email: data.email,
-          
-          apiRoute: '/verify-otp',
-          otpResendRoute: '/resend-otp',
-        },
-      });
+          pathname: '/(auth)/Otp',
+          params: {
+            email: data.email,
+
+            apiRoute: '/verify-otp',
+            otpResendRoute: '/resend-otp',
+          },
+        });
 
       }
-      
+
     } catch (error: any) {
       if (error?.response?.status === 400) {
         const detail = error?.response?.data?.detail || '';
@@ -1161,18 +1162,31 @@ export default function RegisterScreen({ navigation }: any) {
         <Controller
           control={control}
           name="idNumber"
-          rules={{ required: t('required') }}
+          rules={{
+            required: t('required'),
+            validate: (value) => validateIdNumber(value, t) || true,
+          }}
           render={({ field: { onChange, onBlur, value } }) => (
             <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.idNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
               <FileText size={20} color="#6B7280" />
-              <TextInput
-                className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
-                placeholder="A00-000-000000"
-                placeholderTextColor="#9CA3AF"
-              />
+   <TextInput
+      className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
+      onBlur={() => {
+        onBlur();
+        const err = validateIdNumber(value, t);
+        if (err) setError('idNumber', { type: 'manual', message: err });
+        else clearErrors('idNumber');
+      }}
+      onChangeText={(text) => {
+        const sanitized = text.replace(/[^a-zA-Z0-9-]/g, '');
+        onChange(sanitized);
+        clearErrors('idNumber'); // clear as user types
+      }}
+      maxLength={20}
+      value={value}
+      placeholder="A00-000-000000"
+      placeholderTextColor="#9CA3AF"
+    />
             </View>
           )}
         />

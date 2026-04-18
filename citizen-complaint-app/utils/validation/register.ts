@@ -141,17 +141,28 @@ export const validatePassword = (password: string, t: TFunction): string => {
 };
 
 
+
 export const validateIdNumber = (value: string, t: any): string | undefined => {
   if (!value) return t('required');
-  
+
   // Only allow alphanumeric and hyphens
   if (!/^[a-zA-Z0-9-]+$/.test(value)) {
     return t('registerValidation.idNumberInvalidChars');
   }
-  
+
   // Length: 6–20 characters
   if (value.length < 6) return t('registerValidation.idNumberTooShort');
   if (value.length > 20) return t('registerValidation.idNumberTooLong');
-  
+
+  // ❌ Reject all same characters (AAAAAA, 111111)
+  if (/^([a-zA-Z0-9])\1+$/.test(value)) {
+    return t('registerValidation.idNumberRepeatedChars');
+  }
+
+  // ❌ Reject repeating patterns (ABCABC, 121212)
+  if (/^(.+)\1+$/.test(value)) {
+    return t('registerValidation.idNumberPatternRepeat');
+  }
+
   return undefined;
 };
