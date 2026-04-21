@@ -905,14 +905,15 @@ function ResponsesSection({
                   >
                     <Clock size={13} color="#9ca3af" strokeWidth={2} />
                     <Text style={{ fontSize: 13, color: "#9ca3af" }}>
-                      {new Date(resp.response_date).toLocaleString("en-PH", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                        hour12: true,
-                      })}
+{new Date(new Date(resp.response_date.replace(" ", "T") + "Z").getTime() + (8 * 60 * 60 * 1000)).toLocaleString("en-PH", {
+  timeZone: "Asia/Manila",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+})}
                     </Text>
                   </View>
                 </View>

@@ -46,7 +46,7 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
   const { t } = useTranslation();
   const catKey = complaint.category?.category_name ?? "";
   const catLabel = getCategoryLabel(catKey, complaint.title);
-
+ 
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -73,7 +73,11 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
             >
               {catLabel}
             </Text>
-            <StatusBadge status={complaint.status} />
+            <StatusBadge 
+  status={complaint.status} 
+  is_rejected_by_lgu={complaint.is_rejected_by_lgu}
+  is_rejected_by_department={complaint.is_rejected_by_department}
+/>
           </View>
 
           {/* Title */}
@@ -253,6 +257,8 @@ export default function UserComplaints() {
       return response.data;
     },
   });
+
+  console.log("Fetched complaints:", data);
 
   const handleRefresh = async () => {
     setRefreshing(true);

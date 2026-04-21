@@ -1,5 +1,7 @@
 // ─── Complaint Shared Constants ───────────────────────────────────────────────
 
+import { Complaint } from "@/types/complaints/complaint";
+
 export interface StatusConfig {
   label: string;
   badge: string;
@@ -8,42 +10,149 @@ export interface StatusConfig {
   border: string;
 }
 
-
 export const STATUS_CONFIG: Record<string, StatusConfig> = {
-  // ── Generic (keep for backwards compat) ──────────────────────────────────
-  submitted: { label: "Submitted",  badge: "bg-blue-50",   text: "text-blue-700",   dot: "bg-blue-500",   border: "border-blue-200"  },
-  forwarded: { label: "Forwarded",  badge: "bg-amber-50",  text: "text-amber-700",  dot: "bg-amber-500",  border: "border-amber-200" },
-  resolved:  { label: "Resolved",   badge: "bg-green-50",  text: "text-green-700",  dot: "bg-green-500",  border: "border-green-200" },
-  rejected:  { label: "Rejected",   badge: "bg-red-50",    text: "text-red-700",    dot: "bg-red-500",    border: "border-red-200"   },
-  pending:   { label: "Pending",    badge: "bg-purple-50", text: "text-purple-700", dot: "bg-purple-500", border: "border-purple-200"},
+  // ── Generic ─────────────────────────────────────────────
+  submitted: {
+    label: "Submitted",
+    badge: "#EFF6FF",
+    text: "#1D4ED8",
+    dot: "#3B82F6",
+    border: "#BFDBFE",
+  },
+  forwarded: {
+    label: "Forwarded",
+    badge: "#FFFBEB",
+    text: "#B45309",
+    dot: "#F59E0B",
+    border: "#FDE68A",
+  },
+  resolved: {
+    label: "Resolved",
+    badge: "#ECFDF5",
+    text: "#047857",
+    dot: "#10B981",
+    border: "#A7F3D0",
+  },
+  rejected: {
+    label: "Rejected",
+    badge: "#FEF2F2",
+    text: "#B91C1C",
+    dot: "#EF4444",
+    border: "#FECACA",
+  },
+  pending: {
+    label: "Pending",
+    badge: "#F5F3FF",
+    text: "#6D28D9",
+    dot: "#8B5CF6",
+    border: "#DDD6FE",
+  },
 
-  // ── Barangay (sky — not green, avoids "done" confusion) ──────────────────
-  reviewed_by_barangay: { label: "Reviewed by Barangay", badge: "bg-sky-50",  text: "text-sky-700",  dot: "bg-sky-500",  border: "border-sky-200"  },
-  resolved_by_barangay: { label: "Resolved by Barangay", badge: "bg-sky-100", text: "text-sky-800",  dot: "bg-sky-600",  border: "border-sky-300"  },
+  // ── Barangay ────────────────────────────────────────────
+  reviewed_by_barangay: {
+    label: "Reviewed by Barangay",
+    badge: "#EFF6FF",   // BLUE
+    text: "#1D4ED8",
+    dot: "#3B82F6",
+    border: "#BFDBFE",
+  },
+  resolved_by_barangay: {
+    label: "Resolved by Barangay",
+    badge: "#ECFDF5",   // GREEN
+    text: "#047857",
+    dot: "#10B981",
+    border: "#A7F3D0",
+  },
 
-  // ── LGU (violet) ─────────────────────────────────────────────────────────
-  forwarded_to_lgu:     { label: "Forwarded to LGU",     badge: "bg-violet-50",  text: "text-violet-700", dot: "bg-violet-500", border: "border-violet-200" },
-  reviewed_by_lgu:      { label: "Reviewed by LGU",      badge: "bg-violet-100", text: "text-violet-800", dot: "bg-violet-600", border: "border-violet-300" },
+  // ── LGU ─────────────────────────────────────────────────
+  forwarded_to_lgu: {
+    label: "Forwarded to LGU",
+    badge: "#FFFBEB",
+    text: "#B45309",
+    dot: "#F59E0B",
+    border: "#FDE68A",
+  },
+  reviewed_by_lgu: {
+    label: "Reviewed by LGU",
+    badge: "#EFF6FF",   // BLUE
+    text: "#1D4ED8",
+    dot: "#3B82F6",
+    border: "#BFDBFE",
+  },
+  resolved_by_lgu: {
+    label: "Resolved by LGU",
+    badge: "#ECFDF5",   // GREEN
+    text: "#047857",
+    dot: "#10B981",
+    border: "#A7F3D0",
+  },
+  rejected_by_lgu: {
+    label: "Rejected by LGU",
+    badge: "#FEF2F2",   // RED
+    text: "#B91C1C",
+    dot: "#EF4444",
+    border: "#FECACA",
+  },
 
-  // ── Department (amber) ───────────────────────────────────────────────────
-  forwarded_to_department:  { label: "Forwarded to Dept.",      badge: "bg-amber-50",  text: "text-amber-700",  dot: "bg-amber-500",  border: "border-amber-200"  },
-  reviewed_by_department:   { label: "Under Dept. Review",      badge: "bg-amber-100", text: "text-amber-800",  dot: "bg-amber-600",  border: "border-amber-300"  },
-  resolved_by_department:   { label: "Resolved by Dept.",       badge: "bg-green-50",  text: "text-green-700",  dot: "bg-green-500",  border: "border-green-200"  },
+  // ── Department ──────────────────────────────────────────
+  forwarded_to_department: {
+    label: "Forwarded to Dept.",
+    badge: "#FFFBEB",
+    text: "#B45309",
+    dot: "#F59E0B",
+    border: "#FDE68A",
+  },
+  reviewed_by_department: {
+    label: "Under Dept. Review",
+    badge: "#EFF6FF",   // BLUE
+    text: "#1D4ED8",
+    dot: "#3B82F6",
+    border: "#BFDBFE",
+  },
+  resolved_by_department: {
+    label: "Resolved by Dept.",
+    badge: "#ECFDF5",   // GREEN
+    text: "#047857",
+    dot: "#10B981",
+    border: "#A7F3D0",
+  },
+  rejected_by_department: {
+    label: "Rejected by Dept.",
+    badge: "#FEF2F2",   // RED
+    text: "#B91C1C",
+    dot: "#EF4444",
+    border: "#FECACA",
+  },
 };
-
 export const ALL_STATUSES = [
   "submitted",
   "reviewed_by_barangay",
   "resolved_by_barangay",
   "forwarded_to_lgu",
   "reviewed_by_lgu",
+  "resolved_by_lgu",
+  "rejected_by_lgu",
   "forwarded_to_department",
   "reviewed_by_department",
   "resolved_by_department",
+  "rejected_by_department",
   "rejected",
   "pending",
 ] as const;
 
+export type Status = typeof ALL_STATUSES[number];
+
+/** Accepts a raw status string, returns its config with a safe fallback. */
+export function getStatusConfig(status: string | null): StatusConfig {
+  return STATUS_CONFIG[status ?? ""] ?? STATUS_CONFIG["pending"];
+}
+
+/** Resolves the true display status of a complaint, checking boolean flags first. */
+export function resolveStatus(complaint: Complaint): string {
+  if (complaint.is_rejected_by_lgu)        return "rejected_by_lgu";
+  if (complaint.is_rejected_by_department) return "rejected_by_department";
+  return complaint.status ?? "pending";
+}
 
 
 export const CATEGORY_LABELS: Record<string, string> = {
@@ -64,17 +173,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
 
 
 
-export function getStatusConfig(status: string | null): StatusConfig {
-  return (
-    STATUS_CONFIG[status?.toLowerCase() ?? ""] ?? {
-      label: status ?? "Unknown",
-      badge: "bg-gray-50",
-      text: "text-gray-700",
-      dot: "bg-gray-400",
-      border: "border-gray-200",
-    }
-  );
-}
+
 
 export function getCategoryLabel(categoryKey: string, fallback?: string): string {
   return CATEGORY_LABELS[categoryKey] ?? fallback ?? categoryKey;

@@ -106,7 +106,7 @@ export default function EmergencyScreen() {
   } = useQuery<EmergencyAgency[]>({
     queryKey: ['emergency-hotlines'],
     queryFn: async () => {
-      const response = await emergencyApiClient.get('/');
+      const response = await emergencyApiClient.get('/emergency-hotlines');
       const data = response.data;
       // Guard: API must return an array
       if (!Array.isArray(data)) {
