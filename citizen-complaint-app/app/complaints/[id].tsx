@@ -21,13 +21,16 @@ import {
   Clock,
   FileText,
   Hash,
+  ImageIcon,
   Landmark,
   Layers,
   Mail,
   MapPin,
   MessageCircle,
   MessageSquare,
+  Paperclip,
   Phone,
+  Play,
   Shield,
   XCircle,
 } from "lucide-react-native";
@@ -35,14 +38,25 @@ import { useTranslation } from "react-i18next";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
+  Modal,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
   RefreshControl,
+  Dimensions,
 } from "react-native";
+import { Video, ResizeMode } from "expo-av";
 
 // ─── Local Types for incident_links ──────────────────────────────────────────
+
+interface ResponseAttachment {
+  id: number;
+  response_id: number;
+  file_url: string;
+  media_type: "image" | "video";
+}
 
 interface IncidentResponse {
   id: number;
@@ -50,6 +64,13 @@ interface IncidentResponse {
   responder_id: number;
   actions_taken: string;
   response_date: string;
+  user?: {
+    id: number;
+    email: string;
+    role: string;
+    [key: string]: unknown;
+  };
+  response_attachments?: ResponseAttachment[];
 }
 
 interface IncidentDetail {
@@ -79,7 +100,7 @@ type ComplaintStatus =
   | "forwarded_to_department"
   | "reviewed_by_department"
   | "resolved_by_department"
-   | "rejected_by_barangay"
+  | "rejected_by_barangay"
   | "rejected";
 
 type StepState = "completed" | "active" | "pending" | "rejected";
@@ -109,6 +130,7 @@ function getTrackerSteps(
     submitted: 0,
     reviewed_by_barangay: 1,
     rejected: 1,
+    rejected_by_barangay: 1,
     resolved_by_barangay: 2,
     forwarded_to_lgu: 2,
     reviewed_by_lgu: 3,
@@ -133,13 +155,11 @@ function getTrackerSteps(
 
   const submittedState: StepState = currentOrder >= 0 ? "completed" : "pending";
 
-  // Barangay step
   let barangayState: StepState = "pending";
   if (isRejectedByBarangay) barangayState = "rejected";
   else if (currentOrder >= 2) barangayState = "completed";
   else if (currentOrder === 1) barangayState = "active";
 
-  // LGU step
   let lguState: StepState = "pending";
   if (isRejectedByLgu && !isResolved) lguState = "rejected";
   else if (currentOrder >= 4) lguState = "completed";
@@ -149,7 +169,6 @@ function getTrackerSteps(
   )
     lguState = "active";
 
-  // Department step
   let deptState: StepState = "pending";
   if (isRejectedByDepartment && !isResolved) deptState = "rejected";
   else if (currentOrder >= 6) deptState = "completed";
@@ -157,7 +176,6 @@ function getTrackerSteps(
     deptState = "active";
   else if (currentOrder === 5) deptState = "active";
 
-  // Resolved step
   let resolvedState: StepState = "pending";
   if (isResolved) resolvedState = "completed";
 
@@ -275,7 +293,7 @@ function getStatusDisplay(
     };
 
   const map: Record<
-    Exclude<ComplaintStatus, "rejected">,
+    Exclude<ComplaintStatus, "rejected" | "rejected_by_barangay">,
     { label: string; color: string; bg: string }
   > = {
     submitted: {
@@ -325,7 +343,7 @@ function getStatusDisplay(
     },
   };
 
-  return map[status as Exclude<ComplaintStatus, "rejected">];
+  return map[status as Exclude<ComplaintStatus, "rejected" | "rejected_by_barangay">];
 }
 
 // ─── Loading State ────────────────────────────────────────────────────────────
@@ -541,7 +559,6 @@ function ProgressTracker({
 
           return (
             <View key={step.id} style={{ flexDirection: "row" }}>
-              {/* Left column: dot + line */}
               <View style={{ alignItems: "center", width: 48 }}>
                 <View
                   style={{
@@ -571,7 +588,6 @@ function ProgressTracker({
                 )}
               </View>
 
-              {/* Right column: label + sublabel */}
               <View
                 style={{
                   flex: 1,
@@ -728,6 +744,256 @@ function RejectionBanner({ by }: { by: "barangay" | "lgu" | "department" }) {
   );
 }
 
+// ─── Media Viewer Modal (Image + Video) ──────────────────────────────────────
+
+function MediaViewer({
+  item,
+  visible,
+  onClose,
+}: {
+  item: { uri: string; type: "image" | "video" } | null;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const videoRef = React.useRef<Video>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const screenW = Dimensions.get("window").width;
+
+  React.useEffect(() => {
+    if (!visible) {
+      videoRef.current?.pauseAsync();
+      setIsPlaying(false);
+    }
+  }, [visible]);
+
+  if (!item) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.95)",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {/* Close button */}
+        <TouchableOpacity
+          onPress={onClose}
+          style={{
+            position: "absolute",
+            top: 52,
+            right: 20,
+            zIndex: 10,
+            backgroundColor: "rgba(255,255,255,0.15)",
+            borderRadius: 22,
+            width: 44,
+            height: 44,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          activeOpacity={0.8}
+        >
+          <XCircle size={22} color="#fff" strokeWidth={2.5} />
+        </TouchableOpacity>
+
+        {/* Type badge */}
+        <View
+          style={{
+            position: "absolute",
+            top: 58,
+            left: 20,
+            zIndex: 10,
+            backgroundColor: "rgba(255,255,255,0.12)",
+            borderRadius: 20,
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          {item.type === "image" ? (
+            <ImageIcon size={13} color="#fff" strokeWidth={2} />
+          ) : (
+            <Play size={13} color="#fff" strokeWidth={2} fill="#fff" />
+          )}
+          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700", letterSpacing: 0.5 }}>
+            {item.type === "image" ? "PHOTO" : "VIDEO"}
+          </Text>
+        </View>
+
+        {/* ── Image ── */}
+        {item.type === "image" && (
+          <TouchableOpacity activeOpacity={1} onPress={onClose}>
+            <Image
+              source={{ uri: item.uri }}
+              style={{ width: screenW, height: screenW * 1.2 }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* ── Video ── */}
+        {item.type === "video" && (
+          <View style={{ width: screenW, height: screenW * (9 / 16) }}>
+            <Video
+              ref={videoRef}
+              source={{ uri: item.uri }}
+              style={{ width: "100%", height: "100%" }}
+              resizeMode={ResizeMode.CONTAIN}
+              shouldPlay={false}
+              isLooping
+              isMuted={isMuted}
+              onPlaybackStatusUpdate={(status) => {
+                if (status.isLoaded) setIsPlaying(status.isPlaying);
+              }}
+            />
+
+            {/* Video controls overlay */}
+            <View
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                backgroundColor: "rgba(0,0,0,0.45)",
+              }}
+            >
+              {/* Play / Pause */}
+              <TouchableOpacity
+                onPress={() => {
+                  if (isPlaying) {
+                    videoRef.current?.pauseAsync();
+                  } else {
+                    videoRef.current?.playAsync();
+                  }
+                }}
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: "rgba(255,255,255,0.2)",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                activeOpacity={0.8}
+              >
+                {isPlaying ? (
+                  <View style={{ flexDirection: "row", gap: 4 }}>
+                    <View style={{ width: 4, height: 18, backgroundColor: "#fff", borderRadius: 2 }} />
+                    <View style={{ width: 4, height: 18, backgroundColor: "#fff", borderRadius: 2 }} />
+                  </View>
+                ) : (
+                  <Play size={20} color="#fff" strokeWidth={2.5} fill="#fff" />
+                )}
+              </TouchableOpacity>
+
+              {/* Mute toggle */}
+              <TouchableOpacity
+                onPress={() => setIsMuted((m) => !m)}
+                style={{
+                  backgroundColor: "rgba(255,255,255,0.15)",
+                  borderRadius: 20,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
+                  {isMuted ? "🔇 Unmute" : "🔊 Mute"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Attachment Grid ──────────────────────────────────────────────────────────
+
+function AttachmentGrid({ attachments }: { attachments: ResponseAttachment[] }) {
+  const [activeItem, setActiveItem] = useState<{
+    uri: string;
+    type: "image" | "video";
+  } | null>(null);
+
+  if (attachments.length === 0) return null;
+
+  const THUMB = (Dimensions.get("window").width - 32 - 18 * 2 - 8) / 3;
+
+  return (
+    <>
+      {/* Header */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12, marginBottom: 10 }}>
+        <Paperclip size={14} color="#9ca3af" strokeWidth={2} />
+        <Text style={{ fontSize: 13, color: "#9ca3af", fontWeight: "600" }}>
+          Attachments ({attachments.length})
+        </Text>
+      </View>
+
+      {/* Grid */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        {attachments.map((att) => (
+          <TouchableOpacity
+            key={att.id}
+            activeOpacity={0.8}
+            onPress={() => setActiveItem({ uri: att.file_url, type: att.media_type })}
+            style={{
+              width: THUMB,
+              height: THUMB,
+              borderRadius: 12,
+              overflow: "hidden",
+              backgroundColor: "#f3f4f6",
+              borderWidth: 1,
+              borderColor: "#e5e7eb",
+            }}
+          >
+            {att.media_type === "image" ? (
+              <>
+                <Image source={{ uri: att.file_url }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                <View style={{ position: "absolute", bottom: 6, right: 6, backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 8, padding: 4 }}>
+                  <ImageIcon size={11} color="#fff" strokeWidth={2} />
+                </View>
+              </>
+            ) : (
+              <View style={{ flex: 1, backgroundColor: "#111827", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" }}>
+                  <Play size={17} color="#fff" strokeWidth={2.5} fill="#fff" />
+                </View>
+                <Text style={{ fontSize: 9, color: "rgba(255,255,255,0.55)", fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" }}>
+                  Video
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Unified Media Viewer */}
+      <MediaViewer item={activeItem} visible={!!activeItem} onClose={() => setActiveItem(null)} />
+    </>
+  );
+}
+
 // ─── Responses / Remarks Section ─────────────────────────────────────────────
 
 const PREVIEW_COUNT = 2;
@@ -788,9 +1054,7 @@ function ResponsesSection({
           borderBottomColor: "#f3f4f6",
         }}
       >
-        <View
-          style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-        >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <MessageCircle size={18} color={THEME.primary} strokeWidth={2.5} />
           <Text
             style={{
@@ -810,13 +1074,7 @@ function ResponsesSection({
               paddingVertical: 3,
             }}
           >
-            <Text
-              style={{
-                fontSize: 13,
-                fontWeight: "700",
-                color: THEME.primary,
-              }}
-            >
+            <Text style={{ fontSize: 13, fontWeight: "700", color: THEME.primary }}>
               {allResponses.length}
             </Text>
           </View>
@@ -837,9 +1095,7 @@ function ResponsesSection({
           activeOpacity={0.7}
         >
           <ArrowDownUp size={15} color="#6b7280" strokeWidth={2.5} />
-          <Text
-            style={{ fontSize: 14, fontWeight: "600", color: "#6b7280" }}
-          >
+          <Text style={{ fontSize: 14, fontWeight: "600", color: "#6b7280" }}>
             {sortDesc
               ? t("complaintDetail.remarks.newest")
               : t("complaintDetail.remarks.oldest")}
@@ -851,6 +1107,10 @@ function ResponsesSection({
       <View style={{ padding: 18, gap: 14 }}>
         {visible.map((resp, i) => {
           const remarkNumber = sortDesc ? allResponses.length - i : i + 1;
+          const attachments = resp.response_attachments ?? [];
+          const hasText = !!resp.actions_taken?.trim();
+          const hasAttachments = attachments.length > 0;
+
           return (
             <View
               key={resp.id}
@@ -897,35 +1157,73 @@ function ResponsesSection({
                     })}
                   </Text>
                   <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 5,
-                    }}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 5 }}
                   >
                     <Clock size={13} color="#9ca3af" strokeWidth={2} />
                     <Text style={{ fontSize: 13, color: "#9ca3af" }}>
-{new Date(new Date(resp.response_date.replace(" ", "T") + "Z").getTime() + (8 * 60 * 60 * 1000)).toLocaleString("en-PH", {
-  timeZone: "Asia/Manila",
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true,
-})}
+                      {formatDate(resp.response_date)} at{" "}
+                      {formatTime(resp.response_date)}
                     </Text>
                   </View>
                 </View>
+
+                {/* Badge: attachment count */}
+                {hasAttachments && (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 4,
+                      backgroundColor: "#f0f4ff",
+                      borderRadius: 20,
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                    }}
+                  >
+                    <Paperclip size={12} color={THEME.primary} strokeWidth={2.5} />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "700",
+                        color: THEME.primary,
+                      }}
+                    >
+                      {attachments.length}
+                    </Text>
+                  </View>
+                )}
               </View>
 
-              {/* Actions taken text */}
+              {/* Body */}
               <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-                <Text
-                  style={{ fontSize: 16, color: "#1f2937", lineHeight: 24 }}
-                >
-                  {resp.actions_taken}
-                </Text>
+                {/* Actions taken text — or placeholder if empty */}
+                {hasText ? (
+                  <Text style={{ fontSize: 16, color: "#1f2937", lineHeight: 24 }}>
+                    {resp.actions_taken}
+                  </Text>
+                ) : (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                      backgroundColor: "#f3f4f6",
+                      borderRadius: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                    }}
+                  >
+                    <MessageSquare size={15} color="#d1d5db" strokeWidth={2} />
+                    <Text style={{ fontSize: 14, color: "#d1d5db", fontStyle: "italic" }}>
+                      No remarks provided
+                    </Text>
+                  </View>
+                )}
+
+                {/* Attachment grid */}
+                {hasAttachments && (
+                  <AttachmentGrid attachments={attachments} />
+                )}
               </View>
             </View>
           );
@@ -951,9 +1249,7 @@ function ResponsesSection({
           }}
           activeOpacity={0.7}
         >
-          <Text
-            style={{ fontSize: 15, fontWeight: "700", color: THEME.primary }}
-          >
+          <Text style={{ fontSize: 15, fontWeight: "700", color: THEME.primary }}>
             {showAll
               ? t("complaintDetail.remarks.showLess")
               : t("complaintDetail.remarks.viewAll", {
@@ -1042,7 +1338,6 @@ export default function ComplaintDetail() {
           paddingHorizontal: 16,
         }}
       >
-        {/* Row 1: back button + complaint ID */}
         <View
           style={{
             flexDirection: "row",
@@ -1066,17 +1361,12 @@ export default function ComplaintDetail() {
             <ChevronLeft size={24} color="#374151" strokeWidth={2.5} />
           </TouchableOpacity>
 
-          <Text
-            style={{ fontSize: 13, color: "#9ca3af", fontWeight: "600" }}
-          >
+          <Text style={{ fontSize: 13, color: "#9ca3af", fontWeight: "600" }}>
             {t("complaintDetail.header.complaintId", { id: data.id })}
           </Text>
         </View>
 
-        {/* Row 2: title + status chip */}
-        <View
-          style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-        >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <Text
             style={{
               flex: 1,
@@ -1152,11 +1442,7 @@ export default function ComplaintDetail() {
           {data.description && (
             <InfoRow
               icon={
-                <MessageSquare
-                  size={18}
-                  color={THEME.primary}
-                  strokeWidth={2}
-                />
+                <MessageSquare size={18} color={THEME.primary} strokeWidth={2} />
               }
               label={t("complaintDetail.fields.description")}
               value={data.description}
@@ -1164,21 +1450,15 @@ export default function ComplaintDetail() {
           )}
           {data.location_details && (
             <InfoRow
-              icon={
-                <MapPin size={18} color={THEME.primary} strokeWidth={2} />
-              }
+              icon={<MapPin size={18} color={THEME.primary} strokeWidth={2} />}
               label={t("complaintDetail.fields.location")}
               value={data.location_details}
             />
           )}
           <InfoRow
-            icon={
-              <Calendar size={18} color={THEME.primary} strokeWidth={2} />
-            }
+            icon={<Calendar size={18} color={THEME.primary} strokeWidth={2} />}
             label={t("complaintDetail.fields.dateSubmitted")}
-            value={`${formatDate(data.created_at)}  •  ${formatTime(
-              data.created_at
-            )}`}
+            value={`${formatDate(data.created_at)}  •  ${formatTime(data.created_at)}`}
           />
         </SectionCard>
 
@@ -1186,28 +1466,20 @@ export default function ComplaintDetail() {
         {data.barangay && (
           <SectionCard
             title={t("complaintDetail.sections.barangay")}
-            icon={
-              <Shield size={18} color={THEME.primary} strokeWidth={2.5} />
-            }
+            icon={<Shield size={18} color={THEME.primary} strokeWidth={2.5} />}
           >
             <InfoRow
-              icon={
-                <Shield size={18} color={THEME.primary} strokeWidth={2} />
-              }
+              icon={<Shield size={18} color={THEME.primary} strokeWidth={2} />}
               label={t("complaintDetail.fields.barangayName")}
               value={data.barangay.barangay_name}
             />
             <InfoRow
-              icon={
-                <MapPin size={18} color={THEME.primary} strokeWidth={2} />
-              }
+              icon={<MapPin size={18} color={THEME.primary} strokeWidth={2} />}
               label={t("complaintDetail.fields.address")}
               value={data.barangay.barangay_address}
             />
             <InfoRow
-              icon={
-                <Phone size={18} color={THEME.primary} strokeWidth={2} />
-              }
+              icon={<Phone size={18} color={THEME.primary} strokeWidth={2} />}
               label={t("complaintDetail.fields.contactNumber")}
               value={data.barangay.barangay_contact_number}
             />
@@ -1223,48 +1495,30 @@ export default function ComplaintDetail() {
         {data.department && (
           <SectionCard
             title={t("complaintDetail.sections.department")}
-            icon={
-              <Building2
-                size={18}
-                color={THEME.primary}
-                strokeWidth={2.5}
-              />
-            }
+            icon={<Building2 size={18} color={THEME.primary} strokeWidth={2.5} />}
           >
             <InfoRow
-              icon={
-                <Building2
-                  size={18}
-                  color={THEME.primary}
-                  strokeWidth={2}
-                />
-              }
+              icon={<Building2 size={18} color={THEME.primary} strokeWidth={2} />}
               label={t("complaintDetail.fields.departmentName")}
               value={data.department.department_name}
             />
             {data.department.department_address && (
               <InfoRow
-                icon={
-                  <MapPin size={18} color={THEME.primary} strokeWidth={2} />
-                }
+                icon={<MapPin size={18} color={THEME.primary} strokeWidth={2} />}
                 label={t("complaintDetail.fields.address")}
                 value={data.department.department_address}
               />
             )}
             {data.department.department_contact_number && (
               <InfoRow
-                icon={
-                  <Phone size={18} color={THEME.primary} strokeWidth={2} />
-                }
+                icon={<Phone size={18} color={THEME.primary} strokeWidth={2} />}
                 label={t("complaintDetail.fields.contactNumber")}
                 value={data.department.department_contact_number}
               />
             )}
             {data.department.department_email && (
               <InfoRow
-                icon={
-                  <Mail size={18} color={THEME.primary} strokeWidth={2} />
-                }
+                icon={<Mail size={18} color={THEME.primary} strokeWidth={2} />}
                 label={t("complaintDetail.fields.email")}
                 value={data.department.department_email}
               />
@@ -1278,48 +1532,47 @@ export default function ComplaintDetail() {
         )}
       </ScrollView>
 
-
       {/* ── Floating Feedback Button (resolved only) ── */}
-{isResolved && (
-  <View
-    style={{
-      position: "absolute",
-      bottom: 32,
-      left: 16,
-      right: 16,
-      zIndex: 10,
-    }}
-  >
-    <TouchableOpacity
-      onPress={() =>
-        router.push({
-          pathname: "/feedback/PostIncident",
-          params: { incidentId: data.id, complaintTitle: data.title },
-        })
-      }
-      style={{
-        backgroundColor: THEME.primary,
-        borderRadius: 18,
-        paddingVertical: 17,
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "row",
-        gap: 10,
-        shadowColor: THEME.primary,
-        shadowOpacity: 0.35,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: 8,
-      }}
-      activeOpacity={0.85}
-    >
-      <MessageCircle size={20} color="#fff" strokeWidth={2.5} />
-      <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>
-        {t("complaintDetail.feedbackButton")}
-      </Text>
-    </TouchableOpacity>
-  </View>
-)}
+      {isResolved && (
+        <View
+          style={{
+            position: "absolute",
+            bottom: 32,
+            left: 16,
+            right: 16,
+            zIndex: 10,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() =>
+              router.push({
+                pathname: "/feedback/PostIncident",
+                params: { incidentId: data.id, complaintTitle: data.title },
+              })
+            }
+            style={{
+              backgroundColor: THEME.primary,
+              borderRadius: 18,
+              paddingVertical: 17,
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: "row",
+              gap: 10,
+              shadowColor: THEME.primary,
+              shadowOpacity: 0.35,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: 8,
+            }}
+            activeOpacity={0.85}
+          >
+            <MessageCircle size={20} color="#fff" strokeWidth={2.5} />
+            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>
+              {t("complaintDetail.feedbackButton")}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }

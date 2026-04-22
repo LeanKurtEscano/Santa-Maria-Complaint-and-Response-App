@@ -52,7 +52,7 @@ const resources = {
 "supportCenterDesc": "24/7 assistance",
 "resolutionStatus": "Resolution Status",
 "notVerified": {
-    "title": "Account Not Verified",
+    "title": "Your registration is successful!",
     "message": "Your account has not been verified yet. Please check your email and follow the verification link we sent you.",
     "goBackButton": "Go Back to Login",
     "refreshHint": "Pull down to refresh"
@@ -1008,7 +1008,7 @@ const resources = {
   
 
    "notVerified": {
-    "title": "Hindi Pa Na-verify ang Account",
+    "title": "Ang iyong account registration ay successful!",
     "message": "Hindi pa na-verify ang iyong account. Pakisuri ang iyong email at sundan ang verification link na ipinadala namin sa iyo.",
     "goBackButton": "Bumalik sa Pag-login",
     "refreshHint": "I-drag pababa para i-refresh"

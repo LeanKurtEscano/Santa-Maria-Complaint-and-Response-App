@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
-import { ArrowLeft, MapPin, Navigation, LocateFixed, AlertCircle, Check, WifiOff, RefreshCw } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Navigation, LocateFixed, AlertCircle, Check, WifiOff, RefreshCw, Layers } from 'lucide-react-native';
 import { StepDots } from './StepDots';
 import { THEME } from '@/constants/theme';
 import { complaintApiClient } from '@/lib/client/complaint';
@@ -32,6 +32,8 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   const [gettingGps, setGettingGps] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [boundaryError, setBoundaryError] = useState<string | null>(null);
+  // ── 3D terrain toggle ──
+  const [is3D, setIs3D] = useState(false);
   const cardAnim = useRef(new Animated.Value(1)).current;
 
   // ── Fetch location details + geometry ──
@@ -47,7 +49,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
           },
         })
         .then((res) => res.data),
-    staleTime: Infinity, // geometry won't change mid-session
+    staleTime: Infinity,
     retry: 2,
   });
 
@@ -55,13 +57,11 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   useEffect(() => {
     if (mapReady && locationDetails?.geometry) {
       const geoJson = JSON.stringify(locationDetails.geometry);
-      webViewRef.current?.injectJavaScript(`
-        drawBoundary(${geoJson}); true;
-      `);
+      webViewRef.current?.injectJavaScript(`drawBoundary(${geoJson}); true;`);
     }
   }, [mapReady, locationDetails?.geometry]);
 
-  // ── Timeout: if mapReady never fires within 10s, show error ──
+  // ── Load timeout ──
   useEffect(() => {
     if (!mapReady && !mapError) {
       loadTimeoutRef.current = setTimeout(() => setMapError(true), 10_000);
@@ -75,6 +75,13 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     };
   }, [mapReady, mapError, webViewKey]);
+
+  // ── Toggle tile layer when is3D changes (after map is ready) ──
+  useEffect(() => {
+    if (mapReady) {
+      webViewRef.current?.injectJavaScript(`setTileLayer(${is3D}); true;`);
+    }
+  }, [is3D, mapReady]);
 
   const handleRetry = useCallback(() => {
     setMapError(false);
@@ -95,9 +102,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
     setBoundaryError(null);
     setPinned({ lat: barangayLat, lng: barangayLng });
     setLocationMode('barangay');
-    webViewRef.current?.injectJavaScript(
-      `movePin(${barangayLat}, ${barangayLng}, true); true;`
-    );
+    webViewRef.current?.injectJavaScript(`movePin(${barangayLat}, ${barangayLng}, true); true;`);
   };
 
   const handleUseCurrentLocation = async () => {
@@ -134,7 +139,6 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         setGpsError(null);
         setBoundaryError(null);
       } else if (data.type === 'pinOutOfBounds') {
-        // Map snapped the pin back — just show a message
         setBoundaryError('Pin must be placed within the barangay boundary.');
       }
     } catch {}
@@ -154,7 +158,9 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
           html, body { height: 100%; width: 100%; overflow: hidden; }
           #map { height: 100%; width: 100%; }
           .leaflet-control-attribution { font-size: 9px !important; }
-          .pin-icon { background: none !important; border: none !important; }
+          .pin-icon { background: none !important; border: none !important; overflow: visible; }
+
+        
         </style>
       </head>
       <body>
@@ -163,32 +169,60 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
           const map = L.map('map', { zoomControl: true })
             .setView([${barangayLat}, ${barangayLng}], 16);
 
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          // ── Tile layers ──
+          const standardTile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors',
             maxZoom: 19
-          }).addTo(map);
+          });
+
+          // OpenTopoMap shows terrain contours, hills, and elevation shading
+          const terrainTile = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenTopoMap contributors, © OpenStreetMap contributors',
+            maxZoom: 17
+          });
+
+          standardTile.addTo(map);
+          let currentTile = standardTile;
+
+          function setTileLayer(use3D) {
+            if (use3D) {
+              map.removeLayer(standardTile);
+              terrainTile.addTo(map);
+              currentTile = terrainTile;
+            } else {
+              map.removeLayer(terrainTile);
+              standardTile.addTo(map);
+              currentTile = standardTile;
+            }
+          }
+
+          const pinIconHtml = \`
+            <div class="pin-wrapper">
+              <div class="pin-pulse-ring"></div>
+              <div class="pin-pulse-ring"></div>
+              <div class="pin-pulse-ring"></div>
+              <svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg" style="position:relative;z-index:1;">
+                <ellipse cx="18" cy="42" rx="7" ry="2.5" fill="rgba(0,0,0,0.18)"/>
+                <path d="M18 0C10.268 0 4 6.268 4 14c0 7.732 14 30 14 30S32 21.732 32 14C32 6.268 25.732 0 18 0z"
+                      fill="${pinColor}" stroke="${pinColor}" stroke-width="1.5"/>
+                <circle cx="18" cy="14" r="5.5" fill="white"/>
+                <circle cx="18" cy="14" r="2.8" fill="${pinColor}"/>
+              </svg>
+            </div>
+          \`;
 
           const pinIcon = L.divIcon({
             className: 'pin-icon',
-            html: \`<svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg">
-              <ellipse cx="18" cy="42" rx="7" ry="2.5" fill="rgba(0,0,0,0.18)"/>
-              <path d="M18 0C10.268 0 4 6.268 4 14c0 7.732 14 30 14 30S32 21.732 32 14C32 6.268 25.732 0 18 0z"
-                    fill="${pinColor}" stroke="${pinColor}" stroke-width="1.5"/>
-              <circle cx="18" cy="14" r="5.5" fill="white"/>
-              <circle cx="18" cy="14" r="2.8" fill="${pinColor}"/>
-            </svg>\`,
+            html: pinIconHtml,
             iconSize: [36, 44],
             iconAnchor: [18, 44],
           });
 
           let boundaryLayer = null;
-          let boundaryPolygon = null; // turf/raw coords for point-in-polygon check
+          let boundaryPolygon = null;
 
-          // ── Draw red boundary from GeoJSON ──
           function drawBoundary(geoJson) {
-            if (boundaryLayer) {
-              map.removeLayer(boundaryLayer);
-            }
+            if (boundaryLayer) map.removeLayer(boundaryLayer);
             boundaryLayer = L.geoJSON(geoJson, {
               style: {
                 color: '#DC2626',
@@ -200,9 +234,8 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
               }
             }).addTo(map);
 
-            // Extract coordinates for pip check (supports Polygon & MultiPolygon)
             if (geoJson.type === 'Polygon') {
-              boundaryPolygon = geoJson.coordinates[0]; // outer ring
+              boundaryPolygon = geoJson.coordinates[0];
             } else if (geoJson.type === 'MultiPolygon') {
               boundaryPolygon = geoJson.coordinates[0][0];
             } else if (geoJson.type === 'Feature') {
@@ -212,9 +245,8 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
             }
           }
 
-          // ── Point-in-polygon (ray casting) ──
           function isInsideBoundary(lat, lng) {
-            if (!boundaryPolygon) return true; // no boundary loaded yet = allow
+            if (!boundaryPolygon) return true;
             let inside = false;
             const x = lng, y = lat;
             for (let i = 0, j = boundaryPolygon.length - 1; i < boundaryPolygon.length; j = i++) {
@@ -231,7 +263,6 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
           }
 
           function sendOutOfBounds(prevLat, prevLng) {
-            // Snap back to last valid position
             marker.setLatLng([prevLat, prevLng]);
             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pinOutOfBounds' }));
           }
@@ -364,6 +395,23 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
             )}
           </Animated.View>
         )}
+
+        {/* ── 3D Terrain Toggle Button ── */}
+        {mapReady && !mapError && (
+          <TouchableOpacity
+            style={[
+              styles.terrainToggle,
+              is3D && { backgroundColor: THEME.primary, borderColor: THEME.primary },
+            ]}
+            onPress={() => setIs3D((v) => !v)}
+            activeOpacity={0.85}
+          >
+            <Layers size={16} color={is3D ? '#fff' : THEME.primary} />
+            <Text style={[styles.terrainToggleText, { color: is3D ? '#fff' : THEME.primary }]}>
+              {is3D ? '3D' : '2D'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Bottom panel */}
@@ -442,6 +490,27 @@ const styles = StyleSheet.create({
   coordsText: { flex: 1, fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontWeight: '600' },
   gpsBadge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   gpsBadgeText: { fontSize: 10, fontWeight: '700' },
+  // ── 3D terrain toggle ──
+  terrainToggle: {
+    position: 'absolute',
+    bottom: 16,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  terrainToggleText: { fontSize: 12, fontWeight: '700' },
   bottomPanel: { backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 16, paddingBottom: Platform.OS === 'ios' ? 28 : 20, borderTopWidth: 1, borderTopColor: '#E2E8F0', gap: 12 },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
   errorText: { flex: 1, fontSize: 12, color: '#DC2626' },

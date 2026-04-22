@@ -16,7 +16,22 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bot, ClipboardList, FileText, HelpCircle, Send, Sparkles, Square, User, Zap } from 'lucide-react-native';
+import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
+import {
+  ArrowLeft,
+  Bot,
+  ClipboardList,
+  FileText,
+  HelpCircle,
+  Send,
+  Sparkles,
+  Square,
+  User,
+  Wifi,
+  WifiOff,
+  Zap,
+} from 'lucide-react-native';
+import { v4 as uuidv4 } from 'uuid';
 import { chatbotApiClient } from '@/lib/client/chatbot';
 import { getFaqReply } from '@/utils/general/chat';
 import { SUGGESTIONS } from '@/constants/general/chat';
@@ -32,14 +47,228 @@ const formatTime = (d: Date) =>
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 // ─────────────────────────────────────────────
+// Network status hook
+// ─────────────────────────────────────────────
+
+type ConnectionQuality = 'online' | 'slow' | 'offline';
+
+function useConnectionQuality(): ConnectionQuality {
+  const [quality, setQuality] = useState<ConnectionQuality>('online');
+
+  useEffect(() => {
+    const evaluate = (state: NetInfoState): ConnectionQuality => {
+      // No connection at all
+      if (!state.isConnected || state.isInternetReachable === false) {
+        return 'offline';
+      }
+
+      // isInternetReachable is null while still checking — treat as online tentatively
+      if (state.isInternetReachable === null) {
+        return 'online';
+      }
+
+      const type = state.type; // 'wifi' | 'cellular' | 'ethernet' | 'none' | 'unknown' | ...
+
+      if (type === 'cellular') {
+        const details = state.details as any;
+        const cellType: string = details?.cellularGeneration ?? '';
+        // 2G or EDGE is considered slow
+        if (['2g', 'edge', '2G', 'EDGE'].includes(cellType)) {
+          return 'slow';
+        }
+      }
+
+      if (type === 'wifi') {
+        const details = state.details as any;
+        // Some devices expose signal strength (0–100 on Android)
+        const strength: number | undefined = details?.strength;
+        if (strength !== undefined && strength < 30) {
+          return 'slow';
+        }
+      }
+
+      return 'online';
+    };
+
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      setQuality(evaluate(state));
+    });
+
+    // Fetch initial state
+    NetInfo.fetch().then((state) => setQuality(evaluate(state)));
+
+    return () => unsubscribe();
+  }, []);
+
+  return quality;
+}
+
+// ─────────────────────────────────────────────
+// Connection banner
+// ─────────────────────────────────────────────
+
+function ConnectionBanner({ quality }: { quality: ConnectionQuality }) {
+  const slideAnim = useRef(new Animated.Value(-60)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const prevQuality = useRef<ConnectionQuality>('online');
+
+  useEffect(() => {
+    const shouldShow = quality !== 'online';
+    const wasShowing = prevQuality.current !== 'online';
+    prevQuality.current = quality;
+
+    if (shouldShow) {
+      // Slide in
+      Animated.parallel([
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 60,
+          friction: 12,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else if (wasShowing) {
+      // Slide out
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: -60,
+          duration: 250,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [quality]);
+
+  if (quality === 'online') return null;
+
+  const isOffline = quality === 'offline';
+
+  return (
+    <Animated.View
+      style={{
+        transform: [{ translateY: slideAnim }],
+        opacity: opacityAnim,
+        overflow: 'hidden',
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          backgroundColor: isOffline ? '#FEF2F2' : '#FFFBEB',
+          borderBottomWidth: 1,
+          borderBottomColor: isOffline ? '#FECACA' : '#FDE68A',
+        }}
+      >
+        {isOffline ? (
+          <WifiOff size={14} color="#DC2626" />
+        ) : (
+          <Wifi size={14} color="#D97706" />
+        )}
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: '700',
+              color: isOffline ? '#DC2626' : '#B45309',
+            }}
+          >
+            {isOffline ? 'Walang koneksyon sa internet' : 'Mabagal ang koneksyon'}
+          </Text>
+          <Text
+            style={{
+              fontSize: 11,
+              color: isOffline ? '#EF4444' : '#D97706',
+              marginTop: 1,
+            }}
+          >
+            {isOffline
+              ? 'Hindi matanggap ang mga mensahe. Subukang kumonekta muli.'
+              : 'Maaaring matagal ang sagot. Pakiusap na magantay.'}
+          </Text>
+        </View>
+        {/* Pulsing dot */}
+        <PulsingDot color={isOffline ? '#EF4444' : '#F59E0B'} />
+      </View>
+    </Animated.View>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Pulsing status dot
+// ─────────────────────────────────────────────
+
+function PulsingDot({ color }: { color: string }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(0.6)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(scale, {
+            toValue: 1.5,
+            duration: 700,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(scale, {
+            toValue: 1,
+            duration: 700,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 0.4,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: color,
+        transform: [{ scale }],
+        opacity,
+      }}
+    />
+  );
+}
+
+// ─────────────────────────────────────────────
 // Intent detection helpers
 // ─────────────────────────────────────────────
 
-/**
- * Returns which CTA actions to show based on bot reply text.
- * Handles both English and Tagalog keywords, and supports
- * multiple intents in one message.
- */
 type ActionIntent = 'track' | 'file';
 
 const TRACK_PATTERNS = [
@@ -79,16 +308,14 @@ function detectIntents(text: string): ActionIntent[] {
 }
 
 // ─────────────────────────────────────────────
-// Rich text parser — splits text into runs of
-// plain text, bold (**text**), or URLs.
+// Rich text parser
 // ─────────────────────────────────────────────
 
 type TextRun =
-  | { type: 'text';  value: string }
-  | { type: 'bold';  value: string }
-  | { type: 'url';   value: string };
+  | { type: 'text'; value: string }
+  | { type: 'bold'; value: string }
+  | { type: 'url'; value: string };
 
-// Matches **bold** or a URL — whichever comes first
 const RICH_REGEX = /\*\*(.+?)\*\*|https?:\/\/[^\s<>"')\]]+/g;
 
 function parseTextRuns(text: string): TextRun[] {
@@ -102,7 +329,6 @@ function parseTextRuns(text: string): TextRun[] {
       runs.push({ type: 'text', value: text.slice(last, match.index) });
     }
     if (match[1] !== undefined) {
-      // Captured group 1 = bold content inside ** **
       runs.push({ type: 'bold', value: match[1] });
     } else {
       runs.push({ type: 'url', value: match[0] });
@@ -116,7 +342,7 @@ function parseTextRuns(text: string): TextRun[] {
 }
 
 // ─────────────────────────────────────────────
-// Action CTA button rendered below a bot bubble
+// Action CTA button
 // ─────────────────────────────────────────────
 
 interface ActionButtonProps {
@@ -144,10 +370,11 @@ function ActionButton({ intent, onPress }: ActionButtonProps) {
         borderColor: isTrack ? THEME.primary + '55' : '#FED7AA',
       }}
     >
-      {isTrack
-        ? <ClipboardList size={14} color={THEME.primary} />
-        : <FileText size={14} color="#F97316" />
-      }
+      {isTrack ? (
+        <ClipboardList size={14} color={THEME.primary} />
+      ) : (
+        <FileText size={14} color="#F97316" />
+      )}
       <Text
         style={{
           fontSize: 12,
@@ -175,25 +402,45 @@ function TypingDots() {
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(dot, { toValue: -5, duration: 280, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-          Animated.timing(dot, { toValue: 0,  duration: 280, easing: Easing.in(Easing.quad),  useNativeDriver: true }),
+          Animated.timing(dot, {
+            toValue: -5,
+            duration: 280,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 280,
+            easing: Easing.in(Easing.quad),
+            useNativeDriver: true,
+          }),
           Animated.delay(500),
         ])
       );
     const a0 = make(d0, 0);
     const a1 = make(d1, 140);
     const a2 = make(d2, 280);
-    a0.start(); a1.start(); a2.start();
-    return () => { a0.stop(); a1.stop(); a2.stop(); };
+    a0.start();
+    a1.start();
+    a2.start();
+    return () => {
+      a0.stop();
+      a1.stop();
+      a2.stop();
+    };
   }, []);
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 }}>
+    <View
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 }}
+    >
       {[d0, d1, d2].map((dot, i) => (
         <Animated.View
           key={i}
           style={{
-            width: 7, height: 7, borderRadius: 4,
+            width: 7,
+            height: 7,
+            borderRadius: 4,
             backgroundColor: THEME.primary,
             transform: [{ translateY: dot }],
           }}
@@ -220,14 +467,12 @@ function MessageBubble({
 }) {
   const isUser = msg.role === 'user';
   const slideAnim = useRef(new Animated.Value(isUser ? 18 : -18)).current;
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
   const [displayedText, setDisplayedText] = useState(msg.streaming ? '' : msg.text);
   const streamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [cursorVisible, setCursorVisible] = useState(true);
-
-  // Detect intents only on bot messages once streaming is done
   const [intents, setIntents] = useState<ActionIntent[]>([]);
 
   useEffect(() => {
@@ -247,7 +492,9 @@ function MessageBubble({
       }
     };
     streamRef.current = setTimeout(tick, 10);
-    return () => { if (streamRef.current) clearTimeout(streamRef.current); };
+    return () => {
+      if (streamRef.current) clearTimeout(streamRef.current);
+    };
   }, [msg.text, msg.streaming]);
 
   useEffect(() => {
@@ -258,17 +505,25 @@ function MessageBubble({
 
   useEffect(() => {
     Animated.parallel([
-      Animated.spring(slideAnim, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
-      Animated.timing(fadeAnim,  { toValue: 1, duration: 160, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, tension: 70, friction: 10, useNativeDriver: true }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 70,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 160, useNativeDriver: true }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 70,
+        friction: 10,
+        useNativeDriver: true,
+      }),
     ]).start();
   }, []);
 
-  // Render plain text (user) OR rich text with live bold+links (bot, including while streaming)
   const renderContent = () => {
     const textColor = isUser ? '#FFFFFF' : '#1E293B';
 
-    // User bubbles: always plain text
     if (isUser) {
       return (
         <Text style={{ fontSize: 15, lineHeight: 22, color: textColor, fontWeight: '400' }}>
@@ -277,8 +532,6 @@ function MessageBubble({
       );
     }
 
-    // Bot bubbles: parse rich text even mid-stream so ** ** renders bold immediately.
-    // Append cursor separately so the regex never sees it and misreads partial ** markers.
     const cursor = msg.streaming ? (cursorVisible ? '▍' : ' ') : '';
     const runs = parseTextRuns(displayedText);
 
@@ -290,7 +543,11 @@ function MessageBubble({
               <Text
                 key={idx}
                 onPress={() => Linking.openURL(run.value)}
-                style={{ color: '#2563EB', textDecorationLine: 'underline', fontWeight: '500' }}
+                style={{
+                  color: '#2563EB',
+                  textDecorationLine: 'underline',
+                  fontWeight: '500',
+                }}
               >
                 {run.value}
               </Text>
@@ -323,9 +580,26 @@ function MessageBubble({
       }}
     >
       {!isUser && (
-        <View style={{ width: 32, height: 32, flexShrink: 0, marginRight: 8, marginBottom: 2 }}>
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            flexShrink: 0,
+            marginRight: 8,
+            marginBottom: 2,
+          }}
+        >
           {showAvatar && (
-            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: THEME.primary, alignItems: 'center', justifyContent: 'center' }}>
+            <View
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: THEME.primary,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Bot size={15} color="white" />
             </View>
           )}
@@ -333,25 +607,40 @@ function MessageBubble({
       )}
 
       <View style={{ maxWidth: '75%', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
-        {/* Bubble */}
         <View
-          style={isUser ? {
-            backgroundColor: THEME.primary,
-            borderRadius: 20, borderBottomRightRadius: 5,
-            paddingHorizontal: 16, paddingVertical: 10,
-            shadowColor: THEME.primaryDark, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4,
-          } : {
-            backgroundColor: '#FFFFFF',
-            borderRadius: 20, borderBottomLeftRadius: 5,
-            paddingHorizontal: 16, paddingVertical: 10,
-            borderWidth: 1, borderColor: '#F1F5F9',
-            shadowColor: '#94a3b8', shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
-          }}
+          style={
+            isUser
+              ? {
+                  backgroundColor: THEME.primary,
+                  borderRadius: 20,
+                  borderBottomRightRadius: 5,
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  shadowColor: THEME.primaryDark,
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 3 },
+                  elevation: 4,
+                }
+              : {
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 20,
+                  borderBottomLeftRadius: 5,
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  borderWidth: 1,
+                  borderColor: '#F1F5F9',
+                  shadowColor: '#94a3b8',
+                  shadowOpacity: 0.12,
+                  shadowRadius: 6,
+                  shadowOffset: { width: 0, height: 2 },
+                  elevation: 2,
+                }
+          }
         >
           {renderContent()}
         </View>
 
-        {/* Action CTA buttons — rendered below bubble, only for bot + not streaming */}
         {!isUser && !msg.streaming && intents.length > 0 && (
           <View style={{ marginTop: 2, gap: 4 }}>
             {intents.map((intent) => (
@@ -361,14 +650,33 @@ function MessageBubble({
         )}
 
         {isLast && !msg.streaming && (
-          <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 4, marginHorizontal: 2 }}>
+          <Text
+            style={{
+              fontSize: 10,
+              color: '#94A3B8',
+              marginTop: 4,
+              marginHorizontal: 2,
+            }}
+          >
             {formatTime(msg.timestamp)}
           </Text>
         )}
       </View>
 
       {isUser && (
-        <View style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 2, marginLeft: 8, flexShrink: 0, backgroundColor: '#E2E8F0' }}>
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 2,
+            marginLeft: 8,
+            flexShrink: 0,
+            backgroundColor: '#E2E8F0',
+          }}
+        >
           <User size={14} color="#64748B" />
         </View>
       )}
@@ -380,7 +688,15 @@ function MessageBubble({
 // Supporting UI
 // ─────────────────────────────────────────────
 
-function SuggestionChip({ text, onPress, disabled }: { text: string; onPress: () => void; disabled?: boolean }) {
+function SuggestionChip({
+  text,
+  onPress,
+  disabled,
+}: {
+  text: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -397,16 +713,39 @@ function SuggestionChip({ text, onPress, disabled }: { text: string; onPress: ()
         opacity: disabled ? 0.5 : 1,
       }}
     >
-      <Text style={{ color: disabled ? '#94A3B8' : THEME.primary, fontSize: 12, fontWeight: '600' }}>{text}</Text>
+      <Text
+        style={{
+          color: disabled ? '#94A3B8' : THEME.primary,
+          fontSize: 12,
+          fontWeight: '600',
+        }}
+      >
+        {text}
+      </Text>
     </TouchableOpacity>
   );
 }
 
 function DateSeparator() {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 32, marginVertical: 16, gap: 12 }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 32,
+        marginVertical: 16,
+        gap: 12,
+      }}
+    >
       <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
-      <View style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, backgroundColor: '#F1F5F9' }}>
+      <View
+        style={{
+          paddingHorizontal: 12,
+          paddingVertical: 4,
+          borderRadius: 99,
+          backgroundColor: '#F1F5F9',
+        }}
+      >
         <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '500' }}>Ngayon</Text>
       </View>
       <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
@@ -416,8 +755,31 @@ function DateSeparator() {
 
 function BotInfo() {
   return (
-    <View style={{ marginHorizontal: 16, marginBottom: 16, marginTop: 8, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: THEME.primaryMuted, borderWidth: 1, borderColor: THEME.primary + '33' }}>
-      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: THEME.primary, alignItems: 'center', justifyContent: 'center' }}>
+    <View
+      style={{
+        marginHorizontal: 16,
+        marginBottom: 16,
+        marginTop: 8,
+        borderRadius: 16,
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: THEME.primaryMuted,
+        borderWidth: 1,
+        borderColor: THEME.primary + '33',
+      }}
+    >
+      <View
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          backgroundColor: THEME.primary,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <Zap size={18} color="white" />
       </View>
       <View style={{ flex: 1 }}>
@@ -425,7 +787,8 @@ function BotInfo() {
           SantaBot FAQ Assistant
         </Text>
         <Text style={{ fontSize: 11, color: THEME.primary, marginTop: 1 }}>
-          Tanungin mo ako tungkol sa Santa Maria, Laguna — reklamo, serbisyo, dokumento, at higit pa.
+          Tanungin mo ako tungkol sa Santa Maria, Laguna — reklamo, serbisyo, dokumento, at
+          higit pa.
         </Text>
       </View>
     </View>
@@ -436,9 +799,6 @@ function BotInfo() {
 // Initial messages
 // ─────────────────────────────────────────────
 
-// Factory — called once per mount via useState lazy initializer.
-// A static array with a hardcoded id causes duplicate-key errors on
-// hot reload / re-mount because the same id collides with ids already in state.
 const makeInitialMessages = (): Message[] => [
   {
     id: uid(),
@@ -461,155 +821,312 @@ interface ChatbotModalProps {
 export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const connectionQuality = useConnectionQuality();
 
-  const [messages,    setMessages]   = useState<Message[]>(makeInitialMessages);
-  const [input,       setInput]      = useState('');
-  const [isTyping,    setIsTyping]   = useState(false);
+  const isOffline = connectionQuality === 'offline';
+  const isSlow = connectionQuality === 'slow';
+
+  const [messages, setMessages] = useState<Message[]>(makeInitialMessages);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
 
-  const listRef         = useRef<FlatList>(null);
-  const slideAnim       = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const inputRef        = useRef<TextInput>(null);
-  const abortRef        = useRef<AbortController | null>(null);
-  const streamFinishRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // 🔒 Prevents duplicate requests from lag-induced double taps
-  const isSendingRef    = useRef(false);
+  // ─── Session ID ───────────────────────────────────────────────────────────
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
+  const listRef = useRef<FlatList>(null);
+  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const inputRef = useRef<TextInput>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const streamFinishRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSendingRef = useRef(false);
+  const isNearBottomRef = useRef(true);
+
+  const scrollToBottomIfNear = useCallback((animated = true) => {
+    if (isNearBottomRef.current) {
+      setTimeout(() => listRef.current?.scrollToEnd({ animated }), 80);
+    }
+  }, []);
+
+  // ─── Modal open/close ─────────────────────────────────────────────────────
   useEffect(() => {
     if (visible) {
-      Animated.spring(slideAnim, { toValue: 0, tension: 50, friction: 10, useNativeDriver: true }).start();
+      setSessionId(uuidv4());
+      setMessages(makeInitialMessages());
+      isNearBottomRef.current = true;
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 50,
+        friction: 10,
+        useNativeDriver: true,
+      }).start();
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
     } else {
-      Animated.timing(slideAnim, { toValue: SCREEN_HEIGHT, duration: 300, easing: Easing.in(Easing.cubic), useNativeDriver: true }).start();
+      setSessionId(null);
+      setInput('');
+      setIsTyping(false);
+      setIsStreaming(false);
+
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+      if (streamFinishRef.current) {
+        clearTimeout(streamFinishRef.current);
+        streamFinishRef.current = null;
+      }
+      isSendingRef.current = false;
+
+      Animated.timing(slideAnim, {
+        toValue: SCREEN_HEIGHT,
+        duration: 300,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
     }
   }, [visible]);
 
   // ── Action handler ────────────────────────────────────────────────────────
-  /**
-   * Closes the modal first, then navigates — the modal sits on top of the
-   * entire screen so router.push alone won't make the destination visible.
-   * New intents can be added here in the future without touching
-   * the detection logic or UI layer.
-   */
-  const handleAction = useCallback((intent: ActionIntent) => {
-    const routes: Record<ActionIntent, string> = {
-      track: '/complaints/UserComplaints',
-      file: '/(tabs)/Complaints',
-      // Future intents: 'schedule': '/(tabs)/Schedule', etc.
-    };
-
-    const route = routes[intent];
-    if (!route) return;
-
-    // Close the modal, wait for the slide-out animation to finish, then navigate
-    onClose();
-    setTimeout(() => {
-      router.push(route as any);
-    }, 320); // matches the 300ms slide-out animation + small buffer
-  }, [router, onClose]);
+  const handleAction = useCallback(
+    (intent: ActionIntent) => {
+      const routes: Record<ActionIntent, string> = {
+        track: '/complaints/UserComplaints',
+        file: '/(tabs)/Complaints',
+      };
+      const route = routes[intent];
+      if (!route) return;
+      onClose();
+      setTimeout(() => router.push(route as any), 320);
+    },
+    [router, onClose]
+  );
 
   // ── Cancel stream ─────────────────────────────────────────────────────────
   const handleCancel = useCallback(() => {
-    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
-    if (streamFinishRef.current) { clearTimeout(streamFinishRef.current); streamFinishRef.current = null; }
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    if (streamFinishRef.current) {
+      clearTimeout(streamFinishRef.current);
+      streamFinishRef.current = null;
+    }
     setIsTyping(false);
     setIsStreaming(false);
     setMessages((prev) => prev.map((m) => (m.streaming ? { ...m, streaming: false } : m)));
-    isSendingRef.current = false; // 🔓 Release lock on manual cancel
+    isSendingRef.current = false;
   }, []);
 
   // ── Send message ──────────────────────────────────────────────────────────
-  const sendMessage = useCallback(async (text: string, isSuggestion = false) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
+  const sendMessage = useCallback(
+    async (text: string, isSuggestion = false) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      // Block send when offline
+      if (isOffline) return;
 
-    // 🔒 Hard lock — ignore all taps while a request is already in flight
-    if (isSendingRef.current) return;
-    isSendingRef.current = true;
+      if (isSendingRef.current) return;
+      isSendingRef.current = true;
 
-    // Cancel any lingering stream before starting fresh
-    if (isTyping || isStreaming) handleCancel();
+      if (isTyping || isStreaming) handleCancel();
 
-    setInput('');
+      setInput('');
 
-    const userMsg: Message = { id: uid(), role: 'user', text: trimmed, timestamp: new Date(), streaming: false };
-    setMessages((prev) => [...prev, userMsg]);
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
-    setIsTyping(true);
+      const userMsg: Message = {
+        id: uid(),
+        role: 'user',
+        text: trimmed,
+        timestamp: new Date(),
+        streaming: false,
+      };
+      setMessages((prev) => [...prev, userMsg]);
 
-    let reply: string;
+      isNearBottomRef.current = true;
+      scrollToBottomIfNear();
 
-    if (isSuggestion) {
-      await new Promise((r) => setTimeout(r, 400 + Math.random() * 300));
-      reply = getFaqReply(trimmed);
-    } else {
-      try {
-        abortRef.current = new AbortController();
-        const response = await chatbotApiClient.post('/ask', { question: trimmed }, { signal: abortRef.current.signal });
-        reply = response.data.answer;
-      } catch (err: any) {
-        if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
-          setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
-          setIsTyping(false);
-          isSendingRef.current = false; // 🔓 Release lock on abort
-          return;
+      setIsTyping(true);
+
+      let reply: string;
+
+      if (isSuggestion) {
+        await new Promise((r) => setTimeout(r, 400 + Math.random() * 300));
+        reply = getFaqReply(trimmed);
+      } else {
+        try {
+          abortRef.current = new AbortController();
+          const response = await chatbotApiClient.post(
+            '/ask',
+            { question: trimmed, session_id: sessionId },
+            { signal: abortRef.current.signal }
+          );
+          reply = response.data.answer;
+        } catch (err: any) {
+          if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
+            setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+            setIsTyping(false);
+            isSendingRef.current = false;
+            return;
+          }
+          reply =
+            'Pasensya na, may problema sa koneksyon. Subukan ulit o pumili mula sa mga mungkahi sa itaas. 🙏';
+        } finally {
+          abortRef.current = null;
         }
-        reply = 'Pasensya na, may problema sa koneksyon. Subukan ulit o pumili mula sa mga mungkahi sa itaas. 🙏';
-      } finally {
-        abortRef.current = null;
       }
-    }
 
-    setIsTyping(false);
-    setIsStreaming(true);
+      setIsTyping(false);
+      setIsStreaming(true);
 
-    const botId = uid();
-    const botMsg: Message = { id: botId, role: 'bot', text: reply, timestamp: new Date(), streaming: true };
-    setMessages((prev) => [...prev, botMsg]);
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+      const botId = uid();
+      const botMsg: Message = {
+        id: botId,
+        role: 'bot',
+        text: reply,
+        timestamp: new Date(),
+        streaming: true,
+      };
+      setMessages((prev) => [...prev, botMsg]);
+      scrollToBottomIfNear();
 
-    const estimatedDuration = reply.length * 13;
-    streamFinishRef.current = setTimeout(() => {
-      setMessages((prev) => prev.map((m) => (m.id === botId ? { ...m, streaming: false } : m)));
-      setIsStreaming(false);
-      streamFinishRef.current = null;
-      isSendingRef.current = false; // 🔓 Release lock after stream finishes
-    }, estimatedDuration);
-  }, [isTyping, isStreaming, handleCancel]);
+      const estimatedDuration = reply.length * 13;
+      streamFinishRef.current = setTimeout(() => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === botId ? { ...m, streaming: false } : m))
+        );
+        setIsStreaming(false);
+        streamFinishRef.current = null;
+        isSendingRef.current = false;
+      }, estimatedDuration);
+    },
+    [isTyping, isStreaming, handleCancel, scrollToBottomIfNear, sessionId, isOffline]
+  );
 
   const isBusy = isTyping || isStreaming;
+  // Send disabled when offline OR no text typed
+  const sendDisabled = isOffline || !input.trim();
   const kavOffset = Platform.OS === 'android' ? STATUS_BAR_HEIGHT : insets.top;
 
   return (
     <Modal visible={visible} transparent={false} animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
         <Animated.View style={{ flex: 1, transform: [{ translateY: slideAnim }] }}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={kavOffset}>
-
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior="padding"
+            keyboardVerticalOffset={kavOffset}
+          >
             {/* Header */}
-            <View style={{ paddingTop: insets.top, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, gap: 8 }}>
-                <TouchableOpacity onPress={onClose} activeOpacity={0.7} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
+            <View
+              style={{
+                paddingTop: insets.top,
+                backgroundColor: '#FFFFFF',
+                borderBottomWidth: 1,
+                borderBottomColor: '#F1F5F9',
+                shadowColor: '#000',
+                shadowOpacity: 0.06,
+                shadowRadius: 8,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 4,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 8,
+                  paddingVertical: 10,
+                  gap: 8,
+                }}
+              >
+                <TouchableOpacity
+                  onPress={onClose}
+                  activeOpacity={0.7}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   <ArrowLeft size={22} color="#1E293B" />
                 </TouchableOpacity>
 
                 <View style={{ position: 'relative', marginRight: 4 }}>
-                  <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: THEME.primary, alignItems: 'center', justifyContent: 'center' }}>
+                  <View
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 21,
+                      backgroundColor: THEME.primary,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
                     <Bot size={20} color="white" />
                   </View>
-                  <View style={{ position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 6, backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#FFFFFF' }} />
+                  {/* Online dot — turns grey when offline */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      bottom: 1,
+                      right: 1,
+                      width: 11,
+                      height: 11,
+                      borderRadius: 6,
+                      backgroundColor: isOffline
+                        ? '#94A3B8'
+                        : isSlow
+                        ? '#F59E0B'
+                        : '#22C55E',
+                      borderWidth: 2,
+                      borderColor: '#FFFFFF',
+                    }}
+                  />
                 </View>
 
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>SantaBot</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
+                      SantaBot
+                    </Text>
                     <Sparkles size={12} color={THEME.primary} />
                   </View>
-                  <Text style={{ fontSize: 11, color: isBusy ? THEME.primary : '#64748B', fontWeight: '500', marginTop: 1 }}>
-                    {isBusy ? 'Nagtytype...' : 'FAQ · Santa Maria, Laguna'}
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: isOffline
+                        ? '#DC2626'
+                        : isSlow
+                        ? '#D97706'
+                        : isBusy
+                        ? THEME.primary
+                        : '#64748B',
+                      fontWeight: '500',
+                      marginTop: 1,
+                    }}
+                  >
+                    {isOffline
+                      ? 'Walang koneksyon'
+                      : isSlow
+                      ? 'Mabagal ang koneksyon'
+                      : isBusy
+                      ? 'Nagtytype...'
+                      : 'FAQ · Santa Maria, Laguna'}
                   </Text>
                 </View>
 
-                <TouchableOpacity activeOpacity={0.7} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#F8FAFC',
+                  }}
+                >
                   <HelpCircle size={20} color="#94A3B8" />
                 </TouchableOpacity>
               </View>
@@ -623,8 +1140,19 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               style={{ flex: 1, backgroundColor: '#F8FAFC' }}
               contentContainerStyle={{ paddingTop: 8, paddingBottom: 12 }}
               showsVerticalScrollIndicator={false}
-              onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-              ListHeaderComponent={<><DateSeparator /><BotInfo /></>}
+              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+              onScroll={(e) => {
+                const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+                isNearBottomRef.current =
+                  contentOffset.y + layoutMeasurement.height >= contentSize.height - 120;
+              }}
+              scrollEventThrottle={100}
+              ListHeaderComponent={
+                <>
+                  <DateSeparator />
+                  <BotInfo />
+                </>
+              }
               renderItem={({ item, index }) => {
                 const next = messages[index + 1];
                 const isLast = !next || next.role !== item.role;
@@ -640,11 +1168,44 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               }}
               ListFooterComponent={
                 isTyping ? (
-                  <Animated.View style={{ flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, marginTop: 4, marginBottom: 4 }}>
-                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: THEME.primary, alignItems: 'center', justifyContent: 'center', marginRight: 8, marginBottom: 2 }}>
+                  <Animated.View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'flex-end',
+                      paddingHorizontal: 16,
+                      marginTop: 4,
+                      marginBottom: 4,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        backgroundColor: THEME.primary,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 8,
+                        marginBottom: 2,
+                      }}
+                    >
                       <Bot size={14} color="white" />
                     </View>
-                    <View style={{ backgroundColor: '#FFFFFF', borderRadius: 20, borderBottomLeftRadius: 5, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: '#F1F5F9', shadowColor: '#94a3b8', shadowOpacity: 0.1, shadowRadius: 4, elevation: 1 }}>
+                    <View
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: 20,
+                        borderBottomLeftRadius: 5,
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        borderWidth: 1,
+                        borderColor: '#F1F5F9',
+                        shadowColor: '#94a3b8',
+                        shadowOpacity: 0.1,
+                        shadowRadius: 4,
+                        elevation: 1,
+                      }}
+                    >
                       <TypingDots />
                     </View>
                   </Animated.View>
@@ -652,55 +1213,159 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               }
             />
 
-            {/* Suggestion chips */}
-            <View style={{ backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 12, paddingBottom: 10 }}>
-              <Text style={{ fontSize: 10, color: '#94A3B8', fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', paddingHorizontal: 16, marginBottom: 8 }}>
-                Mga Madalas na Tanong
-              </Text>
-              <FlatList
-                data={SUGGESTIONS}
-                keyExtractor={(s) => s}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16 }}
-                renderItem={({ item }) => (
-                  <SuggestionChip text={item} onPress={() => sendMessage(item, true)} disabled={isBusy} />
-                )}
-              />
-            </View>
+            {/* ── Connection banner + suggestion chips + input ── */}
+            <View>
+              {/* Connection banner — sits directly above the suggestion chips */}
+              <ConnectionBanner quality={connectionQuality} />
 
-            {/* Input bar */}
-            <View style={{ backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingHorizontal: 12, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 12), flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-              <View style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 2, flexDirection: 'row', alignItems: 'flex-end', minHeight: 44, borderWidth: 1.5, borderColor: isBusy ? THEME.primary + '55' : '#E2E8F0' }}>
-                <TextInput
-                  ref={inputRef}
-                  value={input}
-                  onChangeText={setInput}
-                  placeholder={isBusy ? 'Naghihintay sa sagot...' : 'Magtanong tungkol sa Santa Maria...'}
-                  placeholderTextColor="#94A3B8"
-                  multiline
-                  maxLength={500}
-                  style={{ flex: 1, fontSize: 15, color: '#1E293B', paddingTop: 10, paddingBottom: 10, maxHeight: 100, lineHeight: 20 }}
-                  returnKeyType="default"
+              {/* Suggestion chips */}
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderTopWidth: connectionQuality !== 'online' ? 0 : 1,
+                  borderTopColor: '#F1F5F9',
+                  paddingTop: 12,
+                  paddingBottom: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    color: '#94A3B8',
+                    fontWeight: '700',
+                    letterSpacing: 1.2,
+                    textTransform: 'uppercase',
+                    paddingHorizontal: 16,
+                    marginBottom: 8,
+                  }}
+                >
+                  Mga Madalas na Tanong
+                </Text>
+                <FlatList
+                  data={SUGGESTIONS}
+                  keyExtractor={(s) => s}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 16 }}
+                  renderItem={({ item }) => (
+                    <SuggestionChip
+                      text={item}
+                      onPress={() => sendMessage(item, true)}
+                      disabled={isBusy || isOffline}
+                    />
+                  )}
                 />
               </View>
 
-              {isBusy ? (
-                <TouchableOpacity onPress={handleCancel} activeOpacity={0.8} style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEE2E2', borderWidth: 1.5, borderColor: '#FECACA' }}>
-                  <Square size={16} color="#EF4444" fill="#EF4444" />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  onPress={() => sendMessage(input)}
-                  disabled={!input.trim()}
-                  activeOpacity={0.8}
-                  style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: input.trim() ? THEME.primary : '#E2E8F0', shadowColor: input.trim() ? THEME.primaryDark : 'transparent', shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: input.trim() ? 4 : 4 }}
+              {/* Input bar */}
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderTopWidth: 1,
+                  borderTopColor: '#F1F5F9',
+                  paddingHorizontal: 12,
+                  paddingTop: 10,
+                  paddingBottom: Math.max(insets.bottom, 12),
+                  flexDirection: 'row',
+                  alignItems: 'flex-end',
+                  gap: 8,
+                }}
+              >
+                <View
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#F1F5F9',
+                    borderRadius: 24,
+                    paddingHorizontal: 16,
+                    paddingVertical: 2,
+                    flexDirection: 'row',
+                    alignItems: 'flex-end',
+                    minHeight: 44,
+                    borderWidth: 1.5,
+                    borderColor: isOffline
+                      ? '#FECACA'
+                      : isSlow
+                      ? '#FDE68A'
+                      : isBusy
+                      ? THEME.primary + '55'
+                      : '#E2E8F0',
+                  }}
                 >
-                  <Send size={18} color={input.trim() ? '#FFFFFF' : '#94A3B8'} style={{ marginLeft: 2 }} />
-                </TouchableOpacity>
-              )}
-            </View>
+                  <TextInput
+                    ref={inputRef}
+                    value={input}
+                    onChangeText={setInput}
+                    placeholder={
+                      isOffline
+                        ? 'Walang koneksyon sa internet...'
+                        : isSlow
+                        ? 'Mabagal ang koneksyon...'
+                        : isBusy
+                        ? 'Naghihintay sa sagot...'
+                        : 'Magtanong tungkol sa Santa Maria...'
+                    }
+                    placeholderTextColor={isOffline ? '#EF4444' : '#94A3B8'}
+                    multiline
+                    maxLength={500}
+                    editable={!isOffline}
+                    style={{
+                      flex: 1,
+                      fontSize: 15,
+                      color: isOffline ? '#94A3B8' : '#1E293B',
+                      paddingTop: 10,
+                      paddingBottom: 10,
+                      maxHeight: 100,
+                      lineHeight: 20,
+                    }}
+                    returnKeyType="default"
+                  />
+                </View>
 
+                {isBusy ? (
+                  <TouchableOpacity
+                    onPress={handleCancel}
+                    activeOpacity={0.8}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: '#FEE2E2',
+                      borderWidth: 1.5,
+                      borderColor: '#FECACA',
+                    }}
+                  >
+                    <Square size={16} color="#EF4444" fill="#EF4444" />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => sendMessage(input)}
+                    disabled={sendDisabled}
+                    activeOpacity={0.8}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: sendDisabled ? '#E2E8F0' : THEME.primary,
+                      shadowColor: sendDisabled ? 'transparent' : THEME.primaryDark,
+                      shadowOpacity: 0.35,
+                      shadowRadius: 8,
+                      shadowOffset: { width: 0, height: 3 },
+                      elevation: sendDisabled ? 0 : 4,
+                    }}
+                  >
+                    <Send
+                      size={18}
+                      color={sendDisabled ? '#94A3B8' : '#FFFFFF'}
+                      style={{ marginLeft: 2 }}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
           </KeyboardAvoidingView>
         </Animated.View>
       </View>

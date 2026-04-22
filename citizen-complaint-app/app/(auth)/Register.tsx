@@ -247,10 +247,9 @@ export default function RegisterScreen({ navigation }: any) {
   const { apiRoute } = useLocalSearchParams();
   const { t, i18n } = useTranslation();
 
-  // ── Derive registration mode from apiRoute ────────────────────────────────
-  // isPhoneMode = true  → show phone only, hide email
-  // isPhoneMode = false → show email only, hide phone
-  const isPhoneMode = apiRoute === '/register-phone-number';
+  // ── isPhoneMode commented out ─────────────────────────────────────────────
+  // const isPhoneMode = apiRoute === '/register-phone-number';
+  // Both email and phone are always shown and submitted regardless of apiRoute.
 
   const [step, setStep] = useState(1);
   const [showGenderModal, setShowGenderModal] = useState(false);
@@ -461,18 +460,25 @@ export default function RegisterScreen({ navigation }: any) {
     // ── Step 2 validation ────────────────────────────────────────────────
     const step2Errors: { field: keyof RegistrationFormData; message: string }[] = [];
 
-    // Only validate email if it's email mode
-    if (!isPhoneMode) {
-      const emailError = validateEmail(data.email, t);
-      if (emailError) step2Errors.push({ field: 'email', message: emailError });
-    }
+    // Always validate email
+    const emailError = validateEmail(data.email, t);
+    if (emailError) step2Errors.push({ field: 'email', message: emailError });
 
-    // Only validate phone if it's phone mode
-    if (isPhoneMode) {
-      const stripped = data.phoneNumber.startsWith('0') ? data.phoneNumber.slice(1) : data.phoneNumber;
-      const phoneError = validateContactNumber(stripped, t);
-      if (phoneError) step2Errors.push({ field: 'phoneNumber', message: phoneError });
-    }
+    // Always validate phone number
+    const stripped = data.phoneNumber.startsWith('0') ? data.phoneNumber.slice(1) : data.phoneNumber;
+    const phoneError = validateContactNumber(stripped, t);
+    if (phoneError) step2Errors.push({ field: 'phoneNumber', message: phoneError });
+
+    // ── isPhoneMode step 2 validation commented out ──────────────────────
+    // if (!isPhoneMode) {
+    //   const emailError = validateEmail(data.email, t);
+    //   if (emailError) step2Errors.push({ field: 'email', message: emailError });
+    // }
+    // if (isPhoneMode) {
+    //   const stripped = data.phoneNumber.startsWith('0') ? data.phoneNumber.slice(1) : data.phoneNumber;
+    //   const phoneError = validateContactNumber(stripped, t);
+    //   if (phoneError) step2Errors.push({ field: 'phoneNumber', message: phoneError });
+    // }
 
     const passwordError = validatePassword(data.password, t);
     if (passwordError) step2Errors.push({ field: 'password', message: passwordError });
@@ -509,11 +515,15 @@ export default function RegisterScreen({ navigation }: any) {
     try {
       await saveFormData();
 
-      // ── Use the correct API route based on mode ───────────────────────
-      const endpoint = isPhoneMode ? '/register-phone-number' : '/register';
-      const payload = isPhoneMode
-        ? { phone_number: data.phoneNumber }
-        : { email: data.email, phone_number: data.phoneNumber };
+      // ── Always use /register and send both email and phone number ─────
+      const endpoint = '/register';
+      const payload = { email: data.email, phone_number: data.phoneNumber };
+
+      // ── isPhoneMode endpoint/payload logic commented out ──────────────
+      // const endpoint = isPhoneMode ? '/register-phone-number' : '/register';
+      // const payload = isPhoneMode
+      //   ? { phone_number: data.phoneNumber }
+      //   : { email: data.email, phone_number: data.phoneNumber };
 
       const response = await authApiClient.post(endpoint, payload);
       if (!response || !response.data) throw new Error('Invalid response from server');
@@ -522,38 +532,47 @@ export default function RegisterScreen({ navigation }: any) {
       setSubmittedEmail(data.email);
       await clearSavedFormData();
 
+      // ── Always route to email OTP after registration ──────────────────
+      router.replace({
+        pathname: '/(auth)/Otp',
+        params: {
+          email: data.email,
+          apiRoute: '/verify-otp',
+          otpResendRoute: '/resend-otp',
+        },
+      });
 
-
-
-      if (isPhoneMode) {
-
-        router.replace({
-          pathname: '/(auth)/Otp',
-          params: {
-            phone: data.phoneNumber,
-            apiRoute: '/verify-phone-number-otp',
-            otpResendRoute: '/resend-phone-otp',
-          },
-        });
-
-      } else {
-
-        router.replace({
-          pathname: '/(auth)/Otp',
-          params: {
-            email: data.email,
-
-            apiRoute: '/verify-otp',
-            otpResendRoute: '/resend-otp',
-          },
-        });
-
-      }
+      // ── isPhoneMode routing commented out ─────────────────────────────
+      // if (isPhoneMode) {
+      //   router.replace({
+      //     pathname: '/(auth)/Otp',
+      //     params: {
+      //       phone: data.phoneNumber,
+      //       apiRoute: '/verify-phone-number-otp',
+      //       otpResendRoute: '/resend-phone-otp',
+      //     },
+      //   });
+      // } else {
+      //   router.replace({
+      //     pathname: '/(auth)/Otp',
+      //     params: {
+      //       email: data.email,
+      //       apiRoute: '/verify-otp',
+      //       otpResendRoute: '/resend-otp',
+      //     },
+      //   });
+      // }
 
     } catch (error: any) {
       if (error?.response?.status === 400) {
         const detail = error?.response?.data?.detail || '';
-        if (isPhoneMode || detail.toLowerCase().includes('phone')) {
+        // ── isPhoneMode error routing commented out ─────────────────────
+        // if (isPhoneMode || detail.toLowerCase().includes('phone')) {
+        //   setError('phoneNumber', { type: 'server', message: detail || 'Phone number already registered' });
+        // } else {
+        //   setError('email', { type: 'server', message: detail || 'Email already registered' });
+        // }
+        if (detail.toLowerCase().includes('phone')) {
           setError('phoneNumber', { type: 'server', message: detail || 'Phone number already registered' });
         } else {
           setError('email', { type: 'server', message: detail || 'Email already registered' });
@@ -912,89 +931,89 @@ export default function RegisterScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* ── Email — shown only in email mode ── */}
-      {!isPhoneMode && (
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-neutral-700 mb-2">{t('email')} *</Text>
-          <Controller
-            control={control}
-            name="email"
-            rules={{
-              required: t('required'),
-              validate: (value) => {
-                const err = validateEmail(value, t);
-                return err ? err : true;
-              },
-            }}
-            render={({ field: { onChange, onBlur, value } }) => (
-              <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.email ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
-                <Mail size={20} color={errors.email ? '#EF4444' : '#6B7280'} />
-                <TextInput
-                  className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
-                  onBlur={() => {
-                    onBlur();
-                    const err = validateEmail(value, t);
-                    if (err) setError('email', { type: 'manual', message: err });
-                    else clearErrors('email');
-                  }}
-                  onChangeText={(text) => { onChange(text); clearErrors('email'); setNetworkError(null); }}
-                  value={value}
-                  placeholder="juan.delacruz@gmail.com"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-            )}
-          />
-          <ErrorMessage message={errors.email?.message} />
-        </View>
-      )}
+      {/* Email — always shown */}
+      <View className="mb-4">
+        <Text className="text-sm font-medium text-neutral-700 mb-2">{t('email')} *</Text>
+        <Controller
+          control={control}
+          name="email"
+          rules={{
+            required: t('required'),
+            validate: (value) => {
+              const err = validateEmail(value, t);
+              return err ? err : true;
+            },
+          }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.email ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+              <Mail size={20} color={errors.email ? '#EF4444' : '#6B7280'} />
+              <TextInput
+                className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
+                onBlur={() => {
+                  onBlur();
+                  const err = validateEmail(value, t);
+                  if (err) setError('email', { type: 'manual', message: err });
+                  else clearErrors('email');
+                }}
+                onChangeText={(text) => { onChange(text); clearErrors('email'); setNetworkError(null); }}
+                value={value}
+                placeholder="juan.delacruz@gmail.com"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+          )}
+        />
+        <ErrorMessage message={errors.email?.message} />
+      </View>
 
-      {/* ── Phone Number — shown only in phone mode ── */}
-      {isPhoneMode && (
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-neutral-700 mb-2">{t('phoneNumber')} *</Text>
-          <Controller
-            control={control}
-            name="phoneNumber"
-            rules={{
-              required: t('required'),
-              validate: (value) => {
-                const stripped = value.startsWith('0') ? value.slice(1) : value;
-                const err = validateContactNumber(stripped, t);
-                return err || true;
-              },
-            }}
-            render={({ field: { onChange, onBlur, value } }) => (
-              <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
-                <Phone size={20} color="#6B7280" />
-                <View className="ml-3 mr-1 border-r border-neutral-300 pr-3">
-                  <Text className="text-base text-neutral-700 py-2.5">+63</Text>
-                </View>
-                <TextInput
-                  className="flex-1 ml-2 text-base text-neutral-900 py-2.5"
-                  onBlur={() => {
-                    onBlur();
-                    const stripped = value.startsWith('0') ? value.slice(1) : value;
-                    const err = validateContactNumber(stripped, t);
-                    if (err) setError('phoneNumber', { type: 'manual', message: err });
-                    else clearErrors('phoneNumber');
-                  }}
-                  onChangeText={(text) => handlePhoneNumberChange(text, onChange)}
-                  value={value}
-                  placeholder="9123456789"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="phone-pad"
-                  maxLength={11}
-                />
+      {/* Phone Number — always shown */}
+      <View className="mb-4">
+        <Text className="text-sm font-medium text-neutral-700 mb-2">{t('phoneNumber')} *</Text>
+        <Controller
+          control={control}
+          name="phoneNumber"
+          rules={{
+            required: t('required'),
+            validate: (value) => {
+              const stripped = value.startsWith('0') ? value.slice(1) : value;
+              const err = validateContactNumber(stripped, t);
+              return err || true;
+            },
+          }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+              <Phone size={20} color="#6B7280" />
+              <View className="ml-3 mr-1 border-r border-neutral-300 pr-3">
+                <Text className="text-base text-neutral-700 py-2.5">+63</Text>
               </View>
-            )}
-          />
-          <Text className="text-xs text-neutral-500 mt-1">Enter your 11-digit number (e.g. 09123456789)</Text>
-          <ErrorMessage message={errors.phoneNumber?.message} />
-        </View>
-      )}
+              <TextInput
+                className="flex-1 ml-2 text-base text-neutral-900 py-2.5"
+                onBlur={() => {
+                  onBlur();
+                  const stripped = value.startsWith('0') ? value.slice(1) : value;
+                  const err = validateContactNumber(stripped, t);
+                  if (err) setError('phoneNumber', { type: 'manual', message: err });
+                  else clearErrors('phoneNumber');
+                }}
+                onChangeText={(text) => handlePhoneNumberChange(text, onChange)}
+                value={value}
+                placeholder="9123456789"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+                maxLength={11}
+              />
+            </View>
+          )}
+        />
+        <Text className="text-xs text-neutral-500 mt-1">Enter your 11-digit number (e.g. 09123456789)</Text>
+        <ErrorMessage message={errors.phoneNumber?.message} />
+      </View>
+
+      {/* isPhoneMode conditional rendering commented out */}
+      {/* {!isPhoneMode && ( <View>...</View> )} */}
+      {/* {isPhoneMode && ( <View>...</View> )} */}
 
       {/* Password */}
       <View className="mb-4">
@@ -1169,24 +1188,24 @@ export default function RegisterScreen({ navigation }: any) {
           render={({ field: { onChange, onBlur, value } }) => (
             <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.idNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
               <FileText size={20} color="#6B7280" />
-   <TextInput
-      className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
-      onBlur={() => {
-        onBlur();
-        const err = validateIdNumber(value, t);
-        if (err) setError('idNumber', { type: 'manual', message: err });
-        else clearErrors('idNumber');
-      }}
-      onChangeText={(text) => {
-        const sanitized = text.replace(/[^a-zA-Z0-9-]/g, '');
-        onChange(sanitized);
-        clearErrors('idNumber'); // clear as user types
-      }}
-      maxLength={20}
-      value={value}
-      placeholder="A00-000-000000"
-      placeholderTextColor="#9CA3AF"
-    />
+              <TextInput
+                className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
+                onBlur={() => {
+                  onBlur();
+                  const err = validateIdNumber(value, t);
+                  if (err) setError('idNumber', { type: 'manual', message: err });
+                  else clearErrors('idNumber');
+                }}
+                onChangeText={(text) => {
+                  const sanitized = text.replace(/[^a-zA-Z0-9-]/g, '');
+                  onChange(sanitized);
+                  clearErrors('idNumber');
+                }}
+                maxLength={20}
+                value={value}
+                placeholder="A00-000-000000"
+                placeholderTextColor="#9CA3AF"
+              />
             </View>
           )}
         />

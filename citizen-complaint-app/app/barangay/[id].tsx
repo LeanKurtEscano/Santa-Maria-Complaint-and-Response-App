@@ -43,11 +43,8 @@ export default function ComplaintFormScreen() {
   console.log('Received route params:', params)
   const barangayId       = params.id as string;
   const barangayAccountId = params.barangayAccountId as string;
-
-  // Resolve barangay map centre from constants (no need to pass lat/lng in params)
-  const { lat: barangayLat, lng: barangayLng } =
-    getBarangayCoords(barangayName) ?? DEFAULT_COORDS;
-
+  const barangayLat = parseFloat(params.barangayLat as string);
+ const barangayLng = parseFloat(params.barangayLng as string);
   // ── Step ────────────────────────────────────────────────────────────────────
   const [step, setStep] = useState<Step>('instructions');
   const { showToast:showGlobalToast } = useToastStore();
