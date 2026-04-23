@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "Santa Maria",
+    "name": "Mary App",
     "slug": "citizen-complaint-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/santamarialogo.jpg",
+    "icon": "./assets/images/santamarialogoapp.jpg",
     "scheme": "citizencomplaintapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -21,7 +21,7 @@
     "android": {
       "googleServicesFile": "./google-services.json",
         "notification": {       
-    "icon": "./assets/images/santamarialogo.jpg",
+    "icon": "./assets/images/santamarialogoapp.jpg",
     "color": "#346739",
     "androidMode": "default"
   },
@@ -55,7 +55,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/notification-icon.png",
+          "icon": "./assets/images/santamarialogoapp.jpg",
           "color": "#346739",
            "sounds": []
         }
@@ -64,7 +64,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/santamarialogo.jpg",
+          "image": "./assets/images/santamarialogoapp.jpg",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#346739",

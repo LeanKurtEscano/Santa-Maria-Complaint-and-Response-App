@@ -996,7 +996,42 @@ function AttachmentGrid({ attachments }: { attachments: ResponseAttachment[] }) 
 
 // ─── Responses / Remarks Section ─────────────────────────────────────────────
 
+
+function getRoleMeta(role?: string): { label: string; color: string; bg: string; icon: React.ReactNode } {
+  switch (role) {
+    case "barangay_official":
+      return {
+        label: "Barangay",
+        color: "#1d4ed8",
+        bg: "#eff6ff",
+        icon: <Shield size={11} color="#1d4ed8" strokeWidth={2.5} />,
+      };
+    case "lgu_official":
+      return {
+        label: "LGU",
+        color: "#7c3aed",
+        bg: "#f5f3ff",
+        icon: <Landmark size={11} color="#7c3aed" strokeWidth={2.5} />,
+      };
+    case "department_staff":
+      return {
+        label: "Department",
+        color: "#0369a1",
+        bg: "#e0f2fe",
+        icon: <Building2 size={11} color="#0369a1" strokeWidth={2.5} />,
+      };
+    default:
+      return {
+        label: "Official",
+        color: "#6b7280",
+        bg: "#f3f4f6",
+        icon: <Shield size={11} color="#6b7280" strokeWidth={2.5} />,
+      };
+  }
+}
+ 
 const PREVIEW_COUNT = 2;
+
 
 function ResponsesSection({
   incidentLinks,
@@ -1006,7 +1041,7 @@ function ResponsesSection({
   const { t } = useTranslation();
   const [sortDesc, setSortDesc] = useState(true);
   const [showAll, setShowAll] = useState(false);
-
+ 
   const allResponses = useMemo(() => {
     const flat = incidentLinks.flatMap(
       (link) => link.incident?.responses ?? []
@@ -1018,13 +1053,13 @@ function ResponsesSection({
       return sortDesc ? -diff : diff;
     });
   }, [incidentLinks, sortDesc]);
-
+ 
   if (allResponses.length === 0) return null;
-
+ 
   const visible = showAll
     ? allResponses
     : allResponses.slice(0, PREVIEW_COUNT);
-
+ 
   return (
     <View
       style={{
@@ -1079,7 +1114,7 @@ function ResponsesSection({
             </Text>
           </View>
         </View>
-
+ 
         {/* Sort toggle */}
         <TouchableOpacity
           onPress={() => setSortDesc((p) => !p)}
@@ -1102,7 +1137,7 @@ function ResponsesSection({
           </Text>
         </TouchableOpacity>
       </View>
-
+ 
       {/* Remark cards */}
       <View style={{ padding: 18, gap: 14 }}>
         {visible.map((resp, i) => {
@@ -1110,7 +1145,8 @@ function ResponsesSection({
           const attachments = resp.response_attachments ?? [];
           const hasText = !!resp.actions_taken?.trim();
           const hasAttachments = attachments.length > 0;
-
+          const roleMeta = getRoleMeta(resp.user?.role);
+ 
           return (
             <View
               key={resp.id}
@@ -1142,20 +1178,47 @@ function ResponsesSection({
                   }}
                 />
                 <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "700",
-                      color: THEME.primary,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                      marginBottom: 4,
-                    }}
-                  >
-                    {t("complaintDetail.remarks.remarkLabel", {
-                      number: remarkNumber,
-                    })}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: THEME.primary,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      {t("complaintDetail.remarks.remarkLabel", {
+                        number: remarkNumber,
+                      })}
+                    </Text>
+ 
+                    {/* ── Role Badge ── */}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 4,
+                        backgroundColor: roleMeta.bg,
+                        borderRadius: 20,
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                      }}
+                    >
+                      {roleMeta.icon}
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: roleMeta.color,
+                          letterSpacing: 0.3,
+                        }}
+                      >
+                        {roleMeta.label}
+                      </Text>
+                    </View>
+                  </View>
+ 
                   <View
                     style={{ flexDirection: "row", alignItems: "center", gap: 5 }}
                   >
@@ -1166,7 +1229,7 @@ function ResponsesSection({
                     </Text>
                   </View>
                 </View>
-
+ 
                 {/* Badge: attachment count */}
                 {hasAttachments && (
                   <View
@@ -1193,10 +1256,9 @@ function ResponsesSection({
                   </View>
                 )}
               </View>
-
+ 
               {/* Body */}
               <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-                {/* Actions taken text — or placeholder if empty */}
                 {hasText ? (
                   <Text style={{ fontSize: 16, color: "#1f2937", lineHeight: 24 }}>
                     {resp.actions_taken}
@@ -1219,8 +1281,7 @@ function ResponsesSection({
                     </Text>
                   </View>
                 )}
-
-                {/* Attachment grid */}
+ 
                 {hasAttachments && (
                   <AttachmentGrid attachments={attachments} />
                 )}
@@ -1229,7 +1290,7 @@ function ResponsesSection({
           );
         })}
       </View>
-
+ 
       {/* View All / Show Less */}
       {allResponses.length > PREVIEW_COUNT && (
         <TouchableOpacity
@@ -1267,8 +1328,6 @@ function ResponsesSection({
     </View>
   );
 }
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ComplaintDetail() {
   const router = useRouter();

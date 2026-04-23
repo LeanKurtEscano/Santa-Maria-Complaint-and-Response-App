@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
-import { ArrowLeft, MapPin, Navigation, LocateFixed, AlertCircle, Check, WifiOff, RefreshCw, Layers } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Navigation, LocateFixed, AlertCircle, Check, WifiOff, RefreshCw, Layers, Timer } from 'lucide-react-native';
 import { StepDots } from './StepDots';
 import { THEME } from '@/constants/theme';
 import { complaintApiClient } from '@/lib/client/complaint';
@@ -17,9 +17,47 @@ interface LocationStepProps {
   onBack: () => void;
 }
 
+const GPS_COOLDOWN_SECONDS = 30;
+
+type GpsErrorType =
+  | 'permission_denied'
+  | 'position_unavailable'
+  | 'timeout'
+  | 'unknown';
+
+function getGpsErrorMessage(type: GpsErrorType): string {
+  switch (type) {
+    case 'permission_denied':
+      return 'Location permission denied. Please enable it in your device Settings.';
+    case 'position_unavailable':
+      return 'Your position could not be determined. Make sure GPS is enabled.';
+    case 'timeout':
+      return 'Location request timed out. Move to an open area and try again.';
+    default:
+      return 'Could not get your location. Please try again.';
+  }
+}
+
+function classifyLocationError(error: unknown): GpsErrorType {
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes('permission') || msg.includes('denied')) return 'permission_denied';
+    if (msg.includes('unavailable') || msg.includes('disabled')) return 'position_unavailable';
+    if (msg.includes('timeout') || msg.includes('timed')) return 'timeout';
+  }
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = (error as any).code;
+    if (code === 1) return 'permission_denied';
+    if (code === 2) return 'position_unavailable';
+    if (code === 3) return 'timeout';
+  }
+  return 'unknown';
+}
+
 export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm, onBack }: LocationStepProps) {
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [webViewKey, setWebViewKey] = useState(0);
   const [mapReady, setMapReady] = useState(false);
@@ -32,8 +70,8 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   const [gettingGps, setGettingGps] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [boundaryError, setBoundaryError] = useState<string | null>(null);
-  // ── 3D terrain toggle ──
-  const [is3D, setIs3D] = useState(false);
+  const [is3D, setIs3D] = useState(true);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const cardAnim = useRef(new Animated.Value(1)).current;
 
   // ── Fetch location details + geometry ──
@@ -53,7 +91,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
     retry: 2,
   });
 
-  // ── Once map is ready AND geometry is available, draw boundary ──
+  // ── Draw boundary once map + geometry ready ──
   useEffect(() => {
     if (mapReady && locationDetails?.geometry) {
       const geoJson = JSON.stringify(locationDetails.geometry);
@@ -76,12 +114,32 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
     };
   }, [mapReady, mapError, webViewKey]);
 
-  // ── Toggle tile layer when is3D changes (after map is ready) ──
+  // ── Toggle tile layer ──
   useEffect(() => {
     if (mapReady) {
       webViewRef.current?.injectJavaScript(`setTileLayer(${is3D}); true;`);
     }
   }, [is3D, mapReady]);
+
+  // ── Cooldown cleanup on unmount ──
+  useEffect(() => {
+    return () => {
+      if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+    };
+  }, []);
+
+  const startCooldown = useCallback(() => {
+    setCooldownRemaining(GPS_COOLDOWN_SECONDS);
+    cooldownIntervalRef.current = setInterval(() => {
+      setCooldownRemaining((prev) => {
+        if (prev <= 1) {
+          if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
 
   const handleRetry = useCallback(() => {
     setMapError(false);
@@ -106,22 +164,35 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   };
 
   const handleUseCurrentLocation = async () => {
+    if (cooldownRemaining > 0 || gettingGps) return;
+
     setGpsError(null);
     setBoundaryError(null);
     setGettingGps(true);
+
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setGpsError('Location permission denied. Please enable it in Settings.');
+        setGpsError(getGpsErrorMessage('permission_denied'));
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+
+      const loc = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 12_000)
+        ),
+      ]);
+
       const { latitude, longitude } = loc.coords;
       setPinned({ lat: latitude, lng: longitude });
       setLocationMode('gps');
       webViewRef.current?.injectJavaScript(`movePin(${latitude}, ${longitude}, true); true;`);
-    } catch {
-      setGpsError('Could not get your location. Please try again.');
+
+      startCooldown();
+    } catch (error) {
+      const errType = classifyLocationError(error);
+      setGpsError(getGpsErrorMessage(errType));
     } finally {
       setGettingGps(false);
     }
@@ -145,6 +216,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   };
 
   const pinColor = THEME.primary;
+  const isGpsDisabled = gettingGps || cooldownRemaining > 0;
 
   const mapHTML = `
     <!DOCTYPE html>
@@ -157,54 +229,71 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
           * { margin: 0; padding: 0; box-sizing: border-box; }
           html, body { height: 100%; width: 100%; overflow: hidden; }
           #map { height: 100%; width: 100%; }
-          .leaflet-control-attribution { font-size: 9px !important; }
           .pin-icon { background: none !important; border: none !important; overflow: visible; }
 
-        
+          /* Make attribution tiny and unobtrusive — required by Leaflet ToS but can be styled */
+          .leaflet-control-attribution {
+            font-size: 8px !important;
+            background: rgba(255,255,255,0.55) !important;
+            padding: 1px 4px !important;
+            line-height: 1.2 !important;
+            backdrop-filter: blur(2px);
+          }
+          .leaflet-control-attribution a {
+            color: #666 !important;
+          }
         </style>
       </head>
       <body>
         <div id="map"></div>
         <script>
-          const map = L.map('map', { zoomControl: true })
+          // minZoom 13 = can't zoom out too far; maxZoom 18 = avoids "Map data not available"
+          const map = L.map('map', { zoomControl: true, minZoom: 13, maxZoom: 18 })
             .setView([${barangayLat}, ${barangayLng}], 16);
 
-          // ── Tile layers ──
+          // ── Satellite tile: ESRI World Imagery ──
+          const satelliteTile = L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            {
+              attribution: '© Esri, Maxar, Earthstar Geographics',
+              maxZoom: 18,
+            }
+          );
+
+          // ── Satellite + labels overlay ──
+          const labelsOverlay = L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+            { maxZoom: 18, opacity: 0.9 }
+          );
+
+          // ── Standard OSM tile ──
           const standardTile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors',
-            maxZoom: 19
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+            maxZoom: 18,
           });
 
-          // OpenTopoMap shows terrain contours, hills, and elevation shading
-          const terrainTile = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenTopoMap contributors, © OpenStreetMap contributors',
-            maxZoom: 17
-          });
+          // Start with satellite
+          satelliteTile.addTo(map);
+          labelsOverlay.addTo(map);
 
-          standardTile.addTo(map);
-          let currentTile = standardTile;
-
-          function setTileLayer(use3D) {
-            if (use3D) {
+          function setTileLayer(useSatellite) {
+            if (useSatellite) {
               map.removeLayer(standardTile);
-              terrainTile.addTo(map);
-              currentTile = terrainTile;
+              satelliteTile.addTo(map);
+              labelsOverlay.addTo(map);
             } else {
-              map.removeLayer(terrainTile);
+              map.removeLayer(satelliteTile);
+              map.removeLayer(labelsOverlay);
               standardTile.addTo(map);
-              currentTile = standardTile;
             }
           }
 
           const pinIconHtml = \`
-            <div class="pin-wrapper">
-              <div class="pin-pulse-ring"></div>
-              <div class="pin-pulse-ring"></div>
-              <div class="pin-pulse-ring"></div>
-              <svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg" style="position:relative;z-index:1;">
+            <div style="position:relative;display:flex;align-items:center;justify-content:center;">
+              <svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg" style="position:relative;z-index:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.3))">
                 <ellipse cx="18" cy="42" rx="7" ry="2.5" fill="rgba(0,0,0,0.18)"/>
                 <path d="M18 0C10.268 0 4 6.268 4 14c0 7.732 14 30 14 30S32 21.732 32 14C32 6.268 25.732 0 18 0z"
-                      fill="${pinColor}" stroke="${pinColor}" stroke-width="1.5"/>
+                      fill="${pinColor}" stroke="white" stroke-width="1.5"/>
                 <circle cx="18" cy="14" r="5.5" fill="white"/>
                 <circle cx="18" cy="14" r="2.8" fill="${pinColor}"/>
               </svg>
@@ -384,19 +473,24 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
               {pinned.lat.toFixed(6)},  {pinned.lng.toFixed(6)}
             </Text>
             {locationMode === 'gps' && (
-              <View style={[styles.gpsBadge, { backgroundColor: '#DCFCE7' }]}>
-                <Text style={[styles.gpsBadgeText, { color: '#16A34A' }]}>GPS</Text>
+              <View style={[styles.modeBadge, { backgroundColor: '#DCFCE7' }]}>
+                <Text style={[styles.modeBadgeText, { color: '#16A34A' }]}>GPS</Text>
               </View>
             )}
             {locationMode === 'barangay' && (
-              <View style={[styles.gpsBadge, { backgroundColor: `${THEME.primary}20` }]}>
-                <Text style={[styles.gpsBadgeText, { color: THEME.primary }]}>BRY</Text>
+              <View style={[styles.modeBadge, { backgroundColor: `${THEME.primary}20` }]}>
+                <Text style={[styles.modeBadgeText, { color: THEME.primary }]}>BRY</Text>
+              </View>
+            )}
+            {locationMode === 'pin' && (
+              <View style={[styles.modeBadge, { backgroundColor: '#FEF9C3' }]}>
+                <Text style={[styles.modeBadgeText, { color: '#A16207' }]}>PIN</Text>
               </View>
             )}
           </Animated.View>
         )}
 
-        {/* ── 3D Terrain Toggle Button ── */}
+        {/* Terrain Toggle Button */}
         {mapReady && !mapError && (
           <TouchableOpacity
             style={[
@@ -408,7 +502,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
           >
             <Layers size={16} color={is3D ? '#fff' : THEME.primary} />
             <Text style={[styles.terrainToggleText, { color: is3D ? '#fff' : THEME.primary }]}>
-              {is3D ? '3D' : '2D'}
+              {is3D ? 'Satellite' : 'Standard'}
             </Text>
           </TouchableOpacity>
         )}
@@ -417,37 +511,69 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
       {/* Bottom panel */}
       <View style={styles.bottomPanel}>
 
-        {(gpsError || boundaryError) && (
+        {/* Error banners */}
+        {gpsError && (
           <View style={styles.errorRow}>
             <AlertCircle size={14} color="#DC2626" />
-            <Text style={styles.errorText}>{gpsError ?? boundaryError}</Text>
+            <Text style={styles.errorText}>{gpsError}</Text>
+            <TouchableOpacity onPress={() => setGpsError(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={{ fontSize: 14, color: '#DC2626', fontWeight: '700' }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {boundaryError && !gpsError && (
+          <View style={styles.errorRow}>
+            <AlertCircle size={14} color="#DC2626" />
+            <Text style={styles.errorText}>{boundaryError}</Text>
+            <TouchableOpacity onPress={() => setBoundaryError(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={{ fontSize: 14, color: '#DC2626', fontWeight: '700' }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Cooldown notice */}
+        {cooldownRemaining > 0 && (
+          <View style={styles.cooldownRow}>
+            <Timer size={13} color="#92400E" />
+            <Text style={styles.cooldownText}>
+              You can use "My Location" again in {cooldownRemaining}s
+            </Text>
           </View>
         )}
 
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity
             onPress={handleUseCurrentLocation}
-            style={[styles.gpsButton, { flex: 1, backgroundColor: `${THEME.primary}15`, borderColor: `${THEME.primary}40` }, gettingGps && { opacity: 0.6 }]}
+            style={[
+              styles.actionButton,
+              { flex: 1, backgroundColor: `${THEME.primary}15`, borderColor: `${THEME.primary}40` },
+              isGpsDisabled && styles.disabledButton,
+            ]}
             activeOpacity={0.8}
-            disabled={gettingGps}
+            disabled={isGpsDisabled}
           >
-            {gettingGps
-              ? <ActivityIndicator size="small" color={THEME.primary} />
-              : <LocateFixed size={16} color={THEME.primary} />
-            }
-            <Text style={[styles.gpsButtonText, { fontSize: 12, color: THEME.primary }]}>
-              {gettingGps ? 'Getting…' : 'My Location'}
+            {gettingGps ? (
+              <ActivityIndicator size="small" color={THEME.primary} />
+            ) : cooldownRemaining > 0 ? (
+              <Timer size={16} color={THEME.primary} style={{ opacity: 0.5 }} />
+            ) : (
+              <LocateFixed size={16} color={THEME.primary} />
+            )}
+            <Text style={[styles.actionButtonText, { color: isGpsDisabled ? `${THEME.primary}60` : THEME.primary }]}>
+              {gettingGps ? 'Getting…' : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : 'My Location'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleResetToBarangay}
-            style={[styles.gpsButton, { flex: 1, borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' }]}
+            style={[
+              styles.actionButton,
+              { flex: 1, borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' },
+            ]}
             activeOpacity={0.8}
-            disabled={locationMode === 'barangay'}
           >
             <MapPin size={16} color="#16A34A" />
-            <Text style={[styles.gpsButtonText, { fontSize: 12, color: '#16A34A' }]}>
+            <Text style={[styles.actionButtonText, { color: '#16A34A' }]}>
               Barangay Pin
             </Text>
           </TouchableOpacity>
@@ -488,9 +614,8 @@ const styles = StyleSheet.create({
   retryButtonText: { fontSize: 14, fontWeight: '600', color: '#fff' },
   coordsBadge: { position: 'absolute', top: 12, left: 12, right: 12, backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
   coordsText: { flex: 1, fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontWeight: '600' },
-  gpsBadge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  gpsBadgeText: { fontSize: 10, fontWeight: '700' },
-  // ── 3D terrain toggle ──
+  modeBadge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  modeBadgeText: { fontSize: 10, fontWeight: '700' },
   terrainToggle: {
     position: 'absolute',
     bottom: 16,
@@ -513,9 +638,12 @@ const styles = StyleSheet.create({
   terrainToggleText: { fontSize: 12, fontWeight: '700' },
   bottomPanel: { backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 16, paddingBottom: Platform.OS === 'ios' ? 28 : 20, borderTopWidth: 1, borderTopColor: '#E2E8F0', gap: 12 },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
-  errorText: { flex: 1, fontSize: 12, color: '#DC2626' },
-  gpsButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 13, borderWidth: 1.5 },
-  gpsButtonText: { fontSize: 14, fontWeight: '600' },
+  errorText: { flex: 1, fontSize: 12, color: '#DC2626', lineHeight: 17 },
+  cooldownRow: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFBEB', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: '#FDE68A' },
+  cooldownText: { flex: 1, fontSize: 12, color: '#92400E', fontWeight: '500' },
+  actionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 13, borderWidth: 1.5 },
+  actionButtonText: { fontSize: 12, fontWeight: '600' },
+  disabledButton: { opacity: 0.55 },
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
   dividerLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },

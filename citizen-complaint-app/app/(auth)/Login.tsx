@@ -128,13 +128,13 @@ export default function LoginScreen({ navigation }: any) {
                     <View className="items-center pt-16 pb-8 px-6">
                         <View className="w-28 h-28 mb-6 items-center justify-center bg-white rounded-full shadow-sm border-4 border-primary-50">
                             <Image
-                                source={require("../../assets/images/santamarialogo.jpg")}
+                                source={require("../../assets/images/santamarialogoapp.jpg")}
                                 className="w-24 h-24 rounded-full"
                                 resizeMode="cover"
                             />
                         </View>
                         <Text className="text-2xl font-bold text-neutral-900 mb-1.5 tracking-tight">
-                            Santa Maria Complaint App
+                             Mary App
                         </Text>
                         <Text className="text-sm text-neutral-500 text-center max-w-[280px] leading-5">
                             {t('welcomeMessage')}
@@ -357,7 +357,8 @@ export default function LoginScreen({ navigation }: any) {
                                 </View>
                             </TouchableOpacity>
 
-                            {/* Register with Phone */}
+                            {/* Register with Phone 
+                            
                             <TouchableOpacity
                                 onPress={() =>
                                     router.push({
@@ -374,7 +375,7 @@ export default function LoginScreen({ navigation }: any) {
                                     minHeight: 52,
                                 }}
                             >
-                                {/* Icon strip — same fixed width as email button */}
+                               
                                 <View
                                     style={{
                                         width: ICON_STRIP_WIDTH,
@@ -387,7 +388,7 @@ export default function LoginScreen({ navigation }: any) {
                                     <Smartphone size={20} color="#fff" />
                                 </View>
 
-                                {/* Label */}
+                              
                                 <Text
                                     style={{
                                         flex: 1,
@@ -401,11 +402,16 @@ export default function LoginScreen({ navigation }: any) {
                                     {t('registerWithPhone') || 'Register with Phone Number'}
                                 </Text>
 
-                                {/* Chevron — same fixed width to mirror left strip */}
+                              
                                 <View style={{ width: ICON_STRIP_WIDTH, alignItems: 'center' }}>
                                     <ChevronRight size={16} color="#0EA5E9" />
                                 </View>
                             </TouchableOpacity>
+                            
+                            
+                            
+                            */}
+                            
                         </View>
 
                         {/* Footer */}

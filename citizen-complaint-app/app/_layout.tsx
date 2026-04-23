@@ -36,8 +36,7 @@ function RootLayoutNav() {
       await AsyncStorage.removeItem('hasSeenOnboarding');
     }
     clearOnboarding(); */}
-
-  
+   
   
   }, []);
 

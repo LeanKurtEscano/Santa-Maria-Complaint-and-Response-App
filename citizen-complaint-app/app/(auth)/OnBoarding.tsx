@@ -1,431 +1,373 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   Animated,
-  Dimensions,
   StatusBar,
   StyleSheet,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import {
-  MapPin,
-  FileText,
-  BarChart2,
-  Bell,
-  ArrowRight,
-  ChevronRight,
-} from 'lucide-react-native';
+import { MapPin, BarChart2, Bell, ArrowRight } from 'lucide-react-native';
+import { THEME } from '@/constants/theme';
+import { Image } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
+const { width: W } = Dimensions.get('window');
 
-const SLIDES = [
+// ─── Feature data ────────────────────────────────────────────────────────────
+const FEATURES = [
   {
-    key: 'welcome',
     icon: MapPin,
-    iconBg: '#DBEAFE',
-    iconBorder: '#93C5FD',
-    iconColor: '#1D4ED8',
-    accentColor: '#0284C7',
-    tagBg: '#EFF6FF',
-    tagBorder: '#BFDBFE',
-    tagColor: '#1D4ED8',
-    tag: 'COMMUNITY FIRST',
-    title: 'Welcome to\nSanta Maria Complaint App',
-    description:
-      'Your direct line to local government. Report, track, and resolve community issues — all in one place.',
-    bg: '#F0F9FF',
+    color: THEME.primary,
+    bg: '#DCFCE7',
+    label: 'Report Issues',
+    sub: 'Submit community complaints in just a few taps',
   },
   {
-    key: 'submit',
-    icon: FileText,
-    iconBg: '#DCFCE7',
-    iconBorder: '#86EFAC',
-    iconColor: '#15803D',
-    accentColor: '#16A34A',
-    tagBg: '#F0FDF4',
-    tagBorder: '#BBF7D0',
-    tagColor: '#15803D',
-    tag: 'EASY REPORTING',
-    title: 'Report Complaints\nin Seconds',
-    description:
-      'Submit incidents like noise disturbances, waste issues, or neighbor disputes in just a few taps.',
-    bg: '#F0FDF4',
-  },
-  {
-    key: 'track',
     icon: BarChart2,
-    iconBg: '#FEF9C3',
-    iconBorder: '#FCD34D',
-    iconColor: '#B45309',
-    accentColor: '#D97706',
-    tagBg: '#FFFBEB',
-    tagBorder: '#FDE68A',
-    tagColor: '#92400E',
-    tag: 'REAL-TIME UPDATES',
-    title: 'Track Your\nComplaints Live',
-    description:
-      'See exactly where your complaint stands — from submission to resolution — with live status updates.',
-    bg: '#FFFBEB',
+    color: '#D97706',
+    bg: '#FEF3C7',
+    label: 'Track in Real-Time',
+    sub: 'Follow every update from submission to resolution',
   },
   {
-    key: 'notify',
     icon: Bell,
-    iconBg: '#EDE9FE',
-    iconBorder: '#C4B5FD',
-    iconColor: '#6D28D9',
-    accentColor: '#7C3AED',
-    tagBg: '#F5F3FF',
-    tagBorder: '#DDD6FE',
-    tagColor: '#5B21B6',
-    tag: 'STAY INFORMED',
-    title: 'Get Notified\nInstantly',
-    description:
-      'Receive alerts the moment your complaint is reviewed, updated, or resolved by your barangay.',
-    bg: '#F5F3FF',
+    color: '#7C3AED',
+    bg: '#EDE9FE',
+    label: 'Instant Notifications',
+    sub: 'Get alerted the moment your barangay takes action',
   },
 ];
 
-const DotIndicator = ({
-  count,
-  active,
-  accentColor,
-}: {
-  count: number;
-  active: number;
-  accentColor: string;
-}) => (
-  <View style={styles.dotsRow}>
-    {Array.from({ length: count }).map((_, i) => (
-      <Animated.View
-        key={i}
-        style={[
-          styles.dot,
-          {
-            width: i === active ? 24 : 8,
-            backgroundColor: i === active ? accentColor : '#CBD5E1',
-          },
-        ]}
-      />
-    ))}
-  </View>
-);
+// ─── Helper ───────────────────────────────────────────────────────────────────
+function makeAnim() {
+  return { opacity: new Animated.Value(0), y: new Animated.Value(40) };
+}
 
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function OnboardingScreen() {
   const router = useRouter();
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isChecking, setIsChecking] = useState(true);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  const iconScale = useRef(new Animated.Value(0.7)).current;
-  const iconOpacity = useRef(new Animated.Value(0)).current;
-
-  const slide = SLIDES[currentIndex];
-  const isLast = currentIndex === SLIDES.length - 1;
+  // 9 elements: logo, appName, tagline, divider, feat0, feat1, feat2, cta, loginRow
+  const anims = useRef(Array.from({ length: 9 }, makeAnim)).current;
+  const logoScale = useRef(new Animated.Value(0.6)).current;
 
   useEffect(() => {
-    const checkOnboarding = async () => {
-      try {
-        const seen = await AsyncStorage.getItem('hasSeenOnboarding');
-        if (seen === 'true') {
-          router.replace('/(auth)');
-          return;
-        }
-      } catch (_) {}
-      setIsChecking(false);
-    };
-    checkOnboarding();
+    // Redirect if already onboarded
+    AsyncStorage.getItem('hasSeenOnboarding').then((val) => {
+      if (val === 'true') router.replace('/(auth)');
+    });
+
+    // Staggered entrance — each element fans in 130ms apart
+    const STAGGER = 130;
+    anims.forEach((a, i) => {
+      const delay = i * STAGGER;
+      Animated.parallel([
+        Animated.timing(a.opacity, {
+          toValue: 1,
+          duration: 420,
+          delay,
+          useNativeDriver: true,
+        }),
+        Animated.spring(a.y, {
+          toValue: 0,
+          speed: 14,
+          bounciness: 5,
+          delay,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+
+    // Logo pops in with a spring scale
+    Animated.spring(logoScale, {
+      toValue: 1,
+      speed: 13,
+      bounciness: 12,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
-  useEffect(() => {
-    if (isChecking) return;
-
-    fadeAnim.setValue(0);
-    slideAnim.setValue(30);
-    iconScale.setValue(0.7);
-    iconOpacity.setValue(0);
-
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        speed: 16,
-        bounciness: 6,
-        useNativeDriver: true,
-      }),
-      Animated.spring(iconScale, {
-        toValue: 1,
-        speed: 14,
-        bounciness: 10,
-        useNativeDriver: true,
-      }),
-      Animated.timing(iconOpacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [currentIndex, isChecking]);
-
-  if (isChecking) return null;
-
-  const animateOut = (onDone: () => void) => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: -20,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(onDone);
-  };
-
-  const goNext = () => {
-    if (isLast) return finishOnboarding();
-    animateOut(() => setCurrentIndex((i) => i + 1));
-  };
-
-  const goBack = () => {
-    if (currentIndex === 0) return;
-    animateOut(() => setCurrentIndex((i) => i - 1));
-  };
-
-  const finishOnboarding = async () => {
-    try {
-      await AsyncStorage.setItem('hasSeenOnboarding', 'true');
-    } catch (_) {}
+  const finish = async () => {
+    await AsyncStorage.setItem('hasSeenOnboarding', 'true');
     router.replace('/(auth)');
   };
 
-  const IconComponent = slide.icon;
+  // Shorthand to pull animated style for element i
+  const a = (i: number) => ({
+    opacity: anims[i].opacity,
+    transform: [{ translateY: anims[i].y }],
+  });
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: slide.bg }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={slide.bg} />
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F0FDF4" />
 
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        {currentIndex > 0 ? (
-          <TouchableOpacity onPress={goBack} activeOpacity={0.7} style={styles.backBtn}>
-            <Text style={[styles.backText, { color: slide.accentColor }]}>← Back</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.backBtn} />
-        )}
-        <TouchableOpacity onPress={finishOnboarding} activeOpacity={0.7}>
-          <Text style={styles.skipText}>Skip</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Decorative background blobs */}
+      <View style={styles.blob1} />
+      <View style={styles.blob2} />
 
-      {/* Main content */}
-      <Animated.View
-        style={[
-          styles.contentWrapper,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
-      >
-        {/* Icon card — now has a visible border */}
-        <Animated.View
-          style={[
-            styles.iconCard,
-            {
-              backgroundColor: slide.iconBg,
-              borderColor: slide.iconBorder,
-              transform: [{ scale: iconScale }],
-              opacity: iconOpacity,
-            },
-          ]}
-        >
-          <IconComponent size={52} color={slide.iconColor} strokeWidth={1.5} />
-        </Animated.View>
+      <View style={styles.container}>
 
-        {/* Tag pill — now has its own bg + border so it's visible */}
-        <View
-          style={[
-            styles.tagPill,
-            {
-              backgroundColor: slide.tagBg,
-              borderColor: slide.tagBorder,
-            },
-          ]}
-        >
-          <Text style={[styles.tagText, { color: slide.tagColor }]}>{slide.tag}</Text>
+        {/* ── HERO ─────────────────────────────────────── */}
+        <View style={styles.hero}>
+
+          {/* Logo — animates with scale + opacity */}
+          <Animated.View
+            style={[
+              styles.logoWrap,
+              { opacity: anims[0].opacity, transform: [{ scale: logoScale }] },
+            ]}
+          >
+            <Image
+              source={require('../../assets/images/santamarialogoapp.jpg')}
+              style={styles.logoImg}
+              resizeMode="contain"
+            />
+          </Animated.View>
+
+          {/* App name */}
+          <Animated.Text style={[styles.appName, a(1)]}>
+            Mary App
+          </Animated.Text>
+
+          {/* Tagline pill */}
+          <Animated.View style={[styles.taglinePill, a(2)]}>
+            <Text style={styles.taglineText}>YOUR COMMUNITY VOICE</Text>
+          </Animated.View>
         </View>
 
-        {/* Title */}
-        <Text style={styles.title}>{slide.title}</Text>
+        {/* ── DIVIDER ──────────────────────────────────── */}
+        <Animated.View style={[styles.divider, a(3)]} />
 
-        {/* Description */}
-        <Text style={styles.description}>{slide.description}</Text>
-      </Animated.View>
+        {/* ── FEATURE CARDS ────────────────────────────── */}
+        <View style={styles.featureList}>
+          {FEATURES.map((f, i) => {
+            const Icon = f.icon;
+            return (
+              <Animated.View key={f.label} style={[styles.featureCard, a(4 + i)]}>
+                <View style={[styles.iconWrap, { backgroundColor: f.bg }]}>
+                  <Icon size={20} color={f.color} strokeWidth={1.9} />
+                </View>
+                <View style={styles.featureText}>
+                  <Text style={styles.featLabel}>{f.label}</Text>
+                  <Text style={styles.featSub}>{f.sub}</Text>
+                </View>
+                <View style={[styles.accentDot, { backgroundColor: f.bg }]}>
+                  <View style={[styles.accentDotCore, { backgroundColor: f.color }]} />
+                </View>
+              </Animated.View>
+            );
+          })}
+        </View>
 
-      {/* Bottom section */}
-      <View style={styles.bottomSection}>
-        <DotIndicator
-          count={SLIDES.length}
-          active={currentIndex}
-          accentColor={slide.accentColor}
-        />
+        {/* ── CTA SECTION ──────────────────────────────── */}
+        <View style={styles.ctaSection}>
 
-        <TouchableOpacity
-          onPress={goNext}
-          activeOpacity={0.88}
-          style={[styles.ctaButton, { backgroundColor: slide.accentColor }]}
-        >
-          <Text style={styles.ctaText}>
-            {isLast ? 'Get Started' : 'Continue'}
-          </Text>
-          {isLast ? (
-            <ArrowRight size={20} color="#FFFFFF" />
-          ) : (
-            <ChevronRight size={20} color="#FFFFFF" />
-          )}
-        </TouchableOpacity>
-
-        {isLast && (
-          <Animated.View style={{ opacity: fadeAnim }}>
+          <Animated.View style={a(7)}>
             <TouchableOpacity
-              onPress={() => router.replace('/(auth)/Login')}
-              activeOpacity={0.7}
-              style={styles.loginRow}
+              onPress={finish}
+              activeOpacity={0.87}
+              style={styles.ctaButton}
             >
-              <Text style={styles.loginText}>Already have an account? </Text>
-              <Text style={[styles.loginLink, { color: slide.accentColor }]}>Log In</Text>
+              <Text style={styles.ctaText}>Get Started</Text>
+              <ArrowRight size={20} color="#fff" strokeWidth={2.5} />
             </TouchableOpacity>
           </Animated.View>
-        )}
 
-        {!isLast && <View style={{ height: 36 }} />}
+          <Animated.View style={[styles.loginRow, a(8)]}>
+            <Text style={styles.loginMuted}>Already have an account?</Text>
+            <TouchableOpacity onPress={() => router.push('/(auth)/login')} activeOpacity={0.7}>
+              <Text style={[styles.loginLink, { color: THEME.primary }]}> Log In</Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safeArea: {
+  safe: {
     flex: 1,
+    backgroundColor: '#F0FDF4',
   },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+
+  // Soft background blobs for depth
+  blob1: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: '#DCFCE7',
+    opacity: 0.6,
+    top: -100,
+    right: -100,
+  },
+  blob2: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: '#BBF7D0',
+    opacity: 0.28,
+    bottom: 40,
+    left: -70,
+  },
+
+  container: {
+    flex: 1,
     paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 10,
+    justifyContent: 'space-between',
+  },
+
+  // ── Hero ──────────────────────────────────────────
+  hero: {
+    alignItems: 'center',
     paddingTop: 8,
-    paddingBottom: 4,
   },
-  backBtn: {
-    width: 72,
+  logoWrap: {
+    width: 92,
+    height: 92,
+    borderRadius: 28,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    marginBottom: 18,
+    shadowColor: '#16a34a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    elevation: 8,
   },
-  backText: {
-    fontSize: 15,
-    fontWeight: '600',
+  logoImg: {
+    width: 92,
+    height: 92,
   },
-  skipText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#94A3B8',
-  },
-  contentWrapper: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    paddingBottom: 16,
-  },
-  iconCard: {
-    width: 120,
-    height: 120,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-    // KEY FIX: visible border so the card doesn't blend into the bg
-    borderWidth: 1.5,
-    borderStyle: 'solid',
-  },
-  tagPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 100,
-    marginBottom: 16,
-    // KEY FIX: visible border on the pill
-    borderWidth: 1,
-    borderStyle: 'solid',
-  },
-  tagText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-  },
-  title: {
-    fontSize: 32,
+  appName: {
+    fontSize: 36,
     fontWeight: '800',
     color: '#0F172A',
-    textAlign: 'center',
-    lineHeight: 40,
-    marginBottom: 16,
-    letterSpacing: -0.5,
+    letterSpacing: -1.2,
+    marginBottom: 10,
   },
-  description: {
-    fontSize: 16,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 26,
-    maxWidth: 300,
+  taglinePill: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 100,
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
   },
-  bottomSection: {
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    alignItems: 'center',
+  taglineText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 2.2,
+    color: THEME.primary,
   },
-  dotsRow: {
+
+  // ── Divider ───────────────────────────────────────
+  divider: {
+    height: 1,
+    backgroundColor: '#D1FAE5',
+    marginVertical: 22,
+  },
+
+  // ── Feature cards ─────────────────────────────────
+  featureList: {
+    flex: 1,
+    gap: 12,
+    justifyContent: 'center',
+  },
+  featureCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 24,
+    gap: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  dot: {
+  iconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureText: { flex: 1 },
+  featLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 3,
+  },
+  featSub: {
+    fontSize: 12,
+    color: '#94A3B8',
+    lineHeight: 17,
+  },
+  accentDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accentDotCore: {
+    width: 8,
     height: 8,
     borderRadius: 4,
+  },
+
+  // ── CTA section ───────────────────────────────────
+  ctaSection: {
+    paddingTop: 22,
+    paddingBottom: 6,
+    alignItems: 'center',
+    gap: 2,
   },
   ctaButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
+    width: W - 48,
     paddingVertical: 18,
-    borderRadius: 18,
-    gap: 8,
-    elevation: 4,
-    marginBottom: 16,
+    borderRadius: 22,
+    gap: 10,
+    backgroundColor: THEME.primary,
+    shadowColor: THEME.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.32,
+    shadowRadius: 18,
+    elevation: 7,
+    marginBottom: 6,
   },
   ctaText: {
     color: '#FFFFFF',
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0.2,
   },
   loginRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
   },
-  loginText: {
+  loginMuted: {
     fontSize: 14,
     color: '#94A3B8',
   },

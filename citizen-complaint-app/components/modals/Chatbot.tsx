@@ -784,7 +784,7 @@ function BotInfo() {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.primaryDark }}>
-          SantaBot FAQ Assistant
+          Mary bot FAQ Assistant
         </Text>
         <Text style={{ fontSize: 11, color: THEME.primary, marginTop: 1 }}>
           Tanungin mo ako tungkol sa Santa Maria, Laguna — reklamo, serbisyo, dokumento, at
@@ -1088,7 +1088,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                     <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
-                      SantaBot
+                      Mary Bot
                     </Text>
                     <Sparkles size={12} color={THEME.primary} />
                   </View>
