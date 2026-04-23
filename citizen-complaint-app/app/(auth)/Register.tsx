@@ -372,12 +372,27 @@ export default function RegisterScreen({ navigation }: any) {
   const toProperCase = (text: string): string =>
     text.split(' ').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
-  const handlePhoneNumberChange = (text: string, onChange: (val: string) => void) => {
-    let digits = text.replace(/\D/g, '');
-    if (digits.startsWith('63')) digits = '0' + digits.slice(2);
-    if (digits.length > 11) digits = digits.slice(0, 11);
+const handlePhoneNumberChange = (text: string, onChange: (val: string) => void) => {
+  let digits = text.replace(/\D/g, ''); // Remove non-digits
+  
+  // If it starts with 63, convert to 09 format
+  if (digits.startsWith('63')) {
+    digits = '0' + digits.slice(2);
+  }
+  
+  // Limit to 11 digits
+  if (digits.length > 11) {
+    digits = digits.slice(0, 11);
+  }
+  
+  // Ensure it starts with 0
+  if (digits.length > 0 && !digits.startsWith('0')) {
+    // Don't auto-add 0, just let user type
     onChange(digits);
-  };
+  } else {
+    onChange(digits);
+  }
+};
 
   const handleImagePick = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
     setCurrentImageField(field);
@@ -969,47 +984,58 @@ export default function RegisterScreen({ navigation }: any) {
       </View>
 
       {/* Phone Number — always shown */}
-      <View className="mb-4">
-        <Text className="text-sm font-medium text-neutral-700 mb-2">{t('phoneNumber')} *</Text>
-        <Controller
-          control={control}
-          name="phoneNumber"
-          rules={{
-            required: t('required'),
-            validate: (value) => {
-              const stripped = value.startsWith('0') ? value.slice(1) : value;
-              const err = validateContactNumber(stripped, t);
-              return err || true;
-            },
+           {/* Phone Number — always shown */}
+<View className="mb-4">
+  <Text className="text-sm font-medium text-neutral-700 mb-2">{t('phoneNumber')} *</Text>
+  <Controller
+    control={control}
+    name="phoneNumber"
+    rules={{
+      required: t('required'),
+      validate: (value) => {
+        // Validation for 11-digit number starting with 09
+        const phoneRegex = /^09\d{9}$/; // Exactly 11 digits starting with 09
+        if (!phoneRegex.test(value)) {
+          return t('phoneInvalid') || 'Phone number must be 11 digits starting with 09 (e.g., 09123456789)';
+        }
+        return true;
+      },
+    }}
+    render={({ field: { onChange, onBlur, value } }) => (
+      <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+        <Phone size={20} color="#6B7280" />
+      
+        <TextInput
+          className="flex-1 ml-2 text-base text-neutral-900 py-2.5"
+          onBlur={() => {
+            onBlur();
+            const phoneRegex = /^09\d{9}$/;
+            if (!phoneRegex.test(value)) {
+              setError('phoneNumber', { 
+                type: 'manual', 
+                message: t('phoneInvalid') || 'Phone number must be 11 digits starting with 09 (e.g., 09123456789)' 
+              });
+            } else {
+              clearErrors('phoneNumber');
+            }
           }}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
-              <Phone size={20} color="#6B7280" />
-              <View className="ml-3 mr-1 border-r border-neutral-300 pr-3">
-                <Text className="text-base text-neutral-700 py-2.5">+63</Text>
-              </View>
-              <TextInput
-                className="flex-1 ml-2 text-base text-neutral-900 py-2.5"
-                onBlur={() => {
-                  onBlur();
-                  const stripped = value.startsWith('0') ? value.slice(1) : value;
-                  const err = validateContactNumber(stripped, t);
-                  if (err) setError('phoneNumber', { type: 'manual', message: err });
-                  else clearErrors('phoneNumber');
-                }}
-                onChangeText={(text) => handlePhoneNumberChange(text, onChange)}
-                value={value}
-                placeholder="9123456789"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="phone-pad"
-                maxLength={11}
-              />
-            </View>
-          )}
+          onChangeText={(text) => {
+            handlePhoneNumberChange(text, onChange);
+            clearErrors('phoneNumber');
+            setNetworkError(null);
+          }}
+          value={value}
+          placeholder="9123456789"
+          placeholderTextColor="#9CA3AF"
+          keyboardType="phone-pad"
+          maxLength={11}
         />
-        <Text className="text-xs text-neutral-500 mt-1">Enter your 11-digit number (e.g. 09123456789)</Text>
-        <ErrorMessage message={errors.phoneNumber?.message} />
       </View>
+    )}
+  />
+  <Text className="text-xs text-neutral-500 mt-1">Enter your 11-digit number starting with 09 (e.g., 09123456789)</Text>
+  <ErrorMessage message={errors.phoneNumber?.message} />
+</View>
 
       {/* isPhoneMode conditional rendering commented out */}
       {/* {!isPhoneMode && ( <View>...</View> )} */}

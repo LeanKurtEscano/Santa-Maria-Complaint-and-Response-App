@@ -228,8 +228,8 @@ export default function PostIncidentFeedbackScreen() {
   const { mutate, isPending } = useMutation({
     mutationFn: async () => {
       await feedbackApiClient.post(
-        `/post-incident?incident_id=${incidentId}`,
-        { ratings: rating, message: message || null }
+        `/post-incident`,
+        { ratings: rating, message: message || null , incident_id: Number(incidentId) }
       );
     },
     onSuccess: () => {

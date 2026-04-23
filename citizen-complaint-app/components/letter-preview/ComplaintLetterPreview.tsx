@@ -4,13 +4,30 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
+import { useRef, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Send, FileText, Paperclip, Shield, Scale } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Send,
+  FileText,
+  Paperclip,
+  User,
+  MapPin,
+  Calendar,
+  Building2,
+  MessageSquare,
+  CheckCircle2,
+  AlertCircle,
+  Check,
+  ScrollText,
+} from 'lucide-react-native';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
 import { Attachment } from '@/hooks/general/useAttachment';
-import GeneralToast from '../Toast/GeneralToast';
 import { THEME } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
 
 interface ComplaintLetterPreviewProps {
   barangayName: string;
@@ -43,6 +60,133 @@ function getRefNumber(): string {
 
 const REF_NUMBER = getRefNumber();
 
+// ── Small reusable row ──────────────────────────────────────────────────────
+function DetailRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+        paddingVertical: 10,
+        borderBottomWidth: 0.5,
+        borderBottomColor: '#E5E7EB', // Light border for white card
+      }}
+    >
+      <View
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          backgroundColor: '#F3F4F6', // Light gray background for icon
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginTop: 1,
+        }}
+      >
+        {icon}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text
+          style={{
+            fontSize: 10,
+            fontWeight: '600',
+            color: '#6B7280', // Darker gray for labels
+            letterSpacing: 0.8,
+            textTransform: 'uppercase',
+            marginBottom: 2,
+          }}
+        >
+          {label}
+        </Text>
+        <Text
+          style={{
+            fontSize: 13,
+            color: '#1F2937', // Dark text for readability
+            lineHeight: 19,
+            fontWeight: '500',
+          }}
+        >
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Card wrapper (White background) ────────────────────────────────────────────
+function Card({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: object;
+}) {
+  return (
+    <View
+      style={[
+        {
+          backgroundColor: '#FFFFFF', // White background
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: '#E5E7EB', // Subtle light border
+          padding: 16,
+          marginBottom: 12,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.05,
+          shadowRadius: 2,
+          elevation: 1,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
+// ── Card header label ───────────────────────────────────────────────────────
+function CardLabel({
+  icon,
+  label,
+}: {
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 14,
+      }}
+    >
+      {icon}
+      <Text
+        style={{
+          fontSize: 11,
+          fontWeight: '700',
+          color: '#4B5563', // Darker gray for labels
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 export default function ComplaintLetterPreview({
   barangayName,
   title,
@@ -52,356 +196,543 @@ export default function ComplaintLetterPreview({
   onBack,
   isSubmitting = false,
 }: ComplaintLetterPreviewProps) {
+  const { t } = useTranslation();
   const { userData } = useCurrentUser();
-
   const today = new Date();
 
   const fullName =
     userData?.first_name && userData?.last_name
       ? `${userData.first_name} ${userData.last_name}`
       : 'Complainant';
-
   const fullAddress = userData?.full_address || userData?.barangay || 'N/A';
 
+  // ── Terms read state ──────────────────────────────────────────────────────
+  const [termsRead, setTermsRead] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const termsScrollRef = useRef<ScrollView>(null);
+
+  const handleTermsScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+    const pct =
+      (layoutMeasurement.height + contentOffset.y) / contentSize.height;
+    if (pct > 0.92 && !termsRead) {
+      setTermsRead(true);
+    }
+  };
+
+  const canSubmit = termsAccepted && !isSubmitting;
+
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: THEME.primary }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: THEME.primary }}>
 
       {/* ── Top Bar ── */}
-      <View className="flex-row items-center justify-between  px-4 py-3" style={{ backgroundColor: THEME.primary }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: 0.5,
+          borderBottomColor: 'rgba(255,255,255,0.1)',
+        }}
+      >
         <TouchableOpacity
           onPress={onBack}
-          className="flex-row items-center gap-1.5 py-2 px-3 rounded-lg bg-white"
           disabled={isSubmitting}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            paddingVertical: 7,
+            paddingHorizontal: 12,
+            borderRadius: 10,
+            backgroundColor: 'rgba(255,255,255,0.12)',
+            borderWidth: 0.5,
+            borderColor: 'rgba(255,255,255,0.18)',
+          }}
         >
-          <ArrowLeft size={16} color="#1e3a5f" />
-          <Text className="text-xs font-bold text-blue-950" style={{ fontFamily: 'serif' }}>
+          <ArrowLeft size={14} color="#FFFFFF" />
+          <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFFFFF' }}>
             Back
           </Text>
         </TouchableOpacity>
 
-        <View className="flex-row items-center gap-2">
-          <FileText size={15} color="#ffffff" />
-          <Text className="text-sm font-bold text-white tracking-wide" style={{ fontFamily: 'serif' }}>
-            Letter Preview
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <FileText size={14} color="rgba(255,255,255,0.7)" />
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: '700',
+              color: '#FFFFFF',
+              letterSpacing: 0.3,
+            }}
+          >
+            Complaint Preview
           </Text>
         </View>
 
-        <View className="w-16" />
+        <View style={{ width: 72 }} />
       </View>
 
       <ScrollView
-        className="flex-1"
-        style={{ backgroundColor: THEME.primary }}
+        style={{ flex: 1 }}
         contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
         showsVerticalScrollIndicator={false}
       >
 
-        {/* ── Bond Paper Card ── */}
+        {/* ── Ref / Date strip ── */}
         <View
-          className="bg-white  border rounded-2xl border-stone-200 px-7 py-8"
           style={{
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.25,
-            shadowRadius: 8,
-            elevation: 8,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginBottom: 12,
+            paddingHorizontal: 2,
           }}
         >
-
-          {/* ── Republic Header ── */}
-          <View className="items-center mb-5">
-            <Text
-              className="text-xs font-bold text-blue-950 tracking-widest uppercase"
-              style={{ fontFamily: 'serif' }}
-            >
-              Republic of the Philippines
-            </Text>
-            <Text
-              className="text-xs text-stone-500 tracking-wider mt-0.5"
-              style={{ fontFamily: 'serif' }}
-            >
-              Province of Laguna
-            </Text>
-            <Text
-              className="text-xs text-stone-500 tracking-wider"
-              style={{ fontFamily: 'serif' }}
-            >
-              Municipality of Santa Maria
-            </Text>
-
-            <View className="w-20 h-px bg-blue-950 my-3" />
-
-            <Text
-              className="text-stone-400 uppercase"
-              style={{ fontFamily: 'serif', fontSize: 8, letterSpacing: 4 }}
-            >
-              Barangay
-            </Text>
-            <Text
-              className="text-2xl font-bold text-blue-950 tracking-wide mt-0.5"
-              style={{ fontFamily: 'serif' }}
-            >
-              {barangayName.toUpperCase()}
-            </Text>
-            <Text
-              className="text-stone-400 tracking-widest uppercase mt-0.5"
-              style={{ fontFamily: 'serif', fontSize: 8 }}
-            >
-              Office of the Punong Barangay
-            </Text>
-          </View>
-
-          {/* ── Icon Row ── */}
-          <View className="flex-row items-center justify-between mb-5 px-1">
-            <View className="w-11 h-11 rounded-full border-2 border-blue-950 bg-blue-50 items-center justify-center">
-              <Shield size={18} color="#1e3a5f" />
-            </View>
-
-            <View className="flex-1 items-center px-3">
-              <Text
-                className="text-xs font-bold text-blue-950 tracking-widest text-center uppercase"
-                style={{ fontFamily: 'serif' }}
-              >
-                Barangay Complaint Form
-              </Text>
-              <View className="w-4/5 h-px bg-blue-950 my-2" />
-              <Text
-                className="text-stone-400"
-                style={{ fontFamily: 'serif', fontSize: 8, letterSpacing: 0.5 }}
-              >
-                Ref. No.: {REF_NUMBER}
-              </Text>
-            </View>
-
-            <View className="w-11 h-11 rounded-full border-2 border-blue-950 bg-blue-50 items-center justify-center">
-              <Scale size={18} color="#1e3a5f" />
-            </View>
-          </View>
-
-          {/* ── Date & Destination Strip ── */}
-          <View className="flex-row border border-blue-200 rounded-sm py-2.5 px-4 mb-5 items-center bg-blue-50">
-            <View className="flex-1 items-center">
-              <Text
-                className="text-stone-400 uppercase mb-1"
-                style={{ fontFamily: 'serif', fontSize: 7, letterSpacing: 2 }}
-              >
-                Date Filed
-              </Text>
-              <Text
-                className="text-xs font-bold text-blue-950 text-center"
-                style={{ fontFamily: 'serif' }}
-              >
-                {formatDate(today)}
-              </Text>
-            </View>
-            <View className="w-px h-8 bg-blue-300 mx-2" />
-            <View className="flex-1 items-center">
-              <Text
-                className="text-stone-400 uppercase mb-1"
-                style={{ fontFamily: 'serif', fontSize: 7, letterSpacing: 2 }}
-              >
-                Filed To
-              </Text>
-              <Text
-                className="text-xs font-bold text-blue-950 text-center"
-                style={{ fontFamily: 'serif' }}
-              >
-                Brgy. {barangayName}
-              </Text>
-            </View>
-          </View>
-
-          {/* ── Thin Divider ── */}
-          <View className="h-px bg-stone-200 mb-5" />
-
-          {/* ── Salutation ── */}
           <Text
-            className="text-xs text-stone-700 leading-6 mb-3"
-            style={{ fontFamily: 'serif' }}
+            style={{
+              fontSize: 10,
+              color: 'rgba(255,255,255,0.7)',
+              letterSpacing: 0.5,
+            }}
           >
-            To:{'\n'}
-            <Text className="font-bold text-blue-950">
-              The Honorable Punong Barangay{'\n'}
+            Ref. No.:{' '}
+            <Text style={{ color: 'rgba(255,255,255,0.9)', fontWeight: '600' }}>
+              {REF_NUMBER}
             </Text>
-            <Text className="italic text-stone-500">
-              Barangay {barangayName},{'\n'}
-            </Text>
-            <Text className="text-stone-500">Santa Maria, Laguna</Text>
           </Text>
+          <Text
+            style={{
+              fontSize: 10,
+              color: 'rgba(255,255,255,0.7)',
+              letterSpacing: 0.5,
+            }}
+          >
+            {formatDate(today)}
+          </Text>
+        </View>
 
-          {/* ── Subject ── */}
-          <View className="flex-row flex-wrap items-start mb-4">
+        {/* ── Card 1: Complainant Info ── */}
+        <Card>
+          <CardLabel
+            icon={<User size={12} color="#6B7280" />}
+            label="Complainant Information"
+          />
+          <DetailRow
+            icon={<User size={15} color="#4B5563" />}
+            label="Full Name"
+            value={fullName}
+          />
+          <DetailRow
+            icon={<MapPin size={15} color="#4B5563" />}
+            label="Address"
+            value={fullAddress}
+          />
+          <DetailRow
+            icon={<Building2 size={15} color="#4B5563" />}
+            label="Filed To"
+            value={`Barangay ${barangayName}`}
+          />
+          <DetailRow
+            icon={<Calendar size={15} color="#4B5563" />}
+            label="Date Filed"
+            value={formatDate(today)}
+          />
+        </Card>
+
+        {/* ── Card 2: Complaint Details ── */}
+        <Card>
+          <CardLabel
+            icon={<MessageSquare size={12} color="#6B7280" />}
+            label="Complaint Details"
+          />
+
+          {/* Subject */}
+          <View
+            style={{
+              marginBottom: 12,
+              paddingBottom: 12,
+              borderBottomWidth: 0.5,
+              borderBottomColor: '#E5E7EB',
+            }}
+          >
             <Text
-              className="text-xs font-bold text-blue-950 tracking-wide leading-5"
-              style={{ fontFamily: 'serif' }}
+              style={{
+                fontSize: 10,
+                fontWeight: '600',
+                color: '#6B7280',
+                letterSpacing: 0.8,
+                textTransform: 'uppercase',
+                marginBottom: 4,
+              }}
             >
-              SUBJECT:{' '}
+              Subject
             </Text>
             <Text
-              className="text-xs font-bold text-blue-950 underline flex-1 leading-5"
-              style={{ fontFamily: 'serif' }}
+              style={{
+                fontSize: 14,
+                fontWeight: '700',
+                color: '#1F2937',
+                lineHeight: 20,
+              }}
             >
               {title}
             </Text>
           </View>
 
-          {/* ── Opening ── */}
-          <Text
-            className="text-xs text-stone-700 leading-6"
-            style={{ fontFamily: 'serif' }}
-          >
-            Respectfully,
-          </Text>
-          <Text
-            className="text-xs text-stone-700 leading-6 mt-1.5"
-            style={{ fontFamily: 'serif' }}
-          >
-            I, the undersigned, a resident of Barangay {barangayName}, Santa Maria,
-            Laguna, hereby file this formal complaint before your esteemed office for
-            appropriate action and resolution:
-          </Text>
-
-          {/* ── Complaint Details Box ── */}
-          <View className="mt-4 border-l-4 border-blue-950 bg-stone-50 px-4 py-3.5 rounded-r-sm">
+          {/* Message */}
+          <View>
             <Text
-              className="text-blue-950 font-bold uppercase mb-2"
-              style={{ fontFamily: 'serif', fontSize: 7, letterSpacing: 2 }}
+              style={{
+                fontSize: 10,
+                fontWeight: '600',
+                color: '#6B7280',
+                letterSpacing: 0.8,
+                textTransform: 'uppercase',
+                marginBottom: 6,
+              }}
             >
-              Complaint Details
+              Description
             </Text>
             <Text
-              className="text-xs text-stone-700 leading-6"
-              style={{ fontFamily: 'serif' }}
+              style={{
+                fontSize: 13,
+                color: '#4B5563',
+                lineHeight: 21,
+              }}
             >
               {message}
             </Text>
           </View>
+        </Card>
 
-          {/* ── Attachments ── */}
-          {attachments.length > 0 && (
-            <View className="mt-4 pt-3 border-t border-stone-200">
-              <Text
-                className="text-blue-950 font-bold uppercase mb-2"
-                style={{ fontFamily: 'serif', fontSize: 7, letterSpacing: 2 }}
+        {/* ── Card 3: Attachments (conditional) ── */}
+        {attachments.length > 0 && (
+          <Card>
+            <CardLabel
+              icon={<Paperclip size={12} color="#6B7280" />}
+              label={`Attachments (${attachments.length})`}
+            />
+            {attachments.map((att, i) => (
+              <View
+                key={i}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  paddingVertical: 9,
+                  borderBottomWidth: i < attachments.length - 1 ? 0.5 : 0,
+                  borderBottomColor: '#E5E7EB',
+                }}
               >
-                Attachments / Evidence ({attachments.length})
-              </Text>
-              {attachments.map((att, i) => (
-                <View key={i} className="flex-row items-center mb-1.5 gap-1.5">
-                  <View className="w-1 h-1 rounded-full bg-blue-950" />
-                  <Paperclip size={9} color="#1e3a5f" />
+                <View
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    backgroundColor: '#F3F4F6',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Paperclip size={14} color="#4B5563" />
+                </View>
+                <View style={{ flex: 1 }}>
                   <Text
-                    className="text-xs text-stone-600 flex-1"
-                    style={{ fontFamily: 'serif' }}
+                    style={{
+                      fontSize: 12,
+                      color: '#1F2937',
+                      fontWeight: '500',
+                    }}
+                    numberOfLines={1}
                   >
                     {att.name}
                   </Text>
                   <Text
-                    className="text-stone-400"
-                    style={{ fontFamily: 'serif', fontSize: 8 }}
+                    style={{
+                      fontSize: 10,
+                      color: '#6B7280',
+                      marginTop: 1,
+                    }}
                   >
-                    [{att.type.toUpperCase()}]
+                    {att.type.toUpperCase()}
                   </Text>
                 </View>
-              ))}
-            </View>
-          )}
+              </View>
+            ))}
+          </Card>
+        )}
 
-          {/* ── Closing ── */}
-          <Text
-            className="text-xs text-stone-700 leading-6 mt-5"
-            style={{ fontFamily: 'serif' }}
+        {/* ── Card 4: Terms & Agreement ── */}
+        <Card style={{ padding: 0, overflow: 'hidden' }}>
+          {/* Card header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              padding: 16,
+              paddingBottom: 12,
+              borderBottomWidth: 0.5,
+              borderBottomColor: '#E5E7EB',
+            }}
           >
-            I humbly pray that your good office take cognizance of this complaint and
-            conduct the necessary proceedings in accordance with the Katarungang
-            Pambarangay Law (R.A. 7160) and other applicable laws and ordinances.
-          </Text>
-          <Text
-            className="text-xs text-stone-700 leading-6 mt-3"
-            style={{ fontFamily: 'serif' }}
-          >
-            I hereby certify that the information provided in this complaint form is
-            true and correct to the best of my knowledge and belief.
-          </Text>
-
-          {/* ── Signature Block ── */}
-          <View className="mt-8">
+            <ScrollText size={13} color="#6B7280" />
             <Text
-              className="text-stone-400 mb-10"
-              style={{ fontFamily: 'serif', fontSize: 9 }}
+              style={{
+                fontSize: 11,
+                fontWeight: '700',
+                color: '#4B5563',
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+                flex: 1,
+              }}
             >
-              Respectfully submitted by:
+              {t('termsModal.title', 'Terms & Agreement')}
             </Text>
-            <View className="w-52">
-              <View className="h-px bg-blue-950 mb-1" />
-              <Text
-                className="text-xs font-bold text-blue-950 tracking-wide"
-                style={{ fontFamily: 'serif' }}
+            {termsRead && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  backgroundColor: '#DCFCE7',
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 20,
+                }}
               >
-                {fullName.toUpperCase()}
-              </Text>
-              <Text
-                className="italic text-stone-500"
-                style={{ fontFamily: 'serif', fontSize: 9 }}
-              >
-                Complainant
-              </Text>
-              <Text
-                className="text-stone-400 mt-0.5"
-                style={{ fontFamily: 'serif', fontSize: 8 }}
-              >
-                {fullAddress}
-              </Text>
-            </View>
+                <CheckCircle2 size={10} color="#16A34A" />
+                <Text style={{ fontSize: 9, color: '#15803D', fontWeight: '600' }}>
+                  READ
+                </Text>
+              </View>
+            )}
           </View>
 
-          {/* ── Footer Rule ── */}
-          <View className="h-px bg-blue-950 mt-6 mb-3" />
-          <Text
-            className="text-stone-400 text-center leading-4"
-            style={{ fontFamily: 'serif', fontSize: 7, letterSpacing: 0.2 }}
+          {/* Intro notice */}
+          <View
+            style={{
+              margin: 12,
+              marginBottom: 4,
+              flexDirection: 'row',
+              gap: 8,
+              backgroundColor: '#F9FAFB',
+              borderLeftWidth: 3,
+              borderLeftColor: '#D1D5DB',
+              borderRadius: 8,
+              padding: 10,
+            }}
           >
-            This document is an official complaint filed with Barangay {barangayName}{' '}
-            through the Santa Maria Barangay Complaint System. Reference No. {REF_NUMBER}
-          </Text>
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 11,
+                color: '#4B5563',
+                lineHeight: 17,
+              }}
+            >
+              {t('termsModal.intro', {
+                appName: t('termsModal.appName', 'Santa Maria Barangay App'),
+              })}
+            </Text>
+          </View>
 
-        </View>
-
-        {/* ── CTA ── */}
-        <View className="mt-6 items-center gap-3">
-          <Text
-            className="text-xs italic"
-            style={{ fontFamily: 'serif', color: 'rgba(255,255,255,0.7)' }}
+          {/* Scrollable terms body */}
+          <ScrollView
+            ref={termsScrollRef}
+            style={{
+              maxHeight: 220,
+              marginHorizontal: 12,
+              marginTop: 10,
+            }}
+            onScroll={handleTermsScroll}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled
           >
-            Review the letter carefully before submitting.
-          </Text>
+            {[
+              { title: t('termsModal.sections.s1Title'), body: t('termsModal.sections.s1Body', { lgu: t('termsModal.municipality') }) },
+              { title: t('termsModal.sections.s2Title'), body: t('termsModal.sections.s2Body') },
+              { title: t('termsModal.sections.s3Title'), body: t('termsModal.sections.s3Body', { law: t('termsModal.sections.s3Law') }) },
+              { title: t('termsModal.sections.s4Title'), body: t('termsModal.sections.s4Body', { law: t('termsModal.sections.s4Law') }) },
+              { title: t('termsModal.sections.s5Title'), body: t('termsModal.sections.s5Body', { charter: t('termsModal.sections.s5Charter'), law: t('termsModal.sections.s5Law') }) },
+              { title: t('termsModal.sections.s6Title'), body: t('termsModal.sections.s6Body') },
+              { title: t('termsModal.sections.s7Title'), body: t('termsModal.sections.s7Body') },
+              { title: t('termsModal.sections.s8Title'), body: t('termsModal.sections.s8Body') },
+              { title: t('termsModal.sections.s9Title'), body: t('termsModal.sections.s9Body') },
+              { title: t('termsModal.sections.s10Title'), body: t('termsModal.sections.s10Body', { country: t('termsModal.sections.s10Country') }) },
+            ].map((sec, i) => (
+              <View key={i} style={{ marginBottom: 14 }}>
+                <Text
+                  style={{
+                    fontSize: 9,
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.8,
+                    color: '#9CA3AF',
+                    marginBottom: 4,
+                  }}
+                >
+                  {sec.title}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: '#4B5563',
+                    lineHeight: 17,
+                  }}
+                >
+                  {sec.body}
+                </Text>
+              </View>
+            ))}
+            <View style={{ height: 12 }} />
+          </ScrollView>
+
+          {/* Scroll notice */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderTopWidth: 0.5,
+              borderTopColor: '#E5E7EB',
+              marginTop: 6,
+            }}
+          >
+            {termsRead ? (
+              <CheckCircle2 size={11} color="#16A34A" />
+            ) : (
+              <AlertCircle size={11} color="#9CA3AF" />
+            )}
+            <Text
+              style={{
+                fontSize: 10,
+                color: termsRead ? '#15803D' : '#6B7280',
+              }}
+            >
+              {termsRead
+                ? t('termsModal.footer.hasRead', 'You have read the terms.')
+                : t('termsModal.footer.notRead', 'Please scroll to read all terms.')}
+            </Text>
+          </View>
+
+          {/* Checkbox accept row */}
+          <TouchableOpacity
+            onPress={() => termsRead && setTermsAccepted(prev => !prev)}
+            activeOpacity={0.7}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              margin: 12,
+              marginTop: 4,
+              padding: 12,
+              borderRadius: 10,
+              backgroundColor: termsAccepted
+                ? '#DCFCE7'
+                : '#F9FAFB',
+              borderWidth: 1,
+              borderColor: termsAccepted
+                ? '#86EFAC'
+                : '#E5E7EB',
+              opacity: termsRead ? 1 : 0.45,
+            }}
+          >
+            <View
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: 5,
+                borderWidth: 1.5,
+                borderColor: termsAccepted ? '#16A34A' : '#D1D5DB',
+                backgroundColor: termsAccepted
+                  ? '#DCFCE7'
+                  : 'transparent',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {termsAccepted && <Check size={12} color="#16A34A" />}
+            </View>
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 11,
+                color: termsAccepted ? '#15803D' : '#4B5563',
+                lineHeight: 16,
+                fontWeight: termsAccepted ? '600' : '400',
+              }}
+            >
+              {t(
+                'termsModal.footer.accept',
+                'I have read and agree to the Terms and Agreement.'
+              )}
+            </Text>
+          </TouchableOpacity>
+        </Card>
+
+        {/* ── Submit CTA ── */}
+        <View style={{ marginTop: 8, alignItems: 'center', gap: 10 }}>
+          {!termsAccepted && (
+            <Text
+              style={{
+                fontSize: 11,
+                color: 'rgba(255,255,255,0.6)',
+                textAlign: 'center',
+                fontStyle: 'italic',
+              }}
+            >
+              {termsRead
+                ? 'Please check the box above to accept the terms.'
+                : 'Read all terms above to enable submission.'}
+            </Text>
+          )}
 
           <TouchableOpacity
             onPress={onConfirmSubmit}
-            disabled={isSubmitting}
-            className={`flex-row items-center py-3.5 px-9 rounded-xl gap-2.5 ${
-              isSubmitting ? 'bg-white opacity-70' : 'bg-white'
-            }`}
+            disabled={!canSubmit}
             activeOpacity={0.85}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              paddingVertical: 14,
+              paddingHorizontal: 36,
+              borderRadius: 14,
+              backgroundColor: canSubmit ? '#FFFFFF' : 'rgba(255,255,255,0.15)',
+              width: '100%',
+            }}
           >
             {isSubmitting ? (
-              <ActivityIndicator size="small" color="#1e3a5f" />
+              <ActivityIndicator size="small" color={THEME.primary} />
             ) : (
-              <Send size={18} color="#1e3a5f" />
+              <Send size={16} color={canSubmit ? THEME.primary : 'rgba(255,255,255,0.4)'} />
             )}
             <Text
-              className="text-blue-950 text-sm font-bold tracking-wide"
-              style={{ fontFamily: 'serif' }}
+              style={{
+                fontSize: 14,
+                fontWeight: '700',
+                color: canSubmit ? THEME.primary : 'rgba(255,255,255,0.4)',
+                letterSpacing: 0.3,
+              }}
             >
               {isSubmitting ? 'Submitting...' : 'Submit Complaint'}
             </Text>
           </TouchableOpacity>
 
           {!isSubmitting && (
-            <TouchableOpacity onPress={onBack} className="py-1.5">
+            <TouchableOpacity onPress={onBack} style={{ paddingVertical: 6 }}>
               <Text
-                className="text-xs"
-                style={{ fontFamily: 'serif', color: 'rgba(255,255,255,0.7)' }}
+                style={{
+                  fontSize: 12,
+                  color: 'rgba(255,255,255,0.45)',
+                }}
               >
                 ← Go back and edit
               </Text>
@@ -410,7 +741,6 @@ export default function ComplaintLetterPreview({
         </View>
 
       </ScrollView>
-
     </SafeAreaView>
   );
 }
