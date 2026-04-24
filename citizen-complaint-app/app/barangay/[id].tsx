@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useAttachments } from '@/hooks/general/useAttachment';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
 import { PRESET_TITLE_KEYS, OTHER_KEY, PresetTitle } from '@/constants/localization/complaint-title-key';
-import { getBarangayCoords,DEFAULT_COORDS } from '@/constants/general/barangay';
+
 import ComplaintLetterPreview from '@/components/letter-preview/ComplaintLetterPreview';
 import { complaintApiClient } from '@/lib/client/complaint';
 import { askForNotificationPermission } from '@/hooks/general/usePushNotifications';
@@ -28,6 +28,7 @@ import { LocationStep } from '@/components/complaint/complaint-proccess/Location
 import { COMPLAINT_DETAILS_MAX_LENGTH, COMPLAINT_DETAILS_MIN_LENGTH } from '@/components/complaint/complaint-proccess/FormStep';
 import useToastStore from '@/store/useGlobalModal';
 import { userApiClient } from '@/lib/client/user';
+import { useComplaintCategories } from '@/hooks/general/useCategories';
 // ─── Step type ────────────────────────────────────────────────────────────────
 type Step = 'instructions' | 'form' | 'location';
 
@@ -37,6 +38,8 @@ export default function ComplaintFormScreen() {
   const { userData, fetchCurrentUser } = useCurrentUser();
   const router = useRouter();
   const params = useLocalSearchParams();
+
+  const { data: presets = PRESET_TITLE_KEYS, isLoading: categoriesLoading } = useComplaintCategories();
 
   // ── Route params ────────────────────────────────────────────────────────────
   const barangayName     = (params.barangayName as string) || 'Barangay';
@@ -339,6 +342,7 @@ const validateForm = (): boolean => {
   return (
     <>
       <FormStep
+        presets={presets}
         barangayName={barangayName}
         hasProfileLocation={hasProfileLocation}
         selectedPreset={selectedPreset}

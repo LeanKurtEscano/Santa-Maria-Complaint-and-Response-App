@@ -8,7 +8,7 @@ import { StepDots } from './StepDots';
 import { THEME } from '@/constants/theme';
 import { complaintApiClient } from '@/lib/client/complaint';
 import { useQuery } from '@tanstack/react-query';
-
+import { useTranslation } from 'react-i18next';
 interface LocationStepProps {
   barangayName: string;
   barangayLat: number;
@@ -58,7 +58,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
+ const { t } = useTranslation();
   const [webViewKey, setWebViewKey] = useState(0);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState(false);
@@ -410,7 +410,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
           <ArrowLeft size={22} color={THEME.primary} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Where did this happen?</Text>
+          <Text style={styles.headerTitle}>{t('location_step.title')}</Text>
           <Text style={[styles.headerSub, { color: THEME.primary }]} numberOfLines={1}>{barangayName}</Text>
         </View>
         <StepDots current={3} />
@@ -419,7 +419,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
       {/* Instruction strip */}
       <View style={styles.strip}>
         <MapPin size={13} color="#4B5563" />
-        <Text style={styles.stripText}>Tap the map to place a pin, or use your current location</Text>
+        <Text style={styles.stripText}>{t('location_step.instruction')}</Text>
       </View>
 
       {/* Map */}
@@ -441,7 +441,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         {!mapReady && !mapError && (
           <View style={styles.mapOverlay}>
             <ActivityIndicator size="large" color={THEME.primary} />
-            <Text style={{ marginTop: 10, fontSize: 13, color: '#94A3B8' }}>Loading map…</Text>
+            <Text style={{ marginTop: 10, fontSize: 13, color: '#94A3B8' }}>{t('location_step.loading_map')}</Text>
           </View>
         )}
 
@@ -449,15 +449,15 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         {mapError && (
           <View style={styles.mapOverlay}>
             <WifiOff size={44} color={THEME.primary} style={{ opacity: 0.85, marginBottom: 14 }} />
-            <Text style={styles.errorTitle}>Map failed to load</Text>
-            <Text style={styles.errorSubtitle}>Check your connection and try again.</Text>
+            <Text style={styles.errorTitle}>{t('location_step.map_error_title')}</Text>
+            <Text style={styles.errorSubtitle}>{t('location_step.map_error_desc')}</Text>
             <TouchableOpacity
               style={[styles.retryButton, { backgroundColor: THEME.primary }]}
               onPress={handleRetry}
               activeOpacity={0.8}
             >
               <RefreshCw size={16} color="#fff" />
-              <Text style={styles.retryButtonText}>Reload Map</Text>
+              <Text style={styles.retryButtonText}>{t('location_step.reload_map')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -536,7 +536,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
           <View style={styles.cooldownRow}>
             <Timer size={13} color="#92400E" />
             <Text style={styles.cooldownText}>
-              You can use "My Location" again in {cooldownRemaining}s
+              {t('location_step.gps_cooldown', { seconds: cooldownRemaining })}
             </Text>
           </View>
         )}
@@ -560,7 +560,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
               <LocateFixed size={16} color={THEME.primary} />
             )}
             <Text style={[styles.actionButtonText, { color: isGpsDisabled ? `${THEME.primary}60` : THEME.primary }]}>
-              {gettingGps ? 'Getting…' : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : 'My Location'}
+              {gettingGps ? t('location_step.gps_getting') : cooldownRemaining > 0 ? t('location_step.gps_wait', { seconds: cooldownRemaining }) : t('location_step.gps_button')}
             </Text>
           </TouchableOpacity>
 
@@ -574,14 +574,14 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
           >
             <MapPin size={16} color="#16A34A" />
             <Text style={[styles.actionButtonText, { color: '#16A34A' }]}>
-              Barangay Pin
+              {t('location_step.barangay_pin')}
             </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.dividerRow}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerLabel}>or tap / drag pin on map</Text>
+          <Text style={styles.dividerLabel}>{t('location_step.or_hint')}</Text>
           <View style={styles.dividerLine} />
         </View>
 
@@ -592,7 +592,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
           disabled={mapError}
         >
           <Check size={18} color="#ffffff" />
-          <Text style={styles.confirmButtonText}>Confirm Location</Text>
+          <Text style={styles.confirmButtonText}>{t('location_step.confirm_location')}</Text>
         </TouchableOpacity>
 
       </View>

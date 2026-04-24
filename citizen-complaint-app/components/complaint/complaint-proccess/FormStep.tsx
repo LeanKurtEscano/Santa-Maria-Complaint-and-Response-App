@@ -20,7 +20,9 @@ import { PRESET_TITLE_KEYS, OTHER_KEY, PresetTitle } from '@/constants/localizat
 import { Attachment } from '@/hooks/general/useAttachment';
 import { StepDots } from './StepDots';
 import { THEME } from '@/constants/theme';
-
+import { useAttachmentViewer } from '@/hooks/general/useAttachmentViewer';
+import { AttachmentViewer } from '@/components/media/AttachmentViewer';
+import { ActivityIndicator } from 'react-native';
 // ─── Validation Constants ──────────────────────────────────────────────────────
 // Minimum enforces meaningful complaints (prevents "noise" or "pothole" alone).
 // Maximum keeps records manageable for barangay staff across high-volume usage.
@@ -148,6 +150,7 @@ function DetailsHint({ state, length }: { state: DetailsValidationState; length:
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface FormStepProps {
+  presets: PresetTitle[];
   barangayName: string;
   hasProfileLocation: boolean;
   selectedPreset: PresetTitle | null;
@@ -180,6 +183,7 @@ interface FormStepProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export function FormStep({
+  presets,
   barangayName,
   hasProfileLocation,
   selectedPreset,
@@ -212,7 +216,7 @@ export function FormStep({
   const router = useRouter();
 
   const isOtherSelected = selectedPreset?.key === OTHER_KEY;
-
+const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer();
   // ── Details validation state ──────────────────────────────────────────────
   const detailsState = getDetailsValidationState(message.length, messageWasTouched || !!messageError);
   const detailsBorderColor = getDetailsBorderColor(detailsState, !!messageError);
@@ -252,9 +256,9 @@ export function FormStep({
           >
             <AlertCircle size={18} color="#D97706" style={{ marginTop: 1, flexShrink: 0 }} />
             <View className="flex-1 ml-3">
-              <Text className="text-sm font-bold text-amber-900">Profile Location Required</Text>
+              <Text className="text-sm font-bold text-amber-900">{t('complaint_form.profile_location_title')}</Text>
               <Text className="text-xs text-amber-700 mt-0.5 leading-5">
-                You haven't set your location yet. Tap here to update your profile before submitting.
+                {t('complaint_form.profile_location_desc')}
               </Text>
             </View>
             <ArrowRight size={16} color="#D97706" style={{ marginTop: 2 }} />
@@ -267,7 +271,7 @@ export function FormStep({
             {t('complaint_form.title_label')} <Text className="text-red-500">*</Text>
           </Text>
           <Text className="text-sm text-gray-500 mb-3 leading-5">
-            Select the category that best describes your complaint.
+            {t('complaint_form.title_description')}
           </Text>
           <TouchableOpacity
             onPress={onOpenTitlePicker}
@@ -323,7 +327,7 @@ export function FormStep({
         
 
           <Text className="text-sm text-gray-500 mb-3 leading-5">
-            Describe your complaint clearly. Include when it happened, who is affected, and any relevant details that will help the barangay address it promptly.
+            {t('complaint_form.details_description')}
           </Text>
 
           {/* Textarea */}
@@ -379,22 +383,46 @@ export function FormStep({
           <Text className="text-base font-bold text-gray-800 mb-1">{t('complaint_form.attachments_label')}</Text>
           <Text className="text-sm text-gray-500 mb-4 leading-5">{t('complaint_form.attachments_hint')}</Text>
 
-          {attachments.map((attachment) => (
-            <View key={attachment.id} className="bg-white border border-gray-200 rounded-2xl p-4 mb-2.5 flex-row items-center">
-              <View className="p-2.5 rounded-xl mr-3" style={{ backgroundColor: `${THEME.primary}15` }}>
-                {getAttachmentIcon(attachment.type)}
-              </View>
-              <View className="flex-1">
-                <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>{attachment.name}</Text>
-                {attachment.size && (
-                  <Text className="text-xs text-gray-500 mt-0.5">{formatFileSize(attachment.size)}</Text>
-                )}
-              </View>
-              <TouchableOpacity onPress={() => onRemoveAttachment(attachment.id)} className="p-2 bg-red-50 rounded-xl ml-2">
-                <X size={18} color="#EF4444" />
-              </TouchableOpacity>
-            </View>
-          ))}
+         
+{attachments.map((attachment) => (
+  <TouchableOpacity
+    key={attachment.id}
+    onPress={() => openAttachment(attachment)}   // ← tap name/row to open
+    activeOpacity={0.75}
+    className="bg-white border border-gray-200 rounded-2xl p-4 mb-2.5 flex-row items-center"
+  >
+    <View className="p-2.5 rounded-xl mr-3" style={{ backgroundColor: `${THEME.primary}15` }}>
+      {getAttachmentIcon(attachment.type)}
+    </View>
+    <View className="flex-1">
+      <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>
+        {attachment.name}
+      </Text>
+      {attachment.size && (
+        <Text className="text-xs text-gray-500 mt-0.5">
+          {formatFileSize(attachment.size)}
+          {'  ·  '}
+          <Text style={{ color: THEME.primary }}>
+            {attachment.type === 'image' ? 'Tap to view' : attachment.type === 'video' ? 'Tap to play' : 'Tap to open'}
+          </Text>
+        </Text>
+      )}
+    </View>
+    {/* Loading spinner while file is opening */}
+    {isOpening ? (
+      <ActivityIndicator size="small" color={THEME.primary} style={{ marginLeft: 8 }} />
+    ) : (
+      <TouchableOpacity
+        onPress={() => onRemoveAttachment(attachment.id)}
+        className="p-2 bg-red-50 rounded-xl ml-2"
+        hitSlop={8}
+      >
+        <X size={18} color="#EF4444" />
+      </TouchableOpacity>
+    )}
+  </TouchableOpacity>
+))}
+ 
 
           {attachments.length < 3 && (
             <TouchableOpacity
@@ -436,7 +464,7 @@ export function FormStep({
           <MapPin size={16} color="#059669" />
           <Text className="text-sm text-emerald-800 flex-1 leading-5">
             <Text className="font-bold">Next: </Text>
-            Pin where the incident happened on the map.
+            {t('complaint_form.next_step_hint')}
           </Text>
         </View>
 
@@ -455,7 +483,7 @@ export function FormStep({
             elevation: 4,
           }}
         >
-          <Text className="font-bold text-base" style={{ color: '#ffffff' }}>Next: Pin Location</Text>
+          <Text className="font-bold text-base" style={{ color: '#ffffff' }}>{t('complaint_form.next_step')}</Text>
           <ArrowRight size={18} color="#ffffff" />
         </TouchableOpacity>
       </View>
@@ -474,7 +502,7 @@ export function FormStep({
               <Text className="text-sm text-gray-500 mt-1">{t('complaint_form.picker_subtitle')}</Text>
             </View>
             <FlatList
-              data={PRESET_TITLE_KEYS}
+              data={presets}
               keyExtractor={(item) => item.key}
               style={{ maxHeight: 380 }}
               contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8 }}
@@ -558,7 +586,7 @@ export function FormStep({
           </Pressable>
         </Pressable>
       </Modal>
-
+<AttachmentViewer viewer={viewer} onClose={closeViewer} />
     </SafeAreaView>
   );
 }

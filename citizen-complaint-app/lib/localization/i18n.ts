@@ -58,6 +58,26 @@ const resources = {
     "refreshHint": "Pull down to refresh"
   },
 
+  "complaintStatus": {
+    "status": {
+      "submitted": "Submitted",
+      "forwarded": "Forwarded",
+      "resolved": "Resolved",
+      "rejected": "Rejected",
+      "pending": "Pending",
+      "reviewed_by_barangay": "Reviewed by Barangay",
+      "resolved_by_barangay": "Resolved by Barangay",
+      "forwarded_to_lgu": "Forwarded to LGU",
+      "reviewed_by_lgu": "Reviewed by LGU",
+      "resolved_by_lgu": "Resolved by LGU",
+      "rejected_by_lgu": "Rejected by LGU",
+      "forwarded_to_department": "Forwarded to Dept.",
+      "reviewed_by_department": "Under Dept. Review",
+      "resolved_by_department": "Resolved by Dept.",
+      "rejected_by_department": "Rejected by Dept."
+    }
+  },
+
  "back": "Back",
   "forgotPasswordTitle": "Forgot Password?",
   "forgotPasswordSubtitle": "Enter your email address and we'll send you a verification code to reset your password.",
@@ -473,6 +493,7 @@ const resources = {
           "water_supply_issue": "Water Supply Issue",
           "garbage_collection": "Garbage Collection Problem",
           "vandalism": "Vandalism / Property Damage",
+          "landslide": "Landslide / Erosion",
           "other": "Other (specify below)"
         }
       },
@@ -548,12 +569,27 @@ const resources = {
           "loadFailed": "Failed to load barangays",
           "screenTitle": "Unable to Retrieve Barangays"
         }
-      }, "complaint_form": {
+      }, 
+      
+      
+      "complaint_form": {
         "screen_title": "File a Complaint",
         "title_label": "Complaint Category",
+        "title_description": "Select the category that best describes your complaint. If your concern doesn't fit any category, choose 'Other' and specify in the details.",
         "title_placeholder": "Select a complaint category",
         "custom_title_placeholder": "Enter your complaint title",
         "custom_title_hint": "Briefly describe your complaint in a few words",
+         "profile_location_title": "Profile Location Required",
+    "profile_location_desc": "You haven't set your location yet. Tap here to update your profile before submitting.",
+
+    "details_description": "Describe your complaint clearly. Include when it happened, who is affected, and any relevant details that will help the barangay address it promptly.",
+
+    "next_step_hint": "Next: Pin where the incident happened on the map.",
+      "next_step":"Next: Pin Location",
+
+    "attachment_photo_tag": "JPG, PNG",
+    "attachment_video_tag": "MP4, MOV",
+    "attachment_any_tag": "ANY",
         "details_label": "Complaint Details",
         "details_placeholder": "Describe your complaint in full detail. Include the location, date of occurrence, and any other relevant information...",
         "attachments_label": "Supporting Attachments",
@@ -593,6 +629,68 @@ const resources = {
         "agreement": "By proceeding, you confirm that you have read and understood the above guidelines.",
         "proceed_to_form": "I Understand — Proceed to Form"
       },
+
+
+      "location_step": {
+    "title": "Where did this happen?",
+   
+
+    "instruction": "Tap the map to place a pin, or use your current location",
+
+    "loading_map": "Loading map…",
+    "map_error_title": "Map failed to load",
+    "map_error_desc": "Check your connection and try again.",
+    "reload_map": "Reload Map",
+
+    "gps_error_permission": "Location permission denied. Please enable it in your device Settings.",
+    "gps_error_unavailable": "Your position could not be determined. Make sure GPS is enabled.",
+    "gps_error_timeout": "Location request timed out. Move to an open area and try again.",
+    "gps_error_unknown": "Could not get your location. Please try again.",
+
+    "gps_button": "My Location",
+    "gps_getting": "Getting…",
+    "gps_wait": "Wait {{seconds}}s",
+    "gps_cooldown": "You can use \"My Location\" again in {{seconds}}s",
+
+    "barangay_pin": "Barangay Pin",
+    "or_hint": "or tap / drag pin on map",
+
+    "confirm_location": "Confirm Location",
+
+    "next_title": "Next: Pin Location"
+  },
+
+    "complaintPreview": {
+    "back": "Back",
+    "title": "Complaint Preview",
+    "refNo": "Ref. No.",
+    "submit": "Submit Complaint",
+    "submitting": "Submitting...",
+    "edit": "← Go back and edit",
+
+    "sections": {
+      "complainantInfo": "Complainant Information",
+      "complaintDetails": "Complaint Details",
+      "attachments": "Attachments",
+      "subject": "Subject",
+      "description": "Description",
+      "fullName": "Full Name",
+      "address": "Address",
+      "filedTo": "Filed To",
+      "dateFiled": "Date Filed"
+    },
+
+    "attachments": {
+      "count": "Attachments ({{count}})"
+    },
+
+    "status": {
+      "read": "READ",
+      "hasRead": "You have read the terms.",
+      "notRead": "Please scroll to read all terms.",
+      "accept": "I have read and agree to the Terms and Agreement."
+    }
+  },
 
 
  "postIncidentFeedback": {
@@ -1325,6 +1423,27 @@ const resources = {
         }
       },
 
+
+       "complaintStatus": {
+    "status": {
+      "submitted": "Naisumite",
+      "forwarded": "Ipinasa",
+      "resolved": "Nalutas",
+      "rejected": "Tinanggihan",
+      "pending": "Nakabinbin",
+      "reviewed_by_barangay": "Nasuri ng Barangay",
+      "resolved_by_barangay": "Nalutas ng Barangay",
+      "forwarded_to_lgu": "Ipinasa sa LGU",
+      "reviewed_by_lgu": "Nasuri ng LGU",
+      "resolved_by_lgu": "Nalutas ng LGU",
+      "rejected_by_lgu": "Tinanggihan ng LGU",
+      "forwarded_to_department": "Ipinasa sa Dept.",
+      "reviewed_by_department": "Sinusuri ng Dept.",
+      "resolved_by_department": "Nalutas ng Dept.",
+      "rejected_by_department": "Tinanggihan ng Dept."
+    }
+  },
+
       "complaint": {
         "screen_title": "Bagong Reklamo",
 
@@ -1379,6 +1498,7 @@ const resources = {
           "water_supply_issue": "Suliranin sa Suplay ng Tubig",
           "garbage_collection": "Problema sa Koleksyon ng Basura",
           "vandalism": "Vandalism / Pinsala sa Ari-arian",
+          "landslide":"Pagguho ng Lupa",
           "other": "Iba pa (tukuyin sa ibaba)"
         }
       },
@@ -1581,9 +1701,20 @@ const resources = {
         "screen_title": "Maghain ng Reklamo",
         "title_label": "Kategorya ng Reklamo",
         "title_placeholder": "Pumili ng kategorya ng reklamo",
+        "title_description": "Pumili ng kategorya na pinaka-angkop sa iyong reklamo. Kung walang kategorya ang tumutugma, piliin ang 'Iba pa' at tukuyin sa ibaba.",
         "custom_title_placeholder": "Ilagay ang pamagat ng inyong reklamo",
         "custom_title_hint": "Ilarawan ang inyong reklamo nang maikli",
         "details_label": "Detalye ng Reklamo",
+         "profile_location_title": "Kailangang I-set ang Lokasyon sa Profile",
+    "profile_location_desc": "Hindi mo pa naitatakda ang iyong lokasyon. I-tap ito para i-update ang iyong profile bago magsumite.",
+
+    "details_description": "Ilarawan nang malinaw ang iyong reklamo. Ilagay kung kailan ito nangyari, sino ang apektado, at iba pang detalye upang agad itong matugunan ng barangay.",
+
+    "next_step_hint": "Sunod: I-pin ang lugar kung saan nangyari ang insidente sa mapa.",
+     "next_step":"Susunod: I-pin ang Lokasyon sa Mapa",
+    "attachment_photo_tag": "JPG, PNG",
+    "attachment_video_tag": "MP4, MOV",
+    "attachment_any_tag": "ANUMAN",
         "details_placeholder": "Ipaliwanag ang inyong reklamo nang malinaw at detalyado. Isama ang lokasyon, petsa ng pangyayari, at lahat ng kaugnay na impormasyon...",
         "attachments_label": "Mga Kalakip na Patunay",
         "attachments_hint": "Maaari kang maglakip ng hanggang 3 na file (larawan, video, o dokumento) bilang karagdagang patunay.",
@@ -1621,6 +1752,67 @@ const resources = {
         "agreement": "Sa pagpapatuloy, kinukumpirma mo na nabasa mo at naintindihan mo ang mga gabay na nasa itaas.",
         "proceed_to_form": "Naiintindihan ko — Magpatuloy sa Form"
       },
+
+      "location_step": {
+    "title": "Saan ito nangyari?",
+   
+
+    "instruction": "I-tap ang mapa para maglagay ng pin, o gamitin ang iyong kasalukuyang lokasyon",
+
+    "loading_map": "Ikinakarga ang mapa…",
+    "map_error_title": "Nabigong i-load ang mapa",
+    "map_error_desc": "Suriin ang iyong koneksyon at subukang muli.",
+    "reload_map": "I-reload ang Mapa",
+
+    "gps_error_permission": "Tinanggihan ang location permission. I-enable ito sa Settings ng iyong device.",
+    "gps_error_unavailable": "Hindi matukoy ang iyong lokasyon. Tiyaking naka-on ang GPS.",
+    "gps_error_timeout": "Nag-time out ang location request. Lumipat sa open area at subukang muli.",
+    "gps_error_unknown": "Hindi makuha ang iyong lokasyon. Subukang muli.",
+
+    "gps_button": "Aking Lokasyon",
+    "gps_getting": "Kinukuha…",
+    "gps_wait": "Maghintay ng {{seconds}}s",
+    "gps_cooldown": "Maaari mong gamitin muli ang \"Aking Lokasyon\" sa loob ng {{seconds}}s",
+
+    "barangay_pin": "Barangay Pin",
+    "or_hint": "o i-tap / i-drag ang pin sa mapa",
+
+    "confirm_location": "Kumpirmahin ang Lokasyon",
+
+    "next_title": "Sunod: I-pin ang Lokasyon"
+  },
+
+"complaintPreview": {
+    "back": "Bumalik",
+    "title": "Preview ng Reklamo",
+    "refNo": "Ref. No.",
+    "submit": "Isumite ang Reklamo",
+    "submitting": "Isinusumite...",
+    "edit": "← Bumalik at i-edit",
+
+    "sections": {
+      "complainantInfo": "Impormasyon ng Nagrereklamo",
+      "complaintDetails": "Detalye ng Reklamo",
+      "attachments": "Mga Kalakip",
+      "subject": "Paksa",
+      "description": "Paglalarawan",
+      "fullName": "Buong Pangalan",
+      "address": "Tirahan",
+      "filedTo": "Isinampa Sa",
+      "dateFiled": "Petsa ng Pagsumite"
+    },
+
+    "attachments": {
+      "count": "Mga Kalakip ({{count}})"
+    },
+
+    "status": {
+      "read": "NABASA",
+      "hasRead": "Nabasa mo na ang mga tuntunin.",
+      "notRead": "I-scroll para mabasa ang lahat ng tuntunin.",
+      "accept": "Nabasa at sumasang-ayon ako sa mga Tuntunin at Kasunduan."
+    }
+  },
 
 
       "header": {
@@ -1875,7 +2067,7 @@ const resources = {
     "update": "Update",
     "success": "Matagumpay",
     "complaint_resolved": "Nalutas",
-    "complaint_under_review": "Nirereview",
+    "complaint_under_review": "Sinusuri",
     "complaint_update": "Ipinasa",
     "info": "Kasalukuyang Insidente"
   },

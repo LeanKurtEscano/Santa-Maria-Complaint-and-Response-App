@@ -43,6 +43,7 @@ const NotificationCard = React.memo(({
   const router = useRouter();
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const [isTruncatable, setIsTruncatable] = useState(false);
 
   useEffect(() => {
     if (!isNew || hasAnimated.current) return;
@@ -62,23 +63,15 @@ const NotificationCard = React.memo(({
   };
 
   const message = t(config.messageKey, { title: item.title });
-  const [isTruncatable, setIsTruncatable] = useState(false);
+
+  const onTextLayout = useCallback((e: any) => {
+    if (!isTruncatable && e.nativeEvent.lines.length > 2) {
+      setIsTruncatable(true);
+    }
+  }, [isTruncatable]);
 
   return (
     <Animated.View style={{ opacity: fadeAnim }}>
-      {!isTruncatable && (
-        <Text
-          style={{ position: "absolute", opacity: 0, fontSize: 13, lineHeight: 18 }}
-          onTextLayout={(e) => {
-            if (e.nativeEvent.lines.length > 1) {
-              setIsTruncatable(true);
-            }
-          }}
-        >
-          {message}
-        </Text>
-      )}
-
       <TouchableOpacity
         onPress={handlePress}
         activeOpacity={item.complaint_id ? 0.7 : 1}
@@ -108,7 +101,7 @@ const NotificationCard = React.memo(({
           <View className="flex-row items-center justify-between mb-0.5">
             <View className={`px-2 py-0.5 border border-gray-100 rounded-full ${config.badgeClass}`}>
               <Text
-                className={`text-[10px] font-bold  uppercase tracking-wider ${config.badgeTextClass}`}
+                className={`text-[10px] font-bold uppercase tracking-wider ${config.badgeTextClass}`}
               >
                 {t(config.labelKey)}
               </Text>
@@ -125,6 +118,24 @@ const NotificationCard = React.memo(({
           >
             {t(config.titleKey)}
           </Text>
+
+          {/* Hidden measurement text — inside flex-1 to get correct width */}
+          {!isTruncatable && (
+            <Text
+              style={{
+                position: "absolute",
+                opacity: 0,
+                fontSize: 13,
+                lineHeight: 18,
+                left: 0,
+                right: 0,
+              }}
+              numberOfLines={0}
+              onTextLayout={onTextLayout}
+            >
+              {message}
+            </Text>
+          )}
 
           {/* Message — expandable */}
           <Text
@@ -167,7 +178,6 @@ const NotificationCard = React.memo(({
     </Animated.View>
   );
 });
-
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
 const EmptyState = () => {
@@ -336,36 +346,31 @@ const Notifications = () => {
     es.addEventListener("existing_incident", handleEvent("existing_incident"));
 
     es.onopen = () => {
+      
       console.log(`${LOG_TAG} connectSSE() — connection opened ✓`);
       setSseStatus("connected");
     };
 
     es.onerror = async (err: any) => {
-     
-      setSseStatus("disconnected");
-      es.close();
-      eventSourceRef.current = null;
 
-      const is401 = err?.status === 401 || err?.xhrStatus === 401;
+   console.log(`${LOG_TAG} raw SSE error:`, JSON.stringify(err), err);
+  setSseStatus("disconnected");
+  es.close();
+  eventSourceRef.current = null;
 
-      if (is401) {
-        console.log(`${LOG_TAG} SSE 401 — attempting token refresh...`);
-        const newToken = await refreshAccessToken();
+  // react-native-sse surfaces 401 inconsistently — always try a refresh first
+  const newToken = await refreshAccessToken();
 
-        if (!newToken) {
-          console.warn(`${LOG_TAG} Refresh failed — forcing logout`);
-          const { useCurrentUser } = await import('@/store/useCurrentUserStore');
-          useCurrentUser.getState().clearUser();
-          return;
-        }
+  if (!newToken) {
+    console.warn(`${LOG_TAG} Refresh failed — forcing logout`);
+    const { useCurrentUser } = await import('@/store/useCurrentUserStore');
+    useCurrentUser.getState().clearUser();
+    return;
+  }
 
-        console.log(`${LOG_TAG} Token refreshed ✓ — reconnecting SSE`);
-        setTimeout(connectSSE, 500);
-      } else {
-        console.log(`${LOG_TAG} connectSSE() — retrying in 5s...`);
-        setTimeout(connectSSE, 5000);
-      }
-    };
+  console.log(`${LOG_TAG} Token refreshed ✓ — reconnecting SSE`);
+  setTimeout(connectSSE, 500);
+};
 
     eventSourceRef.current = es;
     console.log(`${LOG_TAG} connectSSE() — registered ✓`);
@@ -379,7 +384,7 @@ const Notifications = () => {
       eventSourceRef.current?.close();
       eventSourceRef.current = null;
     };
-  }, []);
+  }, [connectSSE]);
 
   // ── Mark single as read ──────────────────────────────────────────────────
 
@@ -452,6 +457,10 @@ const Notifications = () => {
               Notifications
             </Text>
           </View>
+
+          {/* ── DEBUG: SSE Status Indicator (remove before deploy) ── */}
+
+{/* ── END DEBUG ── */}
 
           <View className="flex-row items-center gap-2.5">
             {unreadCount > 0 && (

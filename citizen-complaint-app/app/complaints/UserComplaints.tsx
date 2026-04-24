@@ -170,19 +170,7 @@ function LoadingState() {
 
 // ─── Filter Modal ─────────────────────────────────────────────────────────────
 
-function FilterModal({
-  visible,
-  onClose,
-  selectedStatuses,
-  onToggleStatus,
-  onClear,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  selectedStatuses: string[];
-  onToggleStatus: (s: string) => void;
-  onClear: () => void;
-}) {
+function FilterModal({ visible, onClose, selectedStatuses, onToggleStatus, onClear }) {
   const { t } = useTranslation();
 
   return (
@@ -202,6 +190,7 @@ function FilterModal({
           </TouchableOpacity>
         </View>
 
+        {/* ── Filter Chips ── */}
         <View className="flex-row flex-wrap gap-2 mb-6">
           {ALL_STATUSES.map((s) => {
             const cfg = getStatusConfig(s);
@@ -210,15 +199,34 @@ function FilterModal({
               <TouchableOpacity
                 key={s}
                 onPress={() => onToggleStatus(s)}
-                className="flex-row items-center gap-1.5 px-3 py-2 rounded-xl border bg-white"
-                style={{ borderColor: active ? THEME.primary : "#e5e7eb" }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: active ? THEME.primary : "#e5e7eb",
+                  backgroundColor: active ? cfg.badge : "#ffffff",
+                }}
               >
-                <View className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 999,
+                    backgroundColor: cfg.dot,
+                  }}
+                />
                 <Text
-                  className="text-sm font-semibold"
-                  style={{ color: active ? "#111827" : "#4b5563" }}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: active ? cfg.text : "#4b5563",
+                  }}
                 >
-                  {cfg.label}
+                  {t(cfg.labelKey)}
                 </Text>
                 {active && <CheckCircle2 size={14} color={THEME.primary} />}
               </TouchableOpacity>
@@ -231,7 +239,7 @@ function FilterModal({
           className="py-3.5 rounded-xl items-center"
           style={{ backgroundColor: THEME.primary }}
         >
-          <Text className="font-bold text-base" style={{ color: "#ffffff" }}>
+          <Text className="font-bold text-base text-white">
             {t("complaints.filter.apply")}
           </Text>
         </TouchableOpacity>
@@ -389,33 +397,45 @@ export default function UserComplaints() {
         </View>
 
         {/* Active Filter Pills */}
-        {selectedStatuses.length > 0 && (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-            {selectedStatuses.map((s) => {
-              const cfg = getStatusConfig(s);
-              return (
-                <TouchableOpacity
-                  key={s}
-                  onPress={() => toggleStatus(s)}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 4,
-                    paddingHorizontal: 8,
-                    paddingVertical: 3,
-                    borderRadius: 20,
-                    alignSelf: "flex-start",
-                  }}
-                  className={cfg.badge}
-                >
-                  <View className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                  <Text className={`text-xs font-semibold ${cfg.text}`}>{cfg.label}</Text>
-                  <XCircle size={10} color="#9ca3af" />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
+       {/* Active Filter Pills */}
+{selectedStatuses.length > 0 && (
+  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+    {selectedStatuses.map((s) => {
+      const cfg = getStatusConfig(s);
+      return (
+        <TouchableOpacity
+          key={s}
+          onPress={() => toggleStatus(s)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 20,
+            alignSelf: "flex-start",
+            backgroundColor: cfg.badge,
+            borderWidth: 1,
+            borderColor: cfg.border,
+          }}
+        >
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 999,
+              backgroundColor: cfg.dot,
+            }}
+          />
+          <Text style={{ fontSize: 12, fontWeight: "600", color: cfg.text }}>
+            {t(cfg.labelKey)}
+          </Text>
+          <XCircle size={10} color={cfg.dot} />
+        </TouchableOpacity>
+      );
+    })}
+  </View>
+)}
       </View>
 
       {/* Content */}

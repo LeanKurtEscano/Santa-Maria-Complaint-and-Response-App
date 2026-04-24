@@ -18,5 +18,6 @@ export const PRESET_TITLE_KEYS: PresetTitle[] = [
   { key: 'complaint.preset.water_supply_issue',    category_id: 27 },
   { key: 'complaint.preset.garbage_collection',    category_id: 28 },
   { key: 'complaint.preset.vandalism',             category_id: 29 },
+  { key: 'complaint.preset.landslide',             category_id: 32 },
   { key: OTHER_KEY,                                category_id: 30 },
 ];

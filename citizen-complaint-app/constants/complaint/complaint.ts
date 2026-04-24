@@ -2,128 +2,76 @@
 
 import { Complaint } from "@/types/complaints/complaint";
 
-export interface StatusConfig {
-  label: string;
+export type StatusConfig = {
+  labelKey: string; // was: label: string
   badge: string;
   text: string;
   dot: string;
   border: string;
-}
-
+};
 export const STATUS_CONFIG: Record<string, StatusConfig> = {
-  // ── Generic ─────────────────────────────────────────────
   submitted: {
-    label: "Submitted",
-    badge: "#EFF6FF",
-    text: "#1D4ED8",
-    dot: "#3B82F6",
-    border: "#BFDBFE",
+    labelKey: "complaintStatus.status.submitted",
+    badge: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6", border: "#BFDBFE",
   },
   forwarded: {
-    label: "Forwarded",
-    badge: "#FFFBEB",
-    text: "#B45309",
-    dot: "#F59E0B",
-    border: "#FDE68A",
+    labelKey: "complaintStatus.status.forwarded",
+    badge: "#FFFBEB", text: "#B45309", dot: "#F59E0B", border: "#FDE68A",
   },
   resolved: {
-    label: "Resolved",
-    badge: "#ECFDF5",
-    text: "#047857",
-    dot: "#10B981",
-    border: "#A7F3D0",
+    labelKey: "complaintStatus.status.resolved",
+    badge: "#ECFDF5", text: "#047857", dot: "#10B981", border: "#A7F3D0",
   },
   rejected: {
-    label: "Rejected",
-    badge: "#FEF2F2",
-    text: "#B91C1C",
-    dot: "#EF4444",
-    border: "#FECACA",
+    labelKey: "complaintStatus.status.rejected",
+    badge: "#FEF2F2", text: "#B91C1C", dot: "#EF4444", border: "#FECACA",
   },
   pending: {
-    label: "Pending",
-    badge: "#F5F3FF",
-    text: "#6D28D9",
-    dot: "#8B5CF6",
-    border: "#DDD6FE",
+    labelKey: "complaintStatus.status.pending",
+    badge: "#F5F3FF", text: "#6D28D9", dot: "#8B5CF6", border: "#DDD6FE",
   },
-
-  // ── Barangay ────────────────────────────────────────────
   reviewed_by_barangay: {
-    label: "Reviewed by Barangay",
-    badge: "#EFF6FF",   // BLUE
-    text: "#1D4ED8",
-    dot: "#3B82F6",
-    border: "#BFDBFE",
+    labelKey: "complaintStatus.status.reviewed_by_barangay",
+    badge: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6", border: "#BFDBFE",
   },
   resolved_by_barangay: {
-    label: "Resolved by Barangay",
-    badge: "#ECFDF5",   // GREEN
-    text: "#047857",
-    dot: "#10B981",
-    border: "#A7F3D0",
+    labelKey: "complaintStatus.status.resolved_by_barangay",
+    badge: "#ECFDF5", text: "#047857", dot: "#10B981", border: "#A7F3D0",
   },
-
-  // ── LGU ─────────────────────────────────────────────────
   forwarded_to_lgu: {
-    label: "Forwarded to LGU",
-    badge: "#FFFBEB",
-    text: "#B45309",
-    dot: "#F59E0B",
-    border: "#FDE68A",
+    labelKey: "complaintStatus.status.forwarded_to_lgu",
+    badge: "#FFFBEB", text: "#B45309", dot: "#F59E0B", border: "#FDE68A",
   },
   reviewed_by_lgu: {
-    label: "Reviewed by LGU",
-    badge: "#EFF6FF",   // BLUE
-    text: "#1D4ED8",
-    dot: "#3B82F6",
-    border: "#BFDBFE",
+    labelKey: "complaintStatus.status.reviewed_by_lgu",
+    badge: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6", border: "#BFDBFE",
   },
   resolved_by_lgu: {
-    label: "Resolved by LGU",
-    badge: "#ECFDF5",   // GREEN
-    text: "#047857",
-    dot: "#10B981",
-    border: "#A7F3D0",
+    labelKey: "complaintStatus.status.resolved_by_lgu",
+    badge: "#ECFDF5", text: "#047857", dot: "#10B981", border: "#A7F3D0",
   },
   rejected_by_lgu: {
-    label: "Rejected by LGU",
-    badge: "#FEF2F2",   // RED
-    text: "#B91C1C",
-    dot: "#EF4444",
-    border: "#FECACA",
+    labelKey: "complaintStatus.status.rejected_by_lgu",
+    badge: "#FEF2F2", text: "#B91C1C", dot: "#EF4444", border: "#FECACA",
   },
-
-  // ── Department ──────────────────────────────────────────
   forwarded_to_department: {
-    label: "Forwarded to Dept.",
-    badge: "#FFFBEB",
-    text: "#B45309",
-    dot: "#F59E0B",
-    border: "#FDE68A",
+    labelKey: "complaintStatus.status.forwarded_to_department",
+    badge: "#FFFBEB", text: "#B45309", dot: "#F59E0B", border: "#FDE68A",
   },
   reviewed_by_department: {
-    label: "Under Dept. Review",
-    badge: "#EFF6FF",   // BLUE
-    text: "#1D4ED8",
-    dot: "#3B82F6",
-    border: "#BFDBFE",
+    labelKey: "complaintStatus.status.reviewed_by_department",
+    badge: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6", border: "#BFDBFE",
   },
   resolved_by_department: {
-    label: "Resolved by Dept.",
-    badge: "#ECFDF5",   // GREEN
-    text: "#047857",
-    dot: "#10B981",
-    border: "#A7F3D0",
+    labelKey: "complaintStatus.status.resolved_by_department",
+    badge: "#ECFDF5", text: "#047857", dot: "#10B981", border: "#A7F3D0",
   },
   rejected_by_department: {
-    label: "Rejected by Dept.",
-    badge: "#FEF2F2",   // RED
-    text: "#B91C1C",
-    dot: "#EF4444",
-    border: "#FECACA",
+    labelKey: "complaintStatus.status.rejected_by_department",
+    badge: "#FEF2F2", text: "#B91C1C", dot: "#EF4444", border: "#FECACA",
   },
 };
+
 export const ALL_STATUSES = [
   "submitted",
   "reviewed_by_barangay",
