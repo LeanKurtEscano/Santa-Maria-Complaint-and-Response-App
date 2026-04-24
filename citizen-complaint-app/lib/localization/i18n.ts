@@ -514,6 +514,21 @@ const resources = {
     }
   },
 
+  chatbot: {
+    "ask": "Ask a question?",
+     "info": "Ask me about Santa Maria, Laguna — complaints, services, documents, and more.",
+     "greeting": "Hello! I'm MaryBot 👋\n\nYour FAQ assistant for the Municipality of Santa Maria, Laguna.\n\nHow can I help you?",
+      "frequentQuestions": "Frequently Asked Questions",
+      "suggestions": {
+      "howToFileComplaint": "📋 How to file a complaint?",
+      "complaintStatus": "🔍 Complaint status",
+      "barangayClearance": "📄 Barangay clearance",
+      "municipalServices": "🏛️ Municipal services",
+      "officeHours": "⏰ Office hours",
+      "contactNumbers": "📞 Contact numbers"
+    }
+  },
+
 
       "complaintsScreen": {
         "header": {
@@ -1625,6 +1640,21 @@ const resources = {
            "errors" : {
           "screenTitle": "Hindi Ma-load ang Home Screen",
         }
+      },
+
+      chatbot:{
+        "ask": "Tanong?",
+        "info": "Tanungin mo ako tungkol sa Santa Maria, Laguna — reklamo, serbisyo, dokumento, at higit pa",
+        "greeting": "Kamusta! Ako si MaryBot 👋\n\nAng iyong FAQ assistant para sa Munisipalidad ng Santa Maria, Laguna.\n\nAno ang maipaglilingkod ko sa iyo?",
+         "frequentQuestions": "Mga Madalas na Tanong",
+          "suggestions": {
+      "howToFileComplaint": "📋 Paano mag-file ng reklamo?",
+      "complaintStatus": "🔍 Status ng aking reklamo",
+      "barangayClearance": "📄 Barangay clearance",
+      "municipalServices": "🏛️ Mga serbisyo ng munisipyo",
+      "officeHours": "⏰ Oras ng opisina",
+      "contactNumbers": "📞 Mga contact numbers"
+    }
       },
 
      "emergency": {

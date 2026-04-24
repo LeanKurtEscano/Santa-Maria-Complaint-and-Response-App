@@ -23,6 +23,7 @@ import {
   ClipboardList,
   FileText,
   HelpCircle,
+  Phone,
   Send,
   Sparkles,
   Square,
@@ -37,7 +38,8 @@ import { getFaqReply } from '@/utils/general/chat';
 import { SUGGESTIONS } from '@/constants/general/chat';
 import { Role, Message } from '@/types/general/chat';
 import { THEME } from '@/constants/theme';
-
+import { useTranslation } from 'react-i18next';
+import { detectIntents, TextRun, RICH_REGEX,ActionIntent } from '@/constants/chatbot/rule-based-nlp';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
 
@@ -46,9 +48,6 @@ const formatTime = (d: Date) =>
 
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-// ─────────────────────────────────────────────
-// Network status hook
-// ─────────────────────────────────────────────
 
 type ConnectionQuality = 'online' | 'slow' | 'offline';
 
@@ -85,9 +84,7 @@ function useConnectionQuality(): ConnectionQuality {
   return quality;
 }
 
-// ─────────────────────────────────────────────
-// Connection banner
-// ─────────────────────────────────────────────
+
 
 function ConnectionBanner({ quality }: { quality: ConnectionQuality }) {
   const slideAnim = useRef(new Animated.Value(-60)).current;
@@ -147,9 +144,7 @@ function ConnectionBanner({ quality }: { quality: ConnectionQuality }) {
   );
 }
 
-// ─────────────────────────────────────────────
-// Pulsing status dot
-// ─────────────────────────────────────────────
+
 
 function PulsingDot({ color }: { color: string }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -179,44 +174,6 @@ function PulsingDot({ color }: { color: string }) {
   );
 }
 
-// ─────────────────────────────────────────────
-// Intent detection helpers
-// ─────────────────────────────────────────────
-
-type ActionIntent = 'track' | 'file';
-
-const TRACK_PATTERNS = [
-  /track\b.*complaint/i, /status\b.*complaint/i, /complaint\b.*status/i,
-  /suriin\b.*reklamo/i, /tingnan\b.*reklamo/i, /status\b.*ng\b.*reklamo/i,
-  /reklamo\b.*status/i, /alamin\b.*status/i, /makita\b.*reklamo/i,
-  /i-track/i, /i-check\b.*reklamo/i,
-];
-
-const FILE_PATTERNS = [
-  /how\b.*file\b.*complaint/i, /submit\b.*complaint/i, /make\b.*complaint/i,
-  /lodge\b.*complaint/i, /mag-reklamo/i, /paano\b.*magreklamo/i,
-  /paano\b.*mag.reklamo/i, /mag-file\b.*ng\b.*reklamo/i, /i-file\b.*reklamo/i,
-  /isumite\b.*reklamo/i, /magsumite\b.*ng\b.*reklamo/i, /magsampa\b.*ng\b.*reklamo/i,
-];
-
-function detectIntents(text: string): ActionIntent[] {
-  const intents: ActionIntent[] = [];
-  if (TRACK_PATTERNS.some((p) => p.test(text))) intents.push('track');
-  if (FILE_PATTERNS.some((p) => p.test(text))) intents.push('file');
-  return intents;
-}
-
-// ─────────────────────────────────────────────
-// Rich text parser
-// ─────────────────────────────────────────────
-
-type TextRun =
-  | { type: 'text'; value: string }
-  | { type: 'bold'; value: string }
-  | { type: 'url'; value: string };
-
-const RICH_REGEX = /\*\*(.+?)\*\*|https?:\/\/[^\s<>"')\]]+/g;
-
 function parseTextRuns(text: string): TextRun[] {
   const runs: TextRun[] = [];
   let last = 0;
@@ -233,9 +190,6 @@ function parseTextRuns(text: string): TextRun[] {
   return runs;
 }
 
-// ─────────────────────────────────────────────
-// Action CTA button
-// ─────────────────────────────────────────────
 
 interface ActionButtonProps {
   intent: ActionIntent;
@@ -243,6 +197,9 @@ interface ActionButtonProps {
 }
 
 function ActionButton({ intent, onPress }: ActionButtonProps) {
+  if (intent === 'emergency') {
+    return <EmergencyButton onPress={onPress} />;
+  }
   const isTrack = intent === 'track';
   return (
     <TouchableOpacity
@@ -270,9 +227,32 @@ function ActionButton({ intent, onPress }: ActionButtonProps) {
   );
 }
 
-// ─────────────────────────────────────────────
-// Typing animation
-// ─────────────────────────────────────────────
+function EmergencyButton({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.78}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 6,
+        alignSelf: 'flex-start',
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 12,
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1.5,
+        borderColor: '#FECACA',
+      }}
+    >
+      <Phone size={14} color="#DC2626" />
+      <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>
+        Call for an Emergency
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 function TypingDots() {
   const d0 = useRef(new Animated.Value(0)).current;
@@ -308,9 +288,6 @@ function TypingDots() {
   );
 }
 
-// ─────────────────────────────────────────────
-// Message bubble
-// ─────────────────────────────────────────────
 
 function MessageBubble({
   msg,
@@ -322,10 +299,10 @@ function MessageBubble({
   msg: Message;
   showAvatar: boolean;
   isLast: boolean;
-  
+
   onTextUpdate?: (id: string, text: string) => void;
   onAction: (intent: ActionIntent) => void;
-  
+
 }) {
   const isUser = msg.role === 'user';
   const slideAnim = useRef(new Animated.Value(isUser ? 18 : -18)).current;
@@ -347,12 +324,12 @@ function MessageBubble({
 
     let i = 0;
     const tick = () => {
-    
+
 
       i++;
-   
+
       setDisplayedText(msg.text.slice(0, i));
-onTextUpdate?.(msg.id, msg.text.slice(0, i));
+      onTextUpdate?.(msg.id, msg.text.slice(0, i));
 
       if (i < msg.text.length) {
         const ch = msg.text[i - 1];
@@ -451,20 +428,20 @@ onTextUpdate?.(msg.id, msg.text.slice(0, i));
           style={
             isUser
               ? {
-                  backgroundColor: THEME.primary,
-                  borderRadius: 20, borderBottomRightRadius: 5,
-                  paddingHorizontal: 16, paddingVertical: 10,
-                  shadowColor: THEME.primaryDark, shadowOpacity: 0.3,
-                  shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4,
-                }
+                backgroundColor: THEME.primary,
+                borderRadius: 20, borderBottomRightRadius: 5,
+                paddingHorizontal: 16, paddingVertical: 10,
+                shadowColor: THEME.primaryDark, shadowOpacity: 0.3,
+                shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4,
+              }
               : {
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: 20, borderBottomLeftRadius: 5,
-                  paddingHorizontal: 16, paddingVertical: 10,
-                  borderWidth: 1, borderColor: '#F1F5F9',
-                  shadowColor: '#94a3b8', shadowOpacity: 0.12,
-                  shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
-                }
+                backgroundColor: '#FFFFFF',
+                borderRadius: 20, borderBottomLeftRadius: 5,
+                paddingHorizontal: 16, paddingVertical: 10,
+                borderWidth: 1, borderColor: '#F1F5F9',
+                shadowColor: '#94a3b8', shadowOpacity: 0.12,
+                shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
+              }
           }
         >
           {renderContent()}
@@ -500,10 +477,6 @@ onTextUpdate?.(msg.id, msg.text.slice(0, i));
   );
 }
 
-// ─────────────────────────────────────────────
-// Supporting UI
-// ─────────────────────────────────────────────
-
 function SuggestionChip({ text, onPress, disabled }: { text: string; onPress: () => void; disabled?: boolean }) {
   return (
     <TouchableOpacity
@@ -538,6 +511,7 @@ function DateSeparator() {
 }
 
 function BotInfo() {
+  const { t } = useTranslation();
   return (
     <View
       style={{
@@ -556,30 +530,13 @@ function BotInfo() {
           Mary bot FAQ Assistant
         </Text>
         <Text style={{ fontSize: 11, color: THEME.primary, marginTop: 1 }}>
-          Tanungin mo ako tungkol sa Santa Maria, Laguna — reklamo, serbisyo, dokumento, at higit pa.
+          {t('chatbot.info')}
         </Text>
       </View>
     </View>
   );
 }
 
-// ─────────────────────────────────────────────
-// Initial messages
-// ─────────────────────────────────────────────
-
-const makeInitialMessages = (): Message[] => [
-  {
-    id: uid(),
-    role: 'bot',
-    text: 'Kamusta! Ako si SantaBot 👋\n\nAng iyong FAQ assistant para sa Munisipalidad ng Santa Maria, Laguna.\n\nAno ang maipaglilingkod ko sa iyo?',
-    timestamp: new Date(),
-    streaming: false,
-  },
-];
-
-// ─────────────────────────────────────────────
-// Main modal
-// ─────────────────────────────────────────────
 
 interface ChatbotModalProps {
   visible: boolean;
@@ -590,9 +547,21 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const connectionQuality = useConnectionQuality();
+  const { t } = useTranslation();
 
   const isOffline = connectionQuality === 'offline';
   const isSlow = connectionQuality === 'slow';
+
+  const makeInitialMessages = (): Message[] => [
+    {
+      id: uid(),
+      role: 'bot',
+      text: t('chatbot.greeting'),
+      timestamp: new Date(),
+      streaming: false,
+    },
+  ];
+
 
   const [messages, setMessages] = useState<Message[]>(makeInitialMessages);
   const [input, setInput] = useState('');
@@ -624,7 +593,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     }
   }, []);
 
-  // ─── Modal open/close ─────────────────────────────────────────────────────
   useEffect(() => {
     if (visible) {
       setSessionId(uuidv4());
@@ -657,6 +625,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
       const routes: Record<ActionIntent, string> = {
         track: '/complaints/UserComplaints',
         file: '/(tabs)/Complaints',
+        emergency: '/(tabs)/Emergency',
       };
       const route = routes[intent];
       if (!route) return;
@@ -666,29 +635,29 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     [router, onClose]
   );
 
-const handleCancel = useCallback(() => {
-  generationRef.current += 1;
+  const handleCancel = useCallback(() => {
+    generationRef.current += 1;
 
-  if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
-  if (streamFinishRef.current) { clearTimeout(streamFinishRef.current); streamFinishRef.current = null; }
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    if (streamFinishRef.current) { clearTimeout(streamFinishRef.current); streamFinishRef.current = null; }
 
-  setIsTyping(false);
-  setIsStreaming(false);
+    setIsTyping(false);
+    setIsStreaming(false);
 
-  if (currentBotIdRef.current) {
-    const idToFreeze = currentBotIdRef.current;
-    const partial = displayedTextRef.current;
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === idToFreeze ? { ...m, streaming: false, text: partial } : m
-      )
-    );
-    currentBotIdRef.current = null;
-    displayedTextRef.current = '';
-  }
+    if (currentBotIdRef.current) {
+      const idToFreeze = currentBotIdRef.current;
+      const partial = displayedTextRef.current;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === idToFreeze ? { ...m, streaming: false, text: partial } : m
+        )
+      );
+      currentBotIdRef.current = null;
+      displayedTextRef.current = '';
+    }
 
-  isSendingRef.current = false; // ✅ add this
-}, []);
+    isSendingRef.current = false; // ✅ add this
+  }, []);
 
   // ── Send message ──────────────────────────────────────────────────────────
   const sendMessage = useCallback(
@@ -847,19 +816,14 @@ const handleCancel = useCallback(() => {
                     {isOffline
                       ? 'Walang koneksyon'
                       : isSlow
-                      ? 'Mabagal ang koneksyon'
-                      : isBusy
-                      ? 'Nagtytype...'
-                      : 'FAQ · Santa Maria, Laguna'}
+                        ? 'Mabagal ang koneksyon'
+                        : isBusy
+                          ? 'Nagtytype...'
+                          : 'FAQ · Santa Maria, Laguna'}
                   </Text>
                 </View>
 
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}
-                >
-                  <HelpCircle size={20} color="#94A3B8" />
-                </TouchableOpacity>
+
               </View>
             </View>
 
@@ -889,18 +853,18 @@ const handleCancel = useCallback(() => {
                 const isLast = !next || next.role !== item.role;
                 const showAvatar = item.role === 'bot' && isLast;
                 return (
-                 
+
                   <MessageBubble
-  msg={item}
-  showAvatar={showAvatar}
-  isLast={isLast}
-  onAction={handleAction}
-  onTextUpdate={(id, text) => {
-    if (id === currentBotIdRef.current) {
-      displayedTextRef.current = text;
-    }
-  }}
-/>
+                    msg={item}
+                    showAvatar={showAvatar}
+                    isLast={isLast}
+                    onAction={handleAction}
+                    onTextUpdate={(id, text) => {
+                      if (id === currentBotIdRef.current) {
+                        displayedTextRef.current = text;
+                      }
+                    }}
+                  />
                 );
               }}
               ListFooterComponent={
@@ -950,7 +914,7 @@ const handleCancel = useCallback(() => {
                     paddingHorizontal: 16, marginBottom: 8,
                   }}
                 >
-                  Mga Madalas na Tanong
+                  {t('chatbot.frequentQuestions')}
                 </Text>
                 <FlatList
                   data={SUGGESTIONS}
@@ -960,8 +924,8 @@ const handleCancel = useCallback(() => {
                   contentContainerStyle={{ paddingHorizontal: 16 }}
                   renderItem={({ item }) => (
                     <SuggestionChip
-                      text={item}
-                      onPress={() => sendMessage(item, true)}
+                      text={t(`chatbot.suggestions.${item}`)}
+                      onPress={() => sendMessage(t(`chatbot.suggestions.${item}`), true)}
                       disabled={isBusy || isOffline}
                     />
                   )}
@@ -995,10 +959,10 @@ const handleCancel = useCallback(() => {
                       isOffline
                         ? 'Walang koneksyon sa internet...'
                         : isSlow
-                        ? 'Mabagal ang koneksyon...'
-                        : isBusy
-                        ? 'Naghihintay sa sagot...'
-                        : 'Magtanong tungkol sa Santa Maria...'
+                          ? 'Mabagal ang koneksyon...'
+                          : isBusy
+                            ? 'Naghihintay sa sagot...'
+                            : 'Magtanong tungkol sa Santa Maria...'
                     }
                     placeholderTextColor={isOffline ? '#EF4444' : '#94A3B8'}
                     multiline

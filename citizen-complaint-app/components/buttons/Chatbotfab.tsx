@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing, TouchableOpacity, View, Text } from 'react-native';
 import { Bot } from 'lucide-react-native';
 import { THEME } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
 
 interface ChatbotFABProps {
   onPress: () => void;
@@ -85,7 +86,7 @@ export default function ChatbotFAB({
   });
 
   const iconRotate = iconSway.interpolate({ inputRange: [-1, 1], outputRange: ['-8deg', '8deg'] });
-
+  const { t } = useTranslation();
   return (
     <Animated.View
       style={{
@@ -113,7 +114,7 @@ export default function ChatbotFAB({
               <View className="flex-row items-center gap-1.5">
                 <BlinkDot />
                 <Text style={{ color: THEME.primaryDark, fontSize: 14, fontWeight: '700', letterSpacing: 0.5 }}>
-                  Tanong?
+                  {t('chatbot.ask')}
                 </Text>
               </View>
             </View>

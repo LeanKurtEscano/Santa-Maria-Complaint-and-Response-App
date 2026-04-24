@@ -216,7 +216,7 @@ export default function EmergencyScreen() {
                 elevation: 3,
               }}
             >
-            {/* Icon + agency name */}
+              {/* Icon + agency name */}
               <View className="flex-row items-center gap-x-4 mb-4">
                 <View className={`w-14 h-14 rounded-full items-center justify-center ${theme.iconBg}`}>
                   <theme.Icon size={28} color={theme.iconColor} />
@@ -257,12 +257,10 @@ export default function EmergencyScreen() {
                     }
                     activeOpacity={0.82}
                   >
-                    <View className="flex-row items-center w-48">
-                      <Phone size={18} color="#fff" />
-                      <Text className="text-[15px] font-bold text-white ml-2">
-                        {formatPHPhoneForUI(contact.contact_number)}
-                      </Text>
-                    </View>
+                    <Phone size={18} color="#fff" />
+                    <Text className="text-[15px] font-bold text-white ml-2">
+                      {formatPHPhoneForUI(contact.contact_number)}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
