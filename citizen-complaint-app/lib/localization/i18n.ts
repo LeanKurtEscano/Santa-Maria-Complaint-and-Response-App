@@ -926,7 +926,53 @@ const resources = {
     "rejected_by_barangay": "Your complaint regarding '{{title}}' has been rejected by the Barangay due to insufficient information or other reasons. Please review the details and consider resubmitting a new complaint.",
     "info": "Your complaint is already part of an existing incident. Similar complaints have already been submitted for this incident."
   }
-}
+}, "events": {
+    "upcomingEvents": "Upcoming Events",
+    "seeAll": "See All",
+    "loading": "Loading events…",
+    "retry": "Retry",
+    "failedToLoad": "Failed to load events",
+    "community": "COMMUNITY",
+    "details": "Details",
+    "noEvents": "No upcoming events right now.\nCheck back soon!"
+  }
+
+  ,
+   "viewAllEvents": {
+    "title": "Events",
+    "subtitle": "Community calendar",
+    "searchPlaceholder": "Search events or locations…",
+    "loading": "Loading events…",
+    "noEventsYet": "No events yet",
+    "noEventsMessage": "Check back soon for upcoming community events.",
+    "noResults": "No results found",
+    "noResultsMessage": "No events matched \"{{query}}\".",
+    "clearSearch": "Clear Search",
+    "event": "event",
+    "eventsCount": "events",
+    "forQuery": "for \"{{query}}\""
+  },
+
+   "eventDetails": {
+    "title": "Event Details",
+    "loading": "Loading event…",
+    "goBack": "Go Back",
+
+    "info": {
+      "title": "Event Information",
+      "date": "Date",
+      "time": "Time",
+      "location": "Location"
+    },
+
+    "about": "About this Event",
+
+    "media": {
+      "noPhotos": "No photos for this event",
+      "attached": "{{count}} photo attached",
+      "attached_plural": "{{count}} photos attached"
+    }
+  }
     
 
 
@@ -1851,7 +1897,7 @@ const resources = {
     "rejected_by_department": "Ang iyong reklamo '{{title}}' ay hindi tinanggap ng Department. Mangyaring suriin ang mga detalye at subukan muli.",
     "rejected_by_barangay": "Ang iyong reklamo '{{title}}' ay hindi tinanggap ng Barangay. Mangyaring suriin ang mga detalye at subukan muli.",
     "update": "Na-update na ang iyong reklamo.",
-    "success": "Ang iyong reklamo '{{title}}' ay matagumpay na naresolva.",
+    "success": "Ang iyong reklamo '{{title}}' ay matagumpay na naresolba.",
     "complaint_resolved": "Ang iyong reklamo na '{{title}}' ay nalutas na.",
     "complaint_under_review": "Ang iyong reklamo na '{{title}}' ay kasalukuyang sinusuri.",
     "complaint_update": "Ang iyong reklamo ay ipinasa na sa departamento para sa karagdagang pagproseso.",
@@ -1859,9 +1905,53 @@ const resources = {
   }
 }, 
 
+"events": {
+    "upcomingEvents": "Mga Paparating na Event",
+    "seeAll": "Tingnan Lahat",
+    "loading": "Naglo-load ng events…",
+    "retry": "Subukan Muli",
+    "failedToLoad": "Hindi ma-load ang mga event",
+    "community": "KOMUNIDAD",
+    "details": "Detalye",
+    "noEvents": "Walang paparating na event sa ngayon.\nBumalik muli mamaya!"
+  },
 
 
+   "viewAllEvents": {
+    "title": "Mga Event",
+    "subtitle": "Kalendaryo ng komunidad",
+    "searchPlaceholder": "Maghanap ng event o lokasyon…",
+    "loading": "Naglo-load ng events…",
+    "noEventsYet": "Walang event sa ngayon",
+    "noEventsMessage": "Bumalik muli para sa mga paparating na community event.",
+    "noResults": "Walang nahanap",
+    "noResultsMessage": "Walang event na tumugma sa \"{{query}}\".",
+    "clearSearch": "I-clear ang Search",
+    "event": "event",
+    "eventsCount": "mga event",
+    "forQuery": "para sa \"{{query}}\""
+  },
 
+   "eventDetails": {
+    "title": "Mga Detalye ng Event",
+    "loading": "Ikinakarga ang event…",
+    "goBack": "Bumalik",
+
+    "info": {
+      "title": "Impormasyon ng Event",
+      "date": "Petsa",
+      "time": "Oras",
+      "location": "Lokasyon"
+    },
+
+    "about": "Tungkol sa Event na Ito",
+
+    "media": {
+      "noPhotos": "Walang larawan para sa event na ito",
+      "attached": "{{count}} larawan naka-attach",
+      "attached_plural": "{{count}} mga larawan naka-attach"
+    }
+  }
 
     },
   },

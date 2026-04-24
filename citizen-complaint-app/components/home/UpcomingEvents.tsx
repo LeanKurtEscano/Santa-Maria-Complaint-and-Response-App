@@ -4,7 +4,7 @@ import { CalendarDays, ChevronRight, MapPin, ArrowRight, Clock, RefreshCw, WifiO
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { THEME } from '@/constants/theme';
-
+import { useTranslation } from 'react-i18next';
 const CARD_WIDTH = 260;
 const CARD_GAP   = 14;
 const CARD_STEP  = CARD_WIDTH + CARD_GAP;
@@ -36,6 +36,7 @@ const ACCENTS = [
 ];
 function EventCard({ event, index, onPress }: { event: EventData; index: number; onPress: () => void }) {
   const accent    = ACCENTS[index % ACCENTS.length];
+ 
   const { month, day, weekday, time } = formatEventDate(event.date);
   const thumbnail = getThumbnail(event.media);
   const hasMedia  = !!thumbnail;
@@ -144,6 +145,7 @@ function StripError({ onRetry }: { onRetry: () => void }) {
 export function UpcomingEventsStrip({ data: events = [], isLoading, isError, refetch }: { data?: EventData[]; isLoading: boolean; isError: boolean; refetch: () => void }) {
   const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
+   const {t} = useTranslation();
 
   const scrollX      = useRef(new Animated.Value(0)).current;
   const flatListRef  = useRef<any>(null);
@@ -190,10 +192,10 @@ export function UpcomingEventsStrip({ data: events = [], isLoading, isError, ref
           <View style={{ backgroundColor: THEME.primaryDark, borderRadius: 12, padding: 8 }}>
             <CalendarDays size={16} color="#fff" />
           </View>
-          <Text style={{ color: '#0F172A', fontSize: 16, fontWeight: '800' }}>Upcoming Events</Text>
+          <Text style={{ color: '#0F172A', fontSize: 16, fontWeight: '800' }}>{t('events.upcomingEvents')}</Text>
         </View>
         <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/event/events')} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.primary }}>See All</Text>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: THEME.primary }}>{t('events.seeAll')}</Text>
           <ChevronRight size={13} color={THEME.primary} />
         </TouchableOpacity>
       </View>
@@ -201,14 +203,14 @@ export function UpcomingEventsStrip({ data: events = [], isLoading, isError, ref
       {isLoading ? (
         <View style={{ height: 260, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
           <ActivityIndicator color={THEME.primary} />
-          <Text style={{ color: '#64748B', fontSize: 13 }}>Loading events…</Text>
+          <Text style={{ color: '#64748B', fontSize: 13 }}>{t('events.loading')}</Text>
         </View>
       ) : isError ? (
         <StripError onRetry={refetch} />
       ) : events.length === 0 ? (
         <View style={{ height: 110, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 }}>
           <Text style={{ color: '#64748B', fontSize: 14, fontWeight: '500', textAlign: 'center' }}>
-            No upcoming events right now.{'\n'}Check back soon!
+            {t('events.noEvents')}
           </Text>
         </View>
       ) : (

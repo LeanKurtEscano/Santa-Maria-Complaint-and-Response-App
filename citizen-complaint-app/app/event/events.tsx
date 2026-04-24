@@ -11,6 +11,7 @@ import { eventApiClient } from '@/lib/client/event';
 import ErrorScreen from '@/screen/general/ErrorScreen';
 import { getEventErrorType } from '@/utils/event/eventError';
 import { THEME } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
 interface EventMedia { id: number; media_url: string; media_type: string; uploaded_at: string; }
 interface EventData  { id: number; event_name: string; description?: string; date: string; location?: string; media: EventMedia[]; }
 
@@ -152,6 +153,7 @@ export default function EventsScreen() {
   const [query, setQuery]     = useState('');
   const [focused, setFocused] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const {t} = useTranslation();
 
   const { data: events = [], isLoading, isError, error, refetch, isFetching } = useQuery<EventData[]>({
     queryKey: ['events'],
@@ -186,8 +188,8 @@ export default function EventsScreen() {
             <ChevronLeft size={18} color="#1E293B" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: '#0F172A', fontSize: 17, fontWeight: '700', letterSpacing: -0.3 }}>Events</Text>
-            <Text style={{ color: '#64748B', fontSize: 12, marginTop: 1 }}>Community calendar</Text>
+            <Text style={{ color: '#0F172A', fontSize: 17, fontWeight: '700', letterSpacing: -0.3 }}>{t('viewAllEvents.title')}</Text>
+            <Text style={{ color: '#64748B', fontSize: 12, marginTop: 1 }}>{t('viewAllEvents.subtitle')}</Text>
           </View>
           {!isLoading && !isError && (
             <View style={{ backgroundColor: THEME.primaryDark, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 }}>
@@ -210,7 +212,7 @@ export default function EventsScreen() {
               <Search size={15} color={focused ? THEME.primary : '#94A3B8'} />
               <TextInput
                 style={{ flex: 1, paddingVertical: 11, fontSize: 13, color: '#0F172A' }}
-                placeholder="Search events or locations…"
+                placeholder={t('viewAllEvents.searchPlaceholder')}
                 placeholderTextColor="#94A3B8"
                 value={query}
                 onChangeText={setQuery}
@@ -231,7 +233,7 @@ export default function EventsScreen() {
       {isLoading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
           <ActivityIndicator color={THEME.primary} size="large" />
-          <Text style={{ color: '#64748B', fontSize: 13 }}>Loading events…</Text>
+          <Text style={{ color: '#64748B', fontSize: 13 }}>{t('viewAllEvents.loading')}</Text>
         </View>
       ) : isError ? (
         <ErrorScreen
@@ -249,15 +251,15 @@ export default function EventsScreen() {
           </View>
           <View style={{ alignItems: 'center', gap: 4 }}>
             <Text style={{ color: '#0F172A', fontSize: 15, fontWeight: '600' }}>
-              {query ? 'No results found' : 'No events yet'}
+              {query ? t('viewAllEvents.noResults') : t('viewAllEvents.noEventsYet')}
             </Text>
             <Text style={{ color: '#64748B', fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
-              {query ? `No events matched "${query}".` : 'Check back soon for upcoming community events.'}
+              {query ? t('viewAllEvents.noResultsMessage', { query }) : t('viewAllEvents.noEventsMessage')}
             </Text>
           </View>
           {query ? (
             <TouchableOpacity onPress={() => setQuery('')} style={{ backgroundColor: THEME.primary, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 }}>
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Clear Search</Text>
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>{t('viewAllEvents.clearSearch')}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -272,7 +274,7 @@ export default function EventsScreen() {
           )}
           ListHeaderComponent={
             <Text style={{ paddingHorizontal: 16, marginBottom: 12, color: '#64748B', fontSize: 11, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase' }}>
-              {filtered.length} {filtered.length === 1 ? 'event' : 'events'}{query ? ` for "${query}"` : ''}
+              {t('viewAllEvents.forQuery', { query: query })}
             </Text>
           }
         />

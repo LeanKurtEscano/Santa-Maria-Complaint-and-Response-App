@@ -11,6 +11,7 @@ import { eventApiClient } from '@/lib/client/event';
 import ErrorScreen from '@/screen/general/ErrorScreen';
 import { getEventErrorType } from '@/utils/event/eventError';
 import { THEME } from '@/constants/theme';
+import { useTranslation } from 'react-i18next';
 const { width: SW } = Dimensions.get('window');
 
 interface EventMedia { id: number; media_url: string; media_type: string; uploaded_at: string; }
@@ -100,6 +101,7 @@ export default function EventDetailScreen() {
   const { id }  = useLocalSearchParams<{ id: string }>();
   const router  = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const { t } = useTranslation();
 
   const { data: event, isLoading, isError, error, refetch, isFetching } = useQuery<EventData>({
     queryKey: ['event', id],
@@ -123,10 +125,10 @@ export default function EventDetailScreen() {
   if (isLoading) return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       <StatusBar barStyle="dark-content" />
-      <NavBar onBack={() => router.back()} title="Event Details" />
+      <NavBar onBack={() => router.back()} title={t('eventDetails.title')} />
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <ActivityIndicator color={THEME.primary} size="large" />
-        <Text style={{ color: '#64748B', fontSize: 13 }}>Loading event…</Text>
+        <Text style={{ color: '#64748B', fontSize: 13 }}>{t('eventDetails.loading')}</Text>
       </View>
     </View>
   );
@@ -135,14 +137,14 @@ export default function EventDetailScreen() {
   if (isError || !event) return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       <StatusBar barStyle="dark-content" />
-      <NavBar onBack={() => router.back()} title="Event Details" />
+      <NavBar onBack={() => router.back()} title={t('eventDetails.title')} />
       <ErrorScreen
         type={errorType}
         message={errorMessage}
         onRetry={refetch}
         retryLoading={isFetching}
         fullScreen={false}
-        secondaryAction={{ label: 'Go Back', onPress: () => router.back() }}
+        secondaryAction={{ label: t('eventDetails.goBack'), onPress: () => router.back() }}
       />
     </View>
   );
@@ -154,7 +156,7 @@ export default function EventDetailScreen() {
   return (
     <Animated.View style={{ flex: 1, backgroundColor: '#fff', opacity: fadeAnim }}>
       <StatusBar barStyle="dark-content" />
-      <NavBar onBack={() => router.back()} title="Event Details" />
+      <NavBar onBack={() => router.back()} title={t('eventDetails.title')} />
 
       <ScrollView showsVerticalScrollIndicator={false} bounces>
 
@@ -183,18 +185,18 @@ export default function EventDetailScreen() {
         {/* Info section */}
         <View style={{ backgroundColor: '#fff', paddingHorizontal: 20, marginTop: 8 }}>
           <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, paddingTop: 16, paddingBottom: 4 }}>
-            Event Information
+            {t('eventDetails.info.title')}
           </Text>
-          <DetailRow icon={CalendarDays} label="Date"     value={full} />
-          <DetailRow icon={Clock}        label="Time"     value={time} />
-          {event.location && <DetailRow icon={MapPin} label="Location" value={event.location} />}
+          <DetailRow icon={CalendarDays} label={t('eventDetails.info.date')}     value={full} />
+          <DetailRow icon={Clock}        label={t('eventDetails.info.time')}     value={time} />
+          {event.location && <DetailRow icon={MapPin} label={t('eventDetails.info.location')} value={event.location} />}
         </View>
 
         {/* About */}
         {event.description && (
           <View style={{ backgroundColor: '#fff', paddingHorizontal: 20, paddingBottom: 24, marginTop: 8 }}>
             <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, paddingTop: 16, paddingBottom: 12 }}>
-              About this Event
+              {t('eventDetails.about')}
             </Text>
             <Text style={{ color: '#334155', fontSize: 14, lineHeight: 23 }}>
               {event.description}
@@ -206,7 +208,7 @@ export default function EventDetailScreen() {
         {!hasMedia && (
           <View style={{ marginHorizontal: 20, marginTop: 12, marginBottom: 8, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 8 }}>
             <CalendarDays size={28} color="#CBD5E1" />
-            <Text style={{ color: '#94A3B8', fontSize: 12, fontWeight: '500' }}>No photos for this event</Text>
+            <Text style={{ color: '#94A3B8', fontSize: 12, fontWeight: '500' }}>{t('eventDetails.media.noPhotos')}</Text>
           </View>
         )}
 
