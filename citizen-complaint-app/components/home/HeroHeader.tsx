@@ -160,8 +160,9 @@ function StatsError({ onRetry }: { onRetry: () => void }) {
 function StatsContent({ data }: { data: MyStats }) {
   const statItems = [
     { ...STAT_ITEMS[0], tKey: 'Total',    value: data.total_complaints    },
-    { ...STAT_ITEMS[1], tKey: 'Resolved', value: data.resolved_complaints },
-    { ...STAT_ITEMS[2], tKey: 'Pending',  value: data.pending_complaints  },
+ 
+    { ...STAT_ITEMS[1], tKey: 'Pending',  value: data.pending_complaints  },
+    { ...STAT_ITEMS[2], tKey: 'Resolved', value: data.resolved_complaints },
   ];
 
   return (

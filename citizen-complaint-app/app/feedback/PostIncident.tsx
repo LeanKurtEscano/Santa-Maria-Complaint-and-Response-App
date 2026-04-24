@@ -219,7 +219,7 @@ export default function PostIncidentFeedbackScreen() {
     incidentId: string;
     complaintTitle: string;
   }>();
-
+ console.log((incidentId))
   const [rating, setRating] = useState(0);
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -229,7 +229,7 @@ export default function PostIncidentFeedbackScreen() {
     mutationFn: async () => {
       await feedbackApiClient.post(
         `/post-incident`,
-        { ratings: rating, message: message || null , incident_id: Number(incidentId) }
+        { ratings: rating, message: message || null ,complaint_id: Number(incidentId) }
       );
     },
     onSuccess: () => {

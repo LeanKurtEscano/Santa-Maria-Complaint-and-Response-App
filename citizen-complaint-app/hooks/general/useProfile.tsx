@@ -8,42 +8,40 @@ import { handleApiError } from '@/utils/general/errorHandler';
 import * as secureStorage from 'expo-secure-store';
 import { useTranslation } from 'react-i18next';
 import useToast from './useToast';
+
 export const useProfileLogic = () => {
   const { t } = useTranslation();
-  const { toastType,toastMessage, showToast, setToastVisible,toastVisible } = useToast();
-  
+  const { toastType, toastMessage, showToast, setToastVisible, toastVisible } = useToast();
+
   const { userData, loading, fetchCurrentUser, clearUser } = useCurrentUser();
   const { locationLoading, requestLocationPermission } = useLocationPermission();
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
 
-const updateLocationMutation = useMutation({
-  mutationFn: async ({ latitude, longitude }: { latitude: number; longitude: number }) => {
-    console.log("Sending location update:", { latitude, longitude });
-    const response = await userApiClient.put('/update-current-location', {
-      latitude,
-      longitude,
-    });
-    console.log("Location update response:", response.data);
-    return response.data;
-  },
-  onSuccess: async () => {
-    console.log("Location update successful, fetching user data...");
-
-    setShowLocationModal(false);
-    setShowMapPicker(false);
-
-    showToast(t('profile.location.success.message'), 'success');
-    await fetchCurrentUser(true);
-  },
-  onError: (error) => {
-  
-    const appError = handleApiError(error);
-    showToast(appError.message, 'error');
-    setShowMapPicker(false);
-    setShowLocationModal(false);
-  },
-});
+  const updateLocationMutation = useMutation({
+    mutationFn: async ({ latitude, longitude }: { latitude: number; longitude: number }) => {
+      console.log('Sending location update:', { latitude, longitude });
+      const response = await userApiClient.put('/update-current-location', {
+        latitude,
+        longitude,
+      });
+      console.log('Location update response:', response.data);
+      return response.data;
+    },
+    onSuccess: async () => {
+      console.log('Location update successful, fetching user data...');
+      setShowLocationModal(false);
+      setShowMapPicker(false);
+      showToast(t('profile.location.success.message'), 'success');
+      await fetchCurrentUser(true);
+    },
+    onError: (error) => {
+      const appError = handleApiError(error);
+      showToast(appError.message, 'error');
+      setShowMapPicker(false);
+      setShowLocationModal(false);
+    },
+  });
 
   const handleAllowLocation = async () => {
     const result = await requestLocationPermission();
@@ -63,40 +61,25 @@ const updateLocationMutation = useMutation({
           { text: t('common.cancel'), style: 'cancel' },
           {
             text: t('profile.location.useMap'),
-            onPress: () => setShowMapPicker(true)
-          }
+            onPress: () => setShowMapPicker(true),
+          },
         ]
       );
     }
   };
 
   const handleLocationFromMap = async (latitude: number, longitude: number) => {
-    updateLocationMutation.mutate({ 
-      latitude: latitude.toString(), 
-      longitude: longitude.toString() 
+    updateLocationMutation.mutate({
+      latitude: latitude.toString(),
+      longitude: longitude.toString(),
     });
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      t('profile.logout.title'),
-      t('profile.logout.confirmMessage'),
-      [
-        {
-          text: t('common.cancel'),
-          style: 'cancel',
-        },
-        {
-          text: t('profile.logout.title'),
-          style: 'destructive',
-          onPress: async () => {
-            await secureStorage.deleteItemAsync('complaint_token');
-            clearUser();
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+  // ✅ No Alert here — confirmation is handled by LogoutConfirmModal in the UI
+  const handleLogout = async () => {
+    await secureStorage.deleteItemAsync('complaint_token');
+    await secureStorage.deleteItemAsync('complaint_refresh_token');
+    clearUser();
   };
 
   const hasLocation = userData?.latitude && userData?.longitude;
@@ -110,7 +93,7 @@ const updateLocationMutation = useMutation({
     showMapPicker,
     locationLoading,
     updateLocationMutation,
-    
+
     // Actions
     setShowLocationModal,
     setShowMapPicker,
@@ -122,6 +105,6 @@ const updateLocationMutation = useMutation({
     toastType,
     showToast,
     setToastVisible,
-    toastVisible
+    toastVisible,
   };
 };

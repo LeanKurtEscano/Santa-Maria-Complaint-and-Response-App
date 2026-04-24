@@ -30,36 +30,7 @@ import { EvacuationCenterCard } from '@/components/emergency/EvacuationCenterCar
 import { useProfileLogic } from '@/hooks/general/useProfile';
 import { formatPHPhoneForUI } from '@/utils/general/phone';
 import { emergencyApiClient } from '@/lib/client/emergency';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface EmergencyContactAPI {
-  id: number;
-  contact_number: string;
-  agency_id: number; // ✅ added: present in API response
-}
-
-interface EmergencyAgency {
-  id: number;
-  agency_name: string;
-  created_at: string;
-  updated_at: string | null;
-  emergency_contacts: EmergencyContactAPI[]; // ✅ fixed: was `contacts`
-}
-
-interface PendingContact {
-  name: string;
-  phoneNumber: string;
-}
-
-// ── Per-service visual config ─────────────────────────────────────────────────
-interface ServiceTheme {
-  Icon: React.ComponentType<{ size?: number; color?: string }>;
-  iconColor: string;
-  iconBg: string;
-  borderColor: string;
-  btnColor: string;
-}
-
+import { EmergencyAgency, EmergencyContactAPI, PendingContact, ServiceTheme } from '@/types/general/emergency';
 const SERVICE_THEMES: Record<string, ServiceTheme> = {
   pnp: {
     Icon: ShieldAlert,
@@ -67,6 +38,7 @@ const SERVICE_THEMES: Record<string, ServiceTheme> = {
     iconBg: 'bg-blue-100',
     borderColor: '#1D4ED8',
     btnColor: '#1D4ED8',
+    fullName: 'Philippine National Police',
   },
   bfp: {
     Icon: Flame,
@@ -74,6 +46,7 @@ const SERVICE_THEMES: Record<string, ServiceTheme> = {
     iconBg: 'bg-red-100',
     borderColor: '#DC2626',
     btnColor: '#DC2626',
+    fullName: 'Bureau of Fire Protection',
   },
   mdrrmo: {
     Icon: Siren,
@@ -81,12 +54,11 @@ const SERVICE_THEMES: Record<string, ServiceTheme> = {
     iconBg: 'bg-emerald-100',
     borderColor: '#059669',
     btnColor: '#059669',
+    fullName: 'Municipal Disaster Risk Reduction and Management Office',
   },
 };
-
 const DEFAULT_THEME = SERVICE_THEMES.pnp;
 
-// ─────────────────────────────────────────────────────────────────────────────
 
 export default function EmergencyScreen() {
   const router = useRouter();
@@ -244,14 +216,22 @@ export default function EmergencyScreen() {
                 elevation: 3,
               }}
             >
-              {/* Icon + agency name */}
+            {/* Icon + agency name */}
               <View className="flex-row items-center gap-x-4 mb-4">
                 <View className={`w-14 h-14 rounded-full items-center justify-center ${theme.iconBg}`}>
                   <theme.Icon size={28} color={theme.iconColor} />
                 </View>
-                <Text className="text-[16px] font-bold text-slate-800">
-                  {agency.agency_name ?? ''}
-                </Text>
+                <View className="flex-1">
+                  <Text className="text-[16px] font-bold text-slate-800 uppercase">
+                    {agency.agency_name ?? ''}
+                  </Text>
+                  <Text className="text-[11px] text-slate-500 leading-4 mt-0.5">
+                    {theme.fullName}
+                  </Text>
+                  <Text className="text-[11px] text-slate-400 leading-4">
+                    Santa Maria, Laguna
+                  </Text>
+                </View>
               </View>
 
               {contacts.length === 0 && (

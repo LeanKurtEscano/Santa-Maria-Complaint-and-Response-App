@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -34,10 +35,184 @@ import GeneralToast from '@/components/Toast/GeneralToast';
 import { formatName } from '@/utils/general/name';
 import { THEME } from '@/constants/theme';
 
+// ---------------------------------------------------------------------------
+// LogoutConfirmModal
+// ---------------------------------------------------------------------------
+interface LogoutConfirmModalProps {
+  visible: boolean;
+  loading?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function LogoutConfirmModal({
+  visible,
+  loading = false,
+  onConfirm,
+  onCancel,
+}: LogoutConfirmModalProps) {
+  const { t } = useTranslation();
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onCancel}
+    >
+      {/* Backdrop */}
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={onCancel}
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingHorizontal: 24,
+        }}
+      >
+        {/* Card — stop event propagation so taps inside don't close the modal */}
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => {}}
+          style={{
+            width: '100%',
+            backgroundColor: '#fff',
+            borderRadius: 20,
+            overflow: 'hidden',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.15,
+            shadowRadius: 24,
+            elevation: 12,
+          }}
+        >
+          {/* Icon strip */}
+          <View
+            style={{
+              alignItems: 'center',
+              paddingTop: 28,
+              paddingBottom: 16,
+              backgroundColor: '#FEF2F2',
+            }}
+          >
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 32,
+                backgroundColor: '#FEE2E2',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <LogOut size={28} color="#DC2626" />
+            </View>
+          </View>
+
+          {/* Content */}
+          <View style={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 8 }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '700',
+                color: '#111827',
+                textAlign: 'center',
+                marginBottom: 8,
+              }}
+            >
+              {t('profile.logout.confirmTitle', { defaultValue: 'Log out of your account?' })}
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: '#6B7280',
+                textAlign: 'center',
+                lineHeight: 20,
+              }}
+            >
+              {t('profile.logout.confirmMessage', {
+                defaultValue:
+                  'You will need to sign in again to access your account.',
+              })}
+            </Text>
+          </View>
+
+          {/* Actions */}
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              paddingHorizontal: 24,
+              paddingVertical: 20,
+            }}
+          >
+            {/* Cancel */}
+            <TouchableOpacity
+              onPress={onCancel}
+              disabled={loading}
+              activeOpacity={0.8}
+              style={{
+                flex: 1,
+                backgroundColor: '#F3F4F6',
+                borderRadius: 12,
+                paddingVertical: 13,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: '600', color: '#374151' }}>
+                {t('profile.logout.cancel', { defaultValue: 'Cancel' })}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Confirm */}
+            <TouchableOpacity
+              onPress={onConfirm}
+              disabled={loading}
+              activeOpacity={0.8}
+              style={{
+                flex: 1,
+                backgroundColor: loading ? '#FCA5A5' : '#DC2626',
+                borderRadius: 12,
+                paddingVertical: 13,
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                gap: 6,
+              }}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <LogOut size={16} color="#fff" />
+              )}
+              <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}>
+                {loading
+                  ? t('profile.logout.loggingOut', { defaultValue: 'Logging out…' })
+                  : t('profile.logout.confirm', { defaultValue: 'Log out' })}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ProfileScreen
+// ---------------------------------------------------------------------------
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
   const router = useRouter();
+
+  // Local state for the logout modal
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+
   const {
     userData,
     loading,
@@ -57,6 +232,17 @@ export default function ProfileScreen() {
     setToastVisible,
     toastVisible,
   } = useProfileLogic();
+
+  // Wrap the original handleLogout so we can show a loading state and close the modal
+  const handleLogoutConfirmed = async () => {
+    try {
+      setLogoutLoading(true);
+      await handleLogout(); // now just clears token + user, no Alert inside
+    } finally {
+      setLogoutLoading(false);
+      setShowLogoutModal(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -82,10 +268,7 @@ export default function ProfileScreen() {
     );
   }
 
-  // Derive a display identifier — prefer email, fall back to phone number
   const displayIdentifier = userData.email?.trim() || userData.phone_number?.trim() || null;
-
-  // Safe full name — guard against both fields being undefined/null
   const fullName = [userData.first_name, userData.last_name]
     .filter(Boolean)
     .join(' ')
@@ -131,14 +314,12 @@ export default function ProfileScreen() {
                 </View>
               )}
 
-              {/* Name — only render if we actually have something */}
               {!!fullName && (
                 <Text className="text-xl font-bold text-neutral-900 mt-4">
                   {formatName(fullName)}
                 </Text>
               )}
 
-              {/* Identifier (email or phone) — only render if present */}
               {!!displayIdentifier && (
                 <Text className="text-neutral-600 text-sm mt-1">{displayIdentifier}</Text>
               )}
@@ -246,7 +427,6 @@ export default function ProfileScreen() {
           </Text>
 
           <View className="bg-white rounded-2xl shadow-sm border border-neutral-100 p-6">
-            {/* Email — only show if the user has one */}
             {!!userData.email?.trim() && (
               <>
                 <View className="mb-4">
@@ -262,7 +442,6 @@ export default function ProfileScreen() {
               </>
             )}
 
-            {/* Phone Number — only show if the user has one */}
             {!!userData.phone_number?.trim() && (
               <>
                 <View className="mb-4">
@@ -278,7 +457,6 @@ export default function ProfileScreen() {
               </>
             )}
 
-            {/* Full Name — only show if we have something */}
             {!!fullName && (
               <>
                 <View className="mb-4">
@@ -294,7 +472,6 @@ export default function ProfileScreen() {
               </>
             )}
 
-            {/* Age */}
             {!!userData.age && (
               <>
                 <View className="mb-4">
@@ -312,7 +489,6 @@ export default function ProfileScreen() {
               </>
             )}
 
-            {/* Gender */}
             {!!userData.gender?.trim() && (
               <>
                 <View className="mb-4">
@@ -330,7 +506,6 @@ export default function ProfileScreen() {
               </>
             )}
 
-            {/* Barangay */}
             {!!userData.barangay?.trim() && (
               <>
                 <View className="mb-4">
@@ -346,7 +521,6 @@ export default function ProfileScreen() {
               </>
             )}
 
-            {/* Full Address */}
             {!!userData.full_address?.trim() && (
               <View>
                 <View className="flex-row items-center mb-2">
@@ -388,10 +562,10 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Logout */}
+        {/* Logout Button — now opens the confirmation modal */}
         <View className="px-6 mt-6 mb-6">
           <TouchableOpacity
-            onPress={handleLogout}
+            onPress={() => setShowLogoutModal(true)}
             className="bg-red-50 border border-red-200 rounded-xl py-4 flex-row items-center justify-center"
             activeOpacity={0.8}
           >
@@ -418,6 +592,14 @@ export default function ProfileScreen() {
         initialLongitude={userData.longitude ? parseFloat(userData.longitude) : undefined}
         onConfirm={handleLocationFromMap}
         onCancel={() => setShowMapPicker(false)}
+      />
+
+      {/* Logout Confirmation Modal */}
+      <LogoutConfirmModal
+        visible={showLogoutModal}
+        loading={logoutLoading}
+        onConfirm={handleLogoutConfirmed}
+        onCancel={() => !logoutLoading && setShowLogoutModal(false)}
       />
 
       <GeneralToast

@@ -119,6 +119,7 @@ export default function HomeScreen() {
         scrollY={scrollY}
         title={t('header.city')}
         currentLanguage={currentLanguage}
+        onBell={() => router.push('/(tabs)/Notifications')}
         onChangeLanguage={() => changeLanguage(currentLanguage === 'en' ? 'tl' : 'en')}
       />
 

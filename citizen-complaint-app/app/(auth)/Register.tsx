@@ -1012,7 +1012,7 @@ const handlePhoneNumberChange = (text: string, onChange: (val: string) => void) 
                 }}
                 onChangeText={(text) => handlePhoneNumberChange(text, onChange)}
                 value={value}
-                placeholder="9123456789"
+                placeholder="09123456789"
                 placeholderTextColor="#9CA3AF"
                 keyboardType="phone-pad"
                 maxLength={11}

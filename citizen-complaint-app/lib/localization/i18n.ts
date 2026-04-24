@@ -580,28 +580,35 @@ const resources = {
       },
 
 
-      "postIncidentFeedback": {
-  "title": "Complaint Feedback",
-  "heading": "How was your experience?",
-  "subheading": "Your feedback helps us improve how complaints are handled in your community.",
-  "ratingPrompt": "Rate the overall complaint process",
-  "ratingLabels": {
-    "terrible": "Terrible",
-    "bad": "Bad",
-    "okay": "Okay",
-    "good": "Good",
-    "excellent": "Excellent!"
-  },
-  "commentLabel": "Additional Comments",
-  "commentPlaceholder": "Tell us more about your experience (optional)...",
-  "submit": "Submit Feedback",
-  "successTitle": "Feedback Submitted",
-  "successMessage": "Thank you! Your feedback has been recorded.",
-  "done": "Done",
-  "errorTitle": "Submission Failed",
-  "errorMessage": "Something went wrong. Please try again."
+ "postIncidentFeedback": {
+"title": "Rate Your Experience",
+"heading": "How was your experience?",
+"subheading": "Your feedback helps us improve barangay services and respond better to residents.",
+"ratingPrompt": "Please rate your overall experience",
+"commentLabel": "Additional comments (optional)",
+"commentPlaceholder": "Share more details about your experience...",
+"submit": "Submit Feedback",
+
+"ratingLabels": {
+  "terrible": "Terrible",
+  "bad": "Bad",
+  "okay": "Okay",
+  "good": "Good",
+  "excellent": "Excellent"
 },
 
+"success": {
+  "headerTitle": "Feedback Submitted",
+  "title": "Thank You!",
+  "message": "Your feedback has been successfully submitted. We appreciate your time and effort in helping improve our services.",
+  "viewComplaints": "View My Complaints",
+  "goBack": "Go Back"
+},
+
+"errorTitle": "Submission Failed",
+"errorMessage": "Something went wrong while submitting your feedback. Please try again."
+
+},
       complaintDetail: {
         "feedbackButton": "Submit Feedback",
     loading: "Loading complaint details…",
@@ -1622,7 +1629,7 @@ const resources = {
 
      "emergency": {
     "title": "Emergency",
-    "bannerText": "Tumawag lamang sa tunay na emergency. Ang maling paggamit ng linya ng emergency ay parusahan.",
+    "bannerText": "Tumawag lamang sa tunay na emergency. Ang maling paggamit ng linya ng emergency ay may kaukulang parusa.",
     "callButton": "Tumawag",
     "disclaimer": "Para sa mga hindi emergency na alalahanin, bisitahin ang pinakamalapit na barangay hall.",
     "sections": {
@@ -1752,25 +1759,33 @@ const resources = {
 
 
 "postIncidentFeedback": {
-  "title": "Feedback sa Reklamo",
-  "heading": "Kumusta ang iyong karanasan?",
-  "subheading": "Ang iyong feedback ay tumutulong sa amin na mapabuti ang paraan ng paghawak ng mga reklamo sa inyong komunidad.",
-  "ratingPrompt": "I-rate ang kabuuang proseso ng reklamo",
-  "ratingLabels": {
-    "terrible": "Napakasama",
-    "bad": "Masama",
-    "okay": "Katamtaman",
-    "good": "Maganda",
-    "excellent": "Napakagaling!"
-  },
-  "commentLabel": "Karagdagang Komento",
-  "commentPlaceholder": "Sabihin pa ang higit pa tungkol sa iyong karanasan (opsyonal)...",
-  "submit": "I-submit ang Feedback",
-  "successTitle": "Naisumite ang Feedback",
-  "successMessage": "Salamat! Naitala na ang iyong feedback.",
-  "done": "Tapos na",
-  "errorTitle": "Hindi Naisumite",
-  "errorMessage": "May nangyaring mali. Pakisubukang muli."
+"title": "I-rate ang Iyong Karanasan",
+"heading": "Kumusta ang iyong karanasan?",
+"subheading": "Mahalaga ang iyong feedback upang mapabuti ang serbisyo ng barangay at mas mahusay na makatulong sa mga residente.",
+"ratingPrompt": "Paki-rate ang iyong kabuuang karanasan",
+"commentLabel": "Karagdagang komento (opsyonal)",
+"commentPlaceholder": "Magbahagi ng karagdagang detalye tungkol sa iyong karanasan...",
+"submit": "Isumite ang Feedback",
+
+"ratingLabels": {
+  "terrible": "Napakasama",
+  "bad": "Hindi Maganda",
+  "okay": "Katamtaman",
+  "good": "Maganda",
+  "excellent": "Napakaganda"
+},
+
+"success": {
+  "headerTitle": "Naipasa ang Feedback",
+  "title": "Maraming Salamat!",
+  "message": "Matagumpay na naipasa ang iyong feedback. Pinahahalagahan namin ang iyong oras at tulong sa pagpapabuti ng aming mga serbisyo.",
+  "viewComplaints": "Tingnan ang Aking Mga Reklamo",
+  "goBack": "Bumalik"
+},
+
+"errorTitle": "Hindi Maipasa",
+"errorMessage": "Nagkaroon ng problema sa pagpapasa ng iyong feedback. Pakisubukang muli."
+
 },
 
 "notifications": {
