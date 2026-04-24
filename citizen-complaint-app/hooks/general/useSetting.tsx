@@ -13,9 +13,9 @@ export const useSettingsLogic = () => {
   const { userData, setPushNotificationsEnabled } = useCurrentUser();
   const [currentLanguage, setCurrentLanguage] = useState(i18n.language || 'en');
 
-  // Derive push state from store so it stays in sync
-  const pushNotifications = userData?.push_notifications_enabled ?? false;
-
+  const serverPush = userData?.push_notifications_enabled ?? false;
+  // Optimistic state: starts in sync with server, diverges during pending ops
+  const [optimisticPush, setOptimisticPush] = useState<boolean>(serverPush);
 
   const changeLanguage = async (language: string) => {
     try {
@@ -25,9 +25,11 @@ export const useSettingsLogic = () => {
     } catch (error) {}
   };
 
-const togglePushNotifications = useCallback(async () => {
-    if (pushNotifications) {
-      // Currently ON → ask before turning off
+  const togglePushNotifications = useCallback(async () => {
+    const next = !optimisticPush;
+
+    if (!next) {
+      // Currently ON → confirm before turning off
       Alert.alert(
         'Turn Off Notifications',
         'You will no longer receive updates about your complaints.',
@@ -37,10 +39,14 @@ const togglePushNotifications = useCallback(async () => {
             text: 'Turn Off',
             style: 'destructive',
             onPress: async () => {
+              // Optimistically toggle OFF immediately
+              setOptimisticPush(false);
               try {
                 await userApiClient.post('/enable-push-notifications', { enabled: false });
                 setPushNotificationsEnabled?.(false);
               } catch {
+                // Revert on failure
+                setOptimisticPush(true);
                 Alert.alert('Error', 'Failed to disable notifications. Please try again.');
               }
             },
@@ -48,7 +54,7 @@ const togglePushNotifications = useCallback(async () => {
         ]
       );
     } else {
-      // Currently OFF → ask before turning on
+      // Currently OFF → confirm before turning on
       Alert.alert(
         'Enable Notifications',
         'Would you like to receive updates about the status of your complaints?',
@@ -57,8 +63,13 @@ const togglePushNotifications = useCallback(async () => {
           {
             text: 'Enable',
             onPress: async () => {
+              // Optimistically toggle ON immediately
+              setOptimisticPush(true);
               try {
-                if (!Device.isDevice) return;
+                if (!Device.isDevice) {
+                  setOptimisticPush(false);
+                  return;
+                }
 
                 const { status: existingStatus } = await Notifications.getPermissionsAsync();
                 let finalStatus = existingStatus;
@@ -69,6 +80,8 @@ const togglePushNotifications = useCallback(async () => {
                 }
 
                 if (finalStatus !== 'granted') {
+                  // Revert — permission denied
+                  setOptimisticPush(false);
                   Alert.alert(
                     'Permission Denied',
                     'Please enable notifications in your device settings.'
@@ -90,6 +103,8 @@ const togglePushNotifications = useCallback(async () => {
                 await userApiClient.post('/enable-push-notifications', { enabled: true });
                 setPushNotificationsEnabled?.(true);
               } catch {
+                // Revert on any API/permission failure
+                setOptimisticPush(false);
                 Alert.alert('Error', 'Failed to enable notifications. Please try again.');
               }
             },
@@ -97,12 +112,12 @@ const togglePushNotifications = useCallback(async () => {
         ]
       );
     }
-  }, [pushNotifications, setPushNotificationsEnabled]);
+  }, [optimisticPush, setPushNotificationsEnabled]);
 
   return {
     currentLanguage,
     changeLanguage,
-    pushNotifications,
+    pushNotifications: optimisticPush, // screen consumes optimistic value
     togglePushNotifications,
   };
 };
