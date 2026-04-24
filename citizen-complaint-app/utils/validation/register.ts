@@ -143,24 +143,35 @@ export const validatePassword = (password: string, t: TFunction): string => {
 
 
 export const validateIdNumber = (value: string, t: any): string | undefined => {
-  if (!value) return t('required');
+  if (!value || value.trim() === '') return t('required');
 
-  // Only allow alphanumeric and hyphens
-  if (!/^[a-zA-Z0-9-]+$/.test(value)) {
+  // Only allow alphanumeric, hyphens, and spaces
+  if (!/^[a-zA-Z0-9\- ]+$/.test(value)) {
     return t('registerValidation.idNumberInvalidChars');
   }
 
-  // Length: 6–20 characters
-  if (value.length < 6) return t('registerValidation.idNumberTooShort');
-  if (value.length > 20) return t('registerValidation.idNumberTooLong');
+  // Must contain at least one digit
+  if (!/\d/.test(value)) {
+    return t('registerValidation.idNumberMustHaveDigit');
+  }
 
-  // ❌ Reject all same characters (AAAAAA, 111111)
-  if (/^([a-zA-Z0-9])\1+$/.test(value)) {
+  // No more than 6 consecutive letters
+  if (/[a-zA-Z]{7,}/.test(value)) {
+    return t('registerValidation.idNumberTooManyLetters');
+  }
+
+  // Length: 6–30 characters (including spaces/hyphens)
+  const stripped = value.replace(/[\s-]/g, '');
+  if (stripped.length < 6) return t('registerValidation.idNumberTooShort');
+  if (stripped.length > 30) return t('registerValidation.idNumberTooLong');
+
+  // Reject all same characters (AAAAAA, 111111)
+  if (/^([a-zA-Z0-9])\1+$/.test(stripped)) {
     return t('registerValidation.idNumberRepeatedChars');
   }
 
-  // ❌ Reject repeating patterns (ABCABC, 121212)
-  if (/^(.+)\1+$/.test(value)) {
+  // Reject repeating patterns (ABCABC, 121212)
+  if (/^(.+)\1+$/.test(stripped)) {
     return t('registerValidation.idNumberPatternRepeat');
   }
 

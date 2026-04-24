@@ -10,22 +10,22 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.lean_kurt_escano.citizencomplaintapp",
+      "bundleIdentifier": "com.santamaria.citizencomplaint",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload valid identification during registration and attach images to complaints.",
         "NSCameraUsageDescription": "This app needs access to your camera to capture identification documents and take photos for complaints.",
         "NSPhotoLibraryAddUsageDescription": "This app needs access to save photos to your library.",
-        "NSMicrophoneUsageDescription": "This app needs access to your microphone to record videos for complaints."
+        "NSMicrophoneUsageDescription": "This app needs access to your microphone to record videos for complaints.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "googleServicesFile": "./google-services.json",
-        "notification": {       
-    "icon": "./assets/images/santamarialogoapp.jpg",
-    "color": "#346739",
-    "androidMode": "default"
-  },
-      
+      "notification": {
+        "icon": "./assets/images/santamarialogoapp.jpg",
+        "color": "#346739",
+        "androidMode": "default"
+      },
       "adaptiveIcon": {
         "backgroundColor": "#10B981",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -57,7 +57,7 @@
         {
           "icon": "./assets/images/santamarialogoapp.jpg",
           "color": "#346739",
-           "sounds": []
+          "sounds": []
         }
       ],
       "./plugins/greenTheme",

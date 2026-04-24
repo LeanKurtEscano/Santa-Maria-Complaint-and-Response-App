@@ -57,46 +57,28 @@ function useConnectionQuality(): ConnectionQuality {
 
   useEffect(() => {
     const evaluate = (state: NetInfoState): ConnectionQuality => {
-      // No connection at all
-      if (!state.isConnected || state.isInternetReachable === false) {
-        return 'offline';
-      }
+      if (!state.isConnected || state.isInternetReachable === false) return 'offline';
+      if (state.isInternetReachable === null) return 'online';
 
-      // isInternetReachable is null while still checking — treat as online tentatively
-      if (state.isInternetReachable === null) {
-        return 'online';
-      }
-
-      const type = state.type; // 'wifi' | 'cellular' | 'ethernet' | 'none' | 'unknown' | ...
+      const type = state.type;
 
       if (type === 'cellular') {
         const details = state.details as any;
         const cellType: string = details?.cellularGeneration ?? '';
-        // 2G or EDGE is considered slow
-        if (['2g', 'edge', '2G', 'EDGE'].includes(cellType)) {
-          return 'slow';
-        }
+        if (['2g', 'edge', '2G', 'EDGE'].includes(cellType)) return 'slow';
       }
 
       if (type === 'wifi') {
         const details = state.details as any;
-        // Some devices expose signal strength (0–100 on Android)
         const strength: number | undefined = details?.strength;
-        if (strength !== undefined && strength < 30) {
-          return 'slow';
-        }
+        if (strength !== undefined && strength < 30) return 'slow';
       }
 
       return 'online';
     };
 
-    const unsubscribe = NetInfo.addEventListener((state) => {
-      setQuality(evaluate(state));
-    });
-
-    // Fetch initial state
+    const unsubscribe = NetInfo.addEventListener((state) => setQuality(evaluate(state)));
     NetInfo.fetch().then((state) => setQuality(evaluate(state)));
-
     return () => unsubscribe();
   }, []);
 
@@ -118,34 +100,14 @@ function ConnectionBanner({ quality }: { quality: ConnectionQuality }) {
     prevQuality.current = quality;
 
     if (shouldShow) {
-      // Slide in
       Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 60,
-          friction: 12,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
+        Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 12, useNativeDriver: true }),
+        Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start();
     } else if (wasShowing) {
-      // Slide out
       Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: -60,
-          duration: 250,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
+        Animated.timing(slideAnim, { toValue: -60, duration: 250, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]).start();
     }
   }, [quality]);
@@ -155,13 +117,7 @@ function ConnectionBanner({ quality }: { quality: ConnectionQuality }) {
   const isOffline = quality === 'offline';
 
   return (
-    <Animated.View
-      style={{
-        transform: [{ translateY: slideAnim }],
-        opacity: opacityAnim,
-        overflow: 'hidden',
-      }}
-    >
+    <Animated.View style={{ transform: [{ translateY: slideAnim }], opacity: opacityAnim, overflow: 'hidden' }}>
       <View
         style={{
           flexDirection: 'row',
@@ -174,34 +130,17 @@ function ConnectionBanner({ quality }: { quality: ConnectionQuality }) {
           borderBottomColor: isOffline ? '#FECACA' : '#FDE68A',
         }}
       >
-        {isOffline ? (
-          <WifiOff size={14} color="#DC2626" />
-        ) : (
-          <Wifi size={14} color="#D97706" />
-        )}
+        {isOffline ? <WifiOff size={14} color="#DC2626" /> : <Wifi size={14} color="#D97706" />}
         <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: '700',
-              color: isOffline ? '#DC2626' : '#B45309',
-            }}
-          >
+          <Text style={{ fontSize: 12, fontWeight: '700', color: isOffline ? '#DC2626' : '#B45309' }}>
             {isOffline ? 'Walang koneksyon sa internet' : 'Mabagal ang koneksyon'}
           </Text>
-          <Text
-            style={{
-              fontSize: 11,
-              color: isOffline ? '#EF4444' : '#D97706',
-              marginTop: 1,
-            }}
-          >
+          <Text style={{ fontSize: 11, color: isOffline ? '#EF4444' : '#D97706', marginTop: 1 }}>
             {isOffline
               ? 'Hindi matanggap ang mga mensahe. Subukang kumonekta muli.'
               : 'Maaaring matagal ang sagot. Pakiusap na magantay.'}
           </Text>
         </View>
-        {/* Pulsing dot */}
         <PulsingDot color={isOffline ? '#EF4444' : '#F59E0B'} />
       </View>
     </Animated.View>
@@ -220,30 +159,12 @@ function PulsingDot({ color }: { color: string }) {
     const pulse = Animated.loop(
       Animated.parallel([
         Animated.sequence([
-          Animated.timing(scale, {
-            toValue: 1.5,
-            duration: 700,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(scale, {
-            toValue: 1,
-            duration: 700,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
+          Animated.timing(scale, { toValue: 1.5, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
         ]),
         Animated.sequence([
-          Animated.timing(opacity, {
-            toValue: 1,
-            duration: 700,
-            useNativeDriver: true,
-          }),
-          Animated.timing(opacity, {
-            toValue: 0.4,
-            duration: 700,
-            useNativeDriver: true,
-          }),
+          Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: true }),
         ]),
       ])
     );
@@ -253,14 +174,7 @@ function PulsingDot({ color }: { color: string }) {
 
   return (
     <Animated.View
-      style={{
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: color,
-        transform: [{ scale }],
-        opacity,
-      }}
+      style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, transform: [{ scale }], opacity }}
     />
   );
 }
@@ -272,32 +186,17 @@ function PulsingDot({ color }: { color: string }) {
 type ActionIntent = 'track' | 'file';
 
 const TRACK_PATTERNS = [
-  /track\b.*complaint/i,
-  /status\b.*complaint/i,
-  /complaint\b.*status/i,
-  /suriin\b.*reklamo/i,
-  /tingnan\b.*reklamo/i,
-  /status\b.*ng\b.*reklamo/i,
-  /reklamo\b.*status/i,
-  /alamin\b.*status/i,
-  /makita\b.*reklamo/i,
-  /i-track/i,
-  /i-check\b.*reklamo/i,
+  /track\b.*complaint/i, /status\b.*complaint/i, /complaint\b.*status/i,
+  /suriin\b.*reklamo/i, /tingnan\b.*reklamo/i, /status\b.*ng\b.*reklamo/i,
+  /reklamo\b.*status/i, /alamin\b.*status/i, /makita\b.*reklamo/i,
+  /i-track/i, /i-check\b.*reklamo/i,
 ];
 
 const FILE_PATTERNS = [
-  /how\b.*file\b.*complaint/i,
-  /submit\b.*complaint/i,
-  /make\b.*complaint/i,
-  /lodge\b.*complaint/i,
-  /mag-reklamo/i,
-  /paano\b.*magreklamo/i,
-  /paano\b.*mag.reklamo/i,
-  /mag-file\b.*ng\b.*reklamo/i,
-  /i-file\b.*reklamo/i,
-  /isumite\b.*reklamo/i,
-  /magsumite\b.*ng\b.*reklamo/i,
-  /magsampa\b.*ng\b.*reklamo/i,
+  /how\b.*file\b.*complaint/i, /submit\b.*complaint/i, /make\b.*complaint/i,
+  /lodge\b.*complaint/i, /mag-reklamo/i, /paano\b.*magreklamo/i,
+  /paano\b.*mag.reklamo/i, /mag-file\b.*ng\b.*reklamo/i, /i-file\b.*reklamo/i,
+  /isumite\b.*reklamo/i, /magsumite\b.*ng\b.*reklamo/i, /magsampa\b.*ng\b.*reklamo/i,
 ];
 
 function detectIntents(text: string): ActionIntent[] {
@@ -325,19 +224,12 @@ function parseTextRuns(text: string): TextRun[] {
   RICH_REGEX.lastIndex = 0;
 
   while ((match = RICH_REGEX.exec(text)) !== null) {
-    if (match.index > last) {
-      runs.push({ type: 'text', value: text.slice(last, match.index) });
-    }
-    if (match[1] !== undefined) {
-      runs.push({ type: 'bold', value: match[1] });
-    } else {
-      runs.push({ type: 'url', value: match[0] });
-    }
+    if (match.index > last) runs.push({ type: 'text', value: text.slice(last, match.index) });
+    if (match[1] !== undefined) runs.push({ type: 'bold', value: match[1] });
+    else runs.push({ type: 'url', value: match[0] });
     last = match.index + match[0].length;
   }
-  if (last < text.length) {
-    runs.push({ type: 'text', value: text.slice(last) });
-  }
+  if (last < text.length) runs.push({ type: 'text', value: text.slice(last) });
   return runs;
 }
 
@@ -370,18 +262,8 @@ function ActionButton({ intent, onPress }: ActionButtonProps) {
         borderColor: isTrack ? THEME.primary + '55' : '#FED7AA',
       }}
     >
-      {isTrack ? (
-        <ClipboardList size={14} color={THEME.primary} />
-      ) : (
-        <FileText size={14} color="#F97316" />
-      )}
-      <Text
-        style={{
-          fontSize: 12,
-          fontWeight: '700',
-          color: isTrack ? THEME.primary : '#EA580C',
-        }}
-      >
+      {isTrack ? <ClipboardList size={14} color={THEME.primary} /> : <FileText size={14} color="#F97316" />}
+      <Text style={{ fontSize: 12, fontWeight: '700', color: isTrack ? THEME.primary : '#EA580C' }}>
         {isTrack ? 'Track My Complaint' : 'File a Complaint'}
       </Text>
     </TouchableOpacity>
@@ -402,48 +284,24 @@ function TypingDots() {
       Animated.loop(
         Animated.sequence([
           Animated.delay(delay),
-          Animated.timing(dot, {
-            toValue: -5,
-            duration: 280,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(dot, {
-            toValue: 0,
-            duration: 280,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-          }),
+          Animated.timing(dot, { toValue: -5, duration: 280, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: 280, easing: Easing.in(Easing.quad), useNativeDriver: true }),
           Animated.delay(500),
         ])
       );
     const a0 = make(d0, 0);
     const a1 = make(d1, 140);
     const a2 = make(d2, 280);
-    a0.start();
-    a1.start();
-    a2.start();
-    return () => {
-      a0.stop();
-      a1.stop();
-      a2.stop();
-    };
+    a0.start(); a1.start(); a2.start();
+    return () => { a0.stop(); a1.stop(); a2.stop(); };
   }, []);
 
   return (
-    <View
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 }}
-    >
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 }}>
       {[d0, d1, d2].map((dot, i) => (
         <Animated.View
           key={i}
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: 4,
-            backgroundColor: THEME.primary,
-            transform: [{ translateY: dot }],
-          }}
+          style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: THEME.primary, transform: [{ translateY: dot }] }}
         />
       ))}
     </View>
@@ -459,11 +317,15 @@ function MessageBubble({
   showAvatar,
   isLast,
   onAction,
+  onTextUpdate
 }: {
   msg: Message;
   showAvatar: boolean;
   isLast: boolean;
+  
+  onTextUpdate?: (id: string, text: string) => void;
   onAction: (intent: ActionIntent) => void;
+  
 }) {
   const isUser = msg.role === 'user';
   const slideAnim = useRef(new Animated.Value(isUser ? 18 : -18)).current;
@@ -475,22 +337,30 @@ function MessageBubble({
   const [cursorVisible, setCursorVisible] = useState(true);
   const [intents, setIntents] = useState<ActionIntent[]>([]);
 
+  // ✅ Typewriter effect — checks cancelledIds on every tick
   useEffect(() => {
     if (!msg.streaming) {
       setDisplayedText(msg.text);
       if (!isUser) setIntents(detectIntents(msg.text));
       return;
     }
+
     let i = 0;
     const tick = () => {
+    
+
       i++;
+   
       setDisplayedText(msg.text.slice(0, i));
+onTextUpdate?.(msg.id, msg.text.slice(0, i));
+
       if (i < msg.text.length) {
         const ch = msg.text[i - 1];
         const delay = /[.!?\n]/.test(ch) ? 40 : /[,:]/.test(ch) ? 25 : 12;
         streamRef.current = setTimeout(tick, delay);
       }
     };
+
     streamRef.current = setTimeout(tick, 10);
     return () => {
       if (streamRef.current) clearTimeout(streamRef.current);
@@ -505,19 +375,9 @@ function MessageBubble({
 
   useEffect(() => {
     Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 70,
-        friction: 10,
-        useNativeDriver: true,
-      }),
+      Animated.spring(slideAnim, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
       Animated.timing(fadeAnim, { toValue: 1, duration: 160, useNativeDriver: true }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 70,
-        friction: 10,
-        useNativeDriver: true,
-      }),
+      Animated.spring(scaleAnim, { toValue: 1, tension: 70, friction: 10, useNativeDriver: true }),
     ]).start();
   }, []);
 
@@ -543,22 +403,14 @@ function MessageBubble({
               <Text
                 key={idx}
                 onPress={() => Linking.openURL(run.value)}
-                style={{
-                  color: '#2563EB',
-                  textDecorationLine: 'underline',
-                  fontWeight: '500',
-                }}
+                style={{ color: '#2563EB', textDecorationLine: 'underline', fontWeight: '500' }}
               >
                 {run.value}
               </Text>
             );
           }
           if (run.type === 'bold') {
-            return (
-              <Text key={idx} style={{ fontWeight: '700', color: textColor }}>
-                {run.value}
-              </Text>
-            );
+            return <Text key={idx} style={{ fontWeight: '700', color: textColor }}>{run.value}</Text>;
           }
           return <Text key={idx}>{run.value}</Text>;
         })}
@@ -580,24 +432,12 @@ function MessageBubble({
       }}
     >
       {!isUser && (
-        <View
-          style={{
-            width: 32,
-            height: 32,
-            flexShrink: 0,
-            marginRight: 8,
-            marginBottom: 2,
-          }}
-        >
+        <View style={{ width: 32, height: 32, flexShrink: 0, marginRight: 8, marginBottom: 2 }}>
           {showAvatar && (
             <View
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: THEME.primary,
-                alignItems: 'center',
-                justifyContent: 'center',
+                width: 32, height: 32, borderRadius: 16,
+                backgroundColor: THEME.primary, alignItems: 'center', justifyContent: 'center',
               }}
             >
               <Bot size={15} color="white" />
@@ -612,29 +452,18 @@ function MessageBubble({
             isUser
               ? {
                   backgroundColor: THEME.primary,
-                  borderRadius: 20,
-                  borderBottomRightRadius: 5,
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  shadowColor: THEME.primaryDark,
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  shadowOffset: { width: 0, height: 3 },
-                  elevation: 4,
+                  borderRadius: 20, borderBottomRightRadius: 5,
+                  paddingHorizontal: 16, paddingVertical: 10,
+                  shadowColor: THEME.primaryDark, shadowOpacity: 0.3,
+                  shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4,
                 }
               : {
                   backgroundColor: '#FFFFFF',
-                  borderRadius: 20,
-                  borderBottomLeftRadius: 5,
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  borderWidth: 1,
-                  borderColor: '#F1F5F9',
-                  shadowColor: '#94a3b8',
-                  shadowOpacity: 0.12,
-                  shadowRadius: 6,
-                  shadowOffset: { width: 0, height: 2 },
-                  elevation: 2,
+                  borderRadius: 20, borderBottomLeftRadius: 5,
+                  paddingHorizontal: 16, paddingVertical: 10,
+                  borderWidth: 1, borderColor: '#F1F5F9',
+                  shadowColor: '#94a3b8', shadowOpacity: 0.12,
+                  shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
                 }
           }
         >
@@ -650,14 +479,7 @@ function MessageBubble({
         )}
 
         {isLast && !msg.streaming && (
-          <Text
-            style={{
-              fontSize: 10,
-              color: '#94A3B8',
-              marginTop: 4,
-              marginHorizontal: 2,
-            }}
-          >
+          <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 4, marginHorizontal: 2 }}>
             {formatTime(msg.timestamp)}
           </Text>
         )}
@@ -666,15 +488,9 @@ function MessageBubble({
       {isUser && (
         <View
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 2,
-            marginLeft: 8,
-            flexShrink: 0,
-            backgroundColor: '#E2E8F0',
+            width: 32, height: 32, borderRadius: 16,
+            alignItems: 'center', justifyContent: 'center',
+            marginBottom: 2, marginLeft: 8, flexShrink: 0, backgroundColor: '#E2E8F0',
           }}
         >
           <User size={14} color="#64748B" />
@@ -688,15 +504,7 @@ function MessageBubble({
 // Supporting UI
 // ─────────────────────────────────────────────
 
-function SuggestionChip({
-  text,
-  onPress,
-  disabled,
-}: {
-  text: string;
-  onPress: () => void;
-  disabled?: boolean;
-}) {
+function SuggestionChip({ text, onPress, disabled }: { text: string; onPress: () => void; disabled?: boolean }) {
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -706,20 +514,11 @@ function SuggestionChip({
         borderWidth: 1.5,
         borderColor: disabled ? '#E2E8F0' : THEME.primary + '55',
         backgroundColor: disabled ? '#F8FAFC' : THEME.primaryMuted,
-        borderRadius: 20,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        marginRight: 8,
-        opacity: disabled ? 0.5 : 1,
+        borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
+        marginRight: 8, opacity: disabled ? 0.5 : 1,
       }}
     >
-      <Text
-        style={{
-          color: disabled ? '#94A3B8' : THEME.primary,
-          fontSize: 12,
-          fontWeight: '600',
-        }}
-      >
+      <Text style={{ color: disabled ? '#94A3B8' : THEME.primary, fontSize: 12, fontWeight: '600' }}>
         {text}
       </Text>
     </TouchableOpacity>
@@ -728,24 +527,9 @@ function SuggestionChip({
 
 function DateSeparator() {
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 32,
-        marginVertical: 16,
-        gap: 12,
-      }}
-    >
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 32, marginVertical: 16, gap: 12 }}>
       <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
-      <View
-        style={{
-          paddingHorizontal: 12,
-          paddingVertical: 4,
-          borderRadius: 99,
-          backgroundColor: '#F1F5F9',
-        }}
-      >
+      <View style={{ paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, backgroundColor: '#F1F5F9' }}>
         <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '500' }}>Ngayon</Text>
       </View>
       <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
@@ -757,28 +541,13 @@ function BotInfo() {
   return (
     <View
       style={{
-        marginHorizontal: 16,
-        marginBottom: 16,
-        marginTop: 8,
-        borderRadius: 16,
-        padding: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        backgroundColor: THEME.primaryMuted,
-        borderWidth: 1,
-        borderColor: THEME.primary + '33',
+        marginHorizontal: 16, marginBottom: 16, marginTop: 8,
+        borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12,
+        backgroundColor: THEME.primaryMuted, borderWidth: 1, borderColor: THEME.primary + '33',
       }}
     >
       <View
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 20,
-          backgroundColor: THEME.primary,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
+        style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: THEME.primary, alignItems: 'center', justifyContent: 'center' }}
       >
         <Zap size={18} color="white" />
       </View>
@@ -787,8 +556,7 @@ function BotInfo() {
           Mary bot FAQ Assistant
         </Text>
         <Text style={{ fontSize: 11, color: THEME.primary, marginTop: 1 }}>
-          Tanungin mo ako tungkol sa Santa Maria, Laguna — reklamo, serbisyo, dokumento, at
-          higit pa.
+          Tanungin mo ako tungkol sa Santa Maria, Laguna — reklamo, serbisyo, dokumento, at higit pa.
         </Text>
       </View>
     </View>
@@ -831,7 +599,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
 
-  // ─── Session ID ───────────────────────────────────────────────────────────
   const [sessionId, setSessionId] = useState<string | null>(null);
 
   const listRef = useRef<FlatList>(null);
@@ -842,6 +609,15 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const isSendingRef = useRef(false);
   const isNearBottomRef = useRef(true);
 
+  // ✅ Generation counter — incremented on every send and cancel
+  const generationRef = useRef(0);
+
+  // ✅ Tracks the ID of the bot message currently being streamed
+  const currentBotIdRef = useRef<string | null>(null);
+
+  // ✅ Set of cancelled message IDs — read by MessageBubble typewriter tick
+  const cancelledIdsRef = useRef<Set<string>>(new Set());
+  const displayedTextRef = useRef<string>('');
   const scrollToBottomIfNear = useCallback((animated = true) => {
     if (isNearBottomRef.current) {
       setTimeout(() => listRef.current?.scrollToEnd({ animated }), 80);
@@ -854,12 +630,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
       setSessionId(uuidv4());
       setMessages(makeInitialMessages());
       isNearBottomRef.current = true;
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 50,
-        friction: 10,
-        useNativeDriver: true,
-      }).start();
+      Animated.spring(slideAnim, { toValue: 0, tension: 50, friction: 10, useNativeDriver: true }).start();
       setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
     } else {
       setSessionId(null);
@@ -867,21 +638,15 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
       setIsTyping(false);
       setIsStreaming(false);
 
-      if (abortRef.current) {
-        abortRef.current.abort();
-        abortRef.current = null;
-      }
-      if (streamFinishRef.current) {
-        clearTimeout(streamFinishRef.current);
-        streamFinishRef.current = null;
-      }
+      if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+      if (streamFinishRef.current) { clearTimeout(streamFinishRef.current); streamFinishRef.current = null; }
       isSendingRef.current = false;
+      currentBotIdRef.current = null;
+      cancelledIdsRef.current.clear();
 
       Animated.timing(slideAnim, {
-        toValue: SCREEN_HEIGHT,
-        duration: 300,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
+        toValue: SCREEN_HEIGHT, duration: 300,
+        easing: Easing.in(Easing.cubic), useNativeDriver: true,
       }).start();
     }
   }, [visible]);
@@ -901,34 +666,43 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     [router, onClose]
   );
 
-  // ── Cancel stream ─────────────────────────────────────────────────────────
-  const handleCancel = useCallback(() => {
-    if (abortRef.current) {
-      abortRef.current.abort();
-      abortRef.current = null;
-    }
-    if (streamFinishRef.current) {
-      clearTimeout(streamFinishRef.current);
-      streamFinishRef.current = null;
-    }
-    setIsTyping(false);
-    setIsStreaming(false);
-    setMessages((prev) => prev.map((m) => (m.streaming ? { ...m, streaming: false } : m)));
-    isSendingRef.current = false;
-  }, []);
+const handleCancel = useCallback(() => {
+  generationRef.current += 1;
+
+  if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+  if (streamFinishRef.current) { clearTimeout(streamFinishRef.current); streamFinishRef.current = null; }
+
+  setIsTyping(false);
+  setIsStreaming(false);
+
+  if (currentBotIdRef.current) {
+    const idToFreeze = currentBotIdRef.current;
+    const partial = displayedTextRef.current;
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === idToFreeze ? { ...m, streaming: false, text: partial } : m
+      )
+    );
+    currentBotIdRef.current = null;
+    displayedTextRef.current = '';
+  }
+
+  isSendingRef.current = false; // ✅ add this
+}, []);
 
   // ── Send message ──────────────────────────────────────────────────────────
   const sendMessage = useCallback(
     async (text: string, isSuggestion = false) => {
       const trimmed = text.trim();
-      if (!trimmed) return;
-      // Block send when offline
-      if (isOffline) return;
-
+      if (!trimmed || isOffline) return;
       if (isSendingRef.current) return;
       isSendingRef.current = true;
 
       if (isTyping || isStreaming) handleCancel();
+
+      // ✅ Snapshot generation for this send
+      generationRef.current += 1;
+      const myGeneration = generationRef.current;
 
       setInput('');
 
@@ -940,16 +714,16 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
         streaming: false,
       };
       setMessages((prev) => [...prev, userMsg]);
-
       isNearBottomRef.current = true;
       scrollToBottomIfNear();
-
       setIsTyping(true);
 
       let reply: string;
 
       if (isSuggestion) {
         await new Promise((r) => setTimeout(r, 400 + Math.random() * 300));
+        // ✅ Guard: cancelled during delay
+        if (generationRef.current !== myGeneration) return;
         reply = getFaqReply(trimmed);
       } else {
         try {
@@ -959,6 +733,8 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
             { question: trimmed, session_id: sessionId },
             { signal: abortRef.current.signal }
           );
+          // ✅ Guard: response arrived after cancel
+          if (generationRef.current !== myGeneration) return;
           reply = response.data.answer;
         } catch (err: any) {
           if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
@@ -967,6 +743,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
             isSendingRef.current = false;
             return;
           }
+          if (generationRef.current !== myGeneration) return;
           reply =
             'Pasensya na, may problema sa koneksyon. Subukan ulit o pumili mula sa mga mungkahi sa itaas. 🙏';
         } finally {
@@ -978,6 +755,9 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
       setIsStreaming(true);
 
       const botId = uid();
+      // ✅ Track the active bot message ID
+      currentBotIdRef.current = botId;
+
       const botMsg: Message = {
         id: botId,
         role: 'bot',
@@ -990,11 +770,14 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
 
       const estimatedDuration = reply.length * 13;
       streamFinishRef.current = setTimeout(() => {
+        // ✅ Guard: don't finalise if a newer generation has started
+        if (generationRef.current !== myGeneration) return;
         setMessages((prev) =>
           prev.map((m) => (m.id === botId ? { ...m, streaming: false } : m))
         );
         setIsStreaming(false);
         streamFinishRef.current = null;
+        currentBotIdRef.current = null; // ✅ Clear on natural finish
         isSendingRef.current = false;
       }, estimatedDuration);
     },
@@ -1002,7 +785,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   );
 
   const isBusy = isTyping || isStreaming;
-  // Send disabled when offline OR no text typed
   const sendDisabled = isOffline || !input.trim();
   const kavOffset = Platform.OS === 'android' ? STATUS_BAR_HEIGHT : insets.top;
 
@@ -1010,11 +792,8 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     <Modal visible={visible} transparent={false} animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
         <Animated.View style={{ flex: 1, transform: [{ translateY: slideAnim }] }}>
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior="padding"
-            keyboardVerticalOffset={kavOffset}
-          >
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={kavOffset}>
+
             {/* Header */}
             <View
               style={{
@@ -1022,88 +801,47 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                 backgroundColor: '#FFFFFF',
                 borderBottomWidth: 1,
                 borderBottomColor: '#F1F5F9',
-                shadowColor: '#000',
-                shadowOpacity: 0.06,
-                shadowRadius: 8,
-                shadowOffset: { width: 0, height: 2 },
-                elevation: 4,
+                shadowColor: '#000', shadowOpacity: 0.06,
+                shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4,
               }}
             >
               <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 8,
-                  paddingVertical: 10,
-                  gap: 8,
-                }}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 10, gap: 8 }}
               >
                 <TouchableOpacity
                   onPress={onClose}
                   activeOpacity={0.7}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
+                  style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}
                 >
                   <ArrowLeft size={22} color="#1E293B" />
                 </TouchableOpacity>
 
                 <View style={{ position: 'relative', marginRight: 4 }}>
                   <View
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 21,
-                      backgroundColor: THEME.primary,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
+                    style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: THEME.primary, alignItems: 'center', justifyContent: 'center' }}
                   >
                     <Bot size={20} color="white" />
                   </View>
-                  {/* Online dot — turns grey when offline */}
                   <View
                     style={{
-                      position: 'absolute',
-                      bottom: 1,
-                      right: 1,
-                      width: 11,
-                      height: 11,
-                      borderRadius: 6,
-                      backgroundColor: isOffline
-                        ? '#94A3B8'
-                        : isSlow
-                        ? '#F59E0B'
-                        : '#22C55E',
-                      borderWidth: 2,
-                      borderColor: '#FFFFFF',
+                      position: 'absolute', bottom: 1, right: 1,
+                      width: 11, height: 11, borderRadius: 6,
+                      backgroundColor: isOffline ? '#94A3B8' : isSlow ? '#F59E0B' : '#22C55E',
+                      borderWidth: 2, borderColor: '#FFFFFF',
                     }}
                   />
                 </View>
 
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
-                      Mary Bot
-                    </Text>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>Mary Bot</Text>
                     <Sparkles size={12} color={THEME.primary} />
                   </View>
                   <Text
                     style={{
                       fontSize: 11,
-                      color: isOffline
-                        ? '#DC2626'
-                        : isSlow
-                        ? '#D97706'
-                        : isBusy
-                        ? THEME.primary
-                        : '#64748B',
-                      fontWeight: '500',
-                      marginTop: 1,
+                      color: isOffline ? '#DC2626' : isSlow ? '#D97706' : isBusy ? THEME.primary : '#64748B',
+                      fontWeight: '500', marginTop: 1,
                     }}
                   >
                     {isOffline
@@ -1118,14 +856,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
 
                 <TouchableOpacity
                   activeOpacity={0.7}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: '#F8FAFC',
-                  }}
+                  style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}
                 >
                   <HelpCircle size={20} color="#94A3B8" />
                 </TouchableOpacity>
@@ -1158,52 +889,38 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                 const isLast = !next || next.role !== item.role;
                 const showAvatar = item.role === 'bot' && isLast;
                 return (
+                 
                   <MessageBubble
-                    msg={item}
-                    showAvatar={showAvatar}
-                    isLast={isLast}
-                    onAction={handleAction}
-                  />
+  msg={item}
+  showAvatar={showAvatar}
+  isLast={isLast}
+  onAction={handleAction}
+  onTextUpdate={(id, text) => {
+    if (id === currentBotIdRef.current) {
+      displayedTextRef.current = text;
+    }
+  }}
+/>
                 );
               }}
               ListFooterComponent={
                 isTyping ? (
                   <Animated.View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'flex-end',
-                      paddingHorizontal: 16,
-                      marginTop: 4,
-                      marginBottom: 4,
-                    }}
+                    style={{ flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, marginTop: 4, marginBottom: 4 }}
                   >
                     <View
                       style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
-                        backgroundColor: THEME.primary,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginRight: 8,
-                        marginBottom: 2,
+                        width: 32, height: 32, borderRadius: 16, backgroundColor: THEME.primary,
+                        alignItems: 'center', justifyContent: 'center', marginRight: 8, marginBottom: 2,
                       }}
                     >
                       <Bot size={14} color="white" />
                     </View>
                     <View
                       style={{
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: 20,
-                        borderBottomLeftRadius: 5,
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        borderWidth: 1,
-                        borderColor: '#F1F5F9',
-                        shadowColor: '#94a3b8',
-                        shadowOpacity: 0.1,
-                        shadowRadius: 4,
-                        elevation: 1,
+                        backgroundColor: '#FFFFFF', borderRadius: 20, borderBottomLeftRadius: 5,
+                        paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: '#F1F5F9',
+                        shadowColor: '#94a3b8', shadowOpacity: 0.1, shadowRadius: 4, elevation: 1,
                       }}
                     >
                       <TypingDots />
@@ -1213,9 +930,8 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               }
             />
 
-            {/* ── Connection banner + suggestion chips + input ── */}
+            {/* Bottom area */}
             <View>
-              {/* Connection banner — sits directly above the suggestion chips */}
               <ConnectionBanner quality={connectionQuality} />
 
               {/* Suggestion chips */}
@@ -1224,19 +940,14 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                   backgroundColor: '#FFFFFF',
                   borderTopWidth: connectionQuality !== 'online' ? 0 : 1,
                   borderTopColor: '#F1F5F9',
-                  paddingTop: 12,
-                  paddingBottom: 10,
+                  paddingTop: 12, paddingBottom: 10,
                 }}
               >
                 <Text
                   style={{
-                    fontSize: 10,
-                    color: '#94A3B8',
-                    fontWeight: '700',
-                    letterSpacing: 1.2,
-                    textTransform: 'uppercase',
-                    paddingHorizontal: 16,
-                    marginBottom: 8,
+                    fontSize: 10, color: '#94A3B8', fontWeight: '700',
+                    letterSpacing: 1.2, textTransform: 'uppercase',
+                    paddingHorizontal: 16, marginBottom: 8,
                   }}
                 >
                   Mga Madalas na Tanong
@@ -1261,34 +972,19 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               <View
                 style={{
                   backgroundColor: '#FFFFFF',
-                  borderTopWidth: 1,
-                  borderTopColor: '#F1F5F9',
-                  paddingHorizontal: 12,
-                  paddingTop: 10,
+                  borderTopWidth: 1, borderTopColor: '#F1F5F9',
+                  paddingHorizontal: 12, paddingTop: 10,
                   paddingBottom: Math.max(insets.bottom, 12),
-                  flexDirection: 'row',
-                  alignItems: 'flex-end',
-                  gap: 8,
+                  flexDirection: 'row', alignItems: 'flex-end', gap: 8,
                 }}
               >
                 <View
                   style={{
-                    flex: 1,
-                    backgroundColor: '#F1F5F9',
-                    borderRadius: 24,
-                    paddingHorizontal: 16,
-                    paddingVertical: 2,
-                    flexDirection: 'row',
-                    alignItems: 'flex-end',
-                    minHeight: 44,
-                    borderWidth: 1.5,
-                    borderColor: isOffline
-                      ? '#FECACA'
-                      : isSlow
-                      ? '#FDE68A'
-                      : isBusy
-                      ? THEME.primary + '55'
-                      : '#E2E8F0',
+                    flex: 1, backgroundColor: '#F1F5F9', borderRadius: 24,
+                    paddingHorizontal: 16, paddingVertical: 2,
+                    flexDirection: 'row', alignItems: 'flex-end',
+                    minHeight: 44, borderWidth: 1.5,
+                    borderColor: isOffline ? '#FECACA' : isSlow ? '#FDE68A' : isBusy ? THEME.primary + '55' : '#E2E8F0',
                   }}
                 >
                   <TextInput
@@ -1309,13 +1005,10 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                     maxLength={500}
                     editable={!isOffline}
                     style={{
-                      flex: 1,
-                      fontSize: 15,
+                      flex: 1, fontSize: 15,
                       color: isOffline ? '#94A3B8' : '#1E293B',
-                      paddingTop: 10,
-                      paddingBottom: 10,
-                      maxHeight: 100,
-                      lineHeight: 20,
+                      paddingTop: 10, paddingBottom: 10,
+                      maxHeight: 100, lineHeight: 20,
                     }}
                     returnKeyType="default"
                   />
@@ -1326,14 +1019,9 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                     onPress={handleCancel}
                     activeOpacity={0.8}
                     style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: '#FEE2E2',
-                      borderWidth: 1.5,
-                      borderColor: '#FECACA',
+                      width: 44, height: 44, borderRadius: 22,
+                      alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: '#FEE2E2', borderWidth: 1.5, borderColor: '#FECACA',
                     }}
                   >
                     <Square size={16} color="#EF4444" fill="#EF4444" />
@@ -1344,28 +1032,21 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                     disabled={sendDisabled}
                     activeOpacity={0.8}
                     style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 22,
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      width: 44, height: 44, borderRadius: 22,
+                      alignItems: 'center', justifyContent: 'center',
                       backgroundColor: sendDisabled ? '#E2E8F0' : THEME.primary,
                       shadowColor: sendDisabled ? 'transparent' : THEME.primaryDark,
-                      shadowOpacity: 0.35,
-                      shadowRadius: 8,
+                      shadowOpacity: 0.35, shadowRadius: 8,
                       shadowOffset: { width: 0, height: 3 },
                       elevation: sendDisabled ? 0 : 4,
                     }}
                   >
-                    <Send
-                      size={18}
-                      color={sendDisabled ? '#94A3B8' : '#FFFFFF'}
-                      style={{ marginLeft: 2 }}
-                    />
+                    <Send size={18} color={sendDisabled ? '#94A3B8' : '#FFFFFF'} style={{ marginLeft: 2 }} />
                   </TouchableOpacity>
                 )}
               </View>
             </View>
+
           </KeyboardAvoidingView>
         </Animated.View>
       </View>

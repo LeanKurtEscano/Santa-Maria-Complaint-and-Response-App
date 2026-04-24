@@ -1550,8 +1550,9 @@ export default function ComplaintDetail() {
           </SectionCard>
         )}
 
-        {/* ── Department ── */}
-        {data.department && (
+        {/* ── Department
+        
+          {data.department && (
           <SectionCard
             title={t("complaintDetail.sections.department")}
             icon={<Building2 size={18} color={THEME.primary} strokeWidth={2.5} />}
@@ -1584,6 +1585,8 @@ export default function ComplaintDetail() {
             )}
           </SectionCard>
         )}
+        ── */}
+      
 
         {/* ── Remarks ── */}
         {(data.incident_links ?? []).length > 0 && (

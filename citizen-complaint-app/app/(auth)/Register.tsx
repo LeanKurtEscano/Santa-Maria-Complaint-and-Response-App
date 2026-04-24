@@ -984,58 +984,45 @@ const handlePhoneNumberChange = (text: string, onChange: (val: string) => void) 
       </View>
 
       {/* Phone Number — always shown */}
-           {/* Phone Number — always shown */}
-<View className="mb-4">
-  <Text className="text-sm font-medium text-neutral-700 mb-2">{t('phoneNumber')} *</Text>
-  <Controller
-    control={control}
-    name="phoneNumber"
-    rules={{
-      required: t('required'),
-      validate: (value) => {
-        // Validation for 11-digit number starting with 09
-        const phoneRegex = /^09\d{9}$/; // Exactly 11 digits starting with 09
-        if (!phoneRegex.test(value)) {
-          return t('phoneInvalid') || 'Phone number must be 11 digits starting with 09 (e.g., 09123456789)';
-        }
-        return true;
-      },
-    }}
-    render={({ field: { onChange, onBlur, value } }) => (
-      <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
-        <Phone size={20} color="#6B7280" />
-      
-        <TextInput
-          className="flex-1 ml-2 text-base text-neutral-900 py-2.5"
-          onBlur={() => {
-            onBlur();
-            const phoneRegex = /^09\d{9}$/;
-            if (!phoneRegex.test(value)) {
-              setError('phoneNumber', { 
-                type: 'manual', 
-                message: t('phoneInvalid') || 'Phone number must be 11 digits starting with 09 (e.g., 09123456789)' 
-              });
-            } else {
-              clearErrors('phoneNumber');
-            }
+      <View className="mb-4">
+        <Text className="text-sm font-medium text-neutral-700 mb-2">{t('phoneNumber')} *</Text>
+        <Controller
+          control={control}
+          name="phoneNumber"
+          rules={{
+            required: t('required'),
+            validate: (value) => {
+              const stripped = value.startsWith('0') ? value.slice(1) : value;
+              const err = validateContactNumber(stripped, t);
+              return err || true;
+            },
           }}
-          onChangeText={(text) => {
-            handlePhoneNumberChange(text, onChange);
-            clearErrors('phoneNumber');
-            setNetworkError(null);
-          }}
-          value={value}
-          placeholder="9123456789"
-          placeholderTextColor="#9CA3AF"
-          keyboardType="phone-pad"
-          maxLength={11}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+              <Phone size={20} color="#6B7280" />
+             
+              <TextInput
+                className="flex-1 ml-2 text-base text-neutral-900 py-2.5"
+                onBlur={() => {
+                  onBlur();
+                  const stripped = value.startsWith('0') ? value.slice(1) : value;
+                  const err = validateContactNumber(stripped, t);
+                  if (err) setError('phoneNumber', { type: 'manual', message: err });
+                  else clearErrors('phoneNumber');
+                }}
+                onChangeText={(text) => handlePhoneNumberChange(text, onChange)}
+                value={value}
+                placeholder="9123456789"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+                maxLength={11}
+              />
+            </View>
+          )}
         />
+        <Text className="text-xs text-neutral-500 mt-1">Enter your 11-digit number (e.g. 09123456789)</Text>
+        <ErrorMessage message={errors.phoneNumber?.message} />
       </View>
-    )}
-  />
-  <Text className="text-xs text-neutral-500 mt-1">Enter your 11-digit number starting with 09 (e.g., 09123456789)</Text>
-  <ErrorMessage message={errors.phoneNumber?.message} />
-</View>
 
       {/* isPhoneMode conditional rendering commented out */}
       {/* {!isPhoneMode && ( <View>...</View> )} */}
@@ -1223,11 +1210,11 @@ const handlePhoneNumberChange = (text: string, onChange: (val: string) => void) 
                   else clearErrors('idNumber');
                 }}
                 onChangeText={(text) => {
-                  const sanitized = text.replace(/[^a-zA-Z0-9-]/g, '');
+                 const sanitized = text.replace(/[^a-zA-Z0-9\- ]/g, '');
                   onChange(sanitized);
                   clearErrors('idNumber');
                 }}
-                maxLength={20}
+                maxLength={30}
                 value={value}
                 placeholder="A00-000-000000"
                 placeholderTextColor="#9CA3AF"
