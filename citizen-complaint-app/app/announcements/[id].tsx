@@ -28,7 +28,6 @@ import {
   ImageIcon,
   Video as VideoIcon,
   Play,
-  Share2,
   Megaphone,
   User,
 } from 'lucide-react-native';
@@ -419,19 +418,8 @@ export default function AnnouncementDetailScreen() {
           </Text>
         </View>
 
-        {/* Share button */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.15)',
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.22)',
-            borderRadius: 14,
-            padding: 9,
-          }}
-        >
-          <Share2 size={16} color="white" />
-        </TouchableOpacity>
+        {/* Spacer to keep title centered */}
+        <View style={{ width: 44 }} />
       </Animated.View>
 
       {/* ── Content ── */}

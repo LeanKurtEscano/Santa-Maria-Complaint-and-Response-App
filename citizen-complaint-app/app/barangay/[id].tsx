@@ -177,114 +177,114 @@ const validateForm = (): boolean => {
     setShowPreview(true);
   };
 
-  // ── Final submit ──────────────────────────────────────────────────────────────
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    try {
-      if (!incidentLocation) {
-        showToast('Location unavailable. Please go back and try again.', 'error');
-        return;
-      }
-
-      const parsedBarangayId       = parseInt(barangayId, 10);
-      const parsedBarangayAccountId = barangayAccountId ? parseInt(barangayAccountId, 10) : null;
-
-      if (isNaN(parsedBarangayId)) {
-        showToast('Invalid barangay. Please go back and try again.', 'error');
-        return;
-      }
-      if (!resolvedCategoryId) {
-        showToast('Please select a complaint category.', 'error');
-        return;
-      }
-
-      const complaintData = {
-        title:               resolvedTitle,
-        description:         message,
-        barangay_id:         parsedBarangayId,
-        barangay_account_id: parsedBarangayAccountId,
-        latitude:            incidentLocation.latitude,
-        longitude:           incidentLocation.longitude,
-        category_id:         resolvedCategoryId,
-      };
-
-
-      console.log('Submitting complaint with data:', complaintData, 'and attachments:', attachments);
-
-      const formData = new FormData();
-      formData.append('data', JSON.stringify(complaintData));
-
-      for (const attachment of attachments) {
-        formData.append('attachments', {
-          uri:  attachment.uri,
-          name: attachment.name,
-          type: attachment.mimeType || 'application/octet-stream',
-        } as any);
-      }
-
-      const response = await complaintApiClient.post('/submit-complaint', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-       if (response.status === 201) {
-    showGlobalToast('Complaint submitted successfully!', 'success');
-    resetAttachments();
-    setSelectedPreset(null);
-    setCustomTitle('');
-    setMessage('');
-    setIncidentLocation(null);
-    setShowPreview(false);
-
-    if(!userData?.push_notifications_enabled) { 
-       // Don't prompt if user has already disabled notifications
-    Alert.alert(
-      '🔔 Stay Updated',
-      'Do you want to receive notifications about your complaint status?',
-      [
-        {
-          text: 'No Thanks',
-          style: 'cancel',
-          onPress: () => router.replace('/(tabs)/Complaints'),
-        },
-        {
-          text: 'Yes, Notify Me',
-          onPress: async () => {
-            try {
-              const token = await askForNotificationPermission(); // ← just call it here
-              if (!token) {
-                showGlobalToast('Permission denied for notifications.', 'error');
-                router.push('/(tabs)/Complaints');
-                return;
-              }
-              await userApiClient.post('/push-token', { token });
-              await userApiClient.post('/enable-push-notifications', { enabled: true });
-              fetchCurrentUser(true); // Refresh user data to update notification preference in store
-              showGlobalToast('Notifications enabled!', 'success');
-            } catch (err) {
-              showGlobalToast('Failed to enable notifications.', 'error');
-            } finally {
-              router.replace('/(tabs)/Complaints');
-            }
-          },
-        },
-      ]
-    );
-  } else {
-    router.replace('/(tabs)/Complaints');
-  }
-}
-    } catch (error: any) {
-      // Stay on the preview screen — just show the toast so the user
-      // can retry without losing their filled-in form or pinned location.
-      const detail = error?.response?.data?.detail;
-      showToast(detail ?? 'Something went wrong. Please try again.', 'error');
-    } finally {
-      setIsSubmitting(false);
-      // NOTE: setShowPreview(false) intentionally NOT called here.
-      // The preview only closes on success (above) or when the user taps Back.
+const handleSubmit = async () => {
+  setIsSubmitting(true);
+  try {
+    if (!incidentLocation) {
+      showToast('Location unavailable. Please go back and try again.', 'error');
+      return;
     }
-  };
 
+    const parsedBarangayId = parseInt(barangayId, 10);
+    const parsedBarangayAccountId = barangayAccountId ? parseInt(barangayAccountId, 10) : null;
+
+    if (isNaN(parsedBarangayId)) {
+      showToast('Invalid barangay. Please go back and try again.', 'error');
+      return;
+    }
+    if (!resolvedCategoryId) {
+      showToast('Please select a complaint category.', 'error');
+      return;
+    }
+
+    const complaintData = {
+      title:               resolvedTitle,
+      description:         message,
+      barangay_id:         parsedBarangayId,
+      barangay_account_id: parsedBarangayAccountId,
+      latitude:            incidentLocation.latitude,
+      longitude:           incidentLocation.longitude,
+      category_id:         resolvedCategoryId,
+    };
+
+    console.log('Submitting complaint with data:', complaintData, 'and attachments:', attachments);
+
+    const formData = new FormData();
+    formData.append('data', JSON.stringify(complaintData));
+
+    for (const attachment of attachments) {
+      formData.append('attachments', {
+        uri:  attachment.uri,
+        name: attachment.name,
+        type: attachment.mimeType || 'application/octet-stream',
+      } as any);
+    }
+
+    const response = await complaintApiClient.post('/submit-complaint', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    if (response.status === 201) {
+      showGlobalToast('Complaint submitted successfully!', 'success');
+      resetAttachments();
+      setSelectedPreset(null);
+      setCustomTitle('');
+      setMessage('');
+      setIncidentLocation(null);
+
+      if (!userData?.push_notifications_enabled) {
+        Alert.alert(
+          '🔔 Stay Updated',
+          'Do you want to receive notifications about your complaint status?',
+          [
+            {
+              text: 'No Thanks',
+              style: 'cancel',
+              onPress: () => {
+                setShowPreview(false);
+                setStep('instructions');
+                router.replace('/(tabs)/Complaints');
+              },
+            },
+            {
+              text: 'Yes, Notify Me',
+              onPress: async () => {
+                // Navigate instantly, don't wait for async work
+                setShowPreview(false);
+                setStep('instructions');
+                router.replace('/(tabs)/Complaints');
+
+                // Do notification work silently in the background
+                try {
+                  const token = await askForNotificationPermission();
+                  if (!token) {
+                    showGlobalToast('Permission denied for notifications.', 'error');
+                    return;
+                  }
+                  await userApiClient.post('/push-token', { token });
+                  await userApiClient.post('/enable-push-notifications', { enabled: true });
+                  fetchCurrentUser(true);
+                  showGlobalToast('Notifications enabled!', 'success');
+                } catch (err) {
+                  showGlobalToast('Failed to enable notifications.', 'error');
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        setShowPreview(false);
+        setStep('instructions');
+        router.replace('/(tabs)/Complaints');
+      }
+    }
+  } catch (error: any) {
+    const detail = error?.response?.data?.detail;
+    showToast(detail ?? 'Something went wrong. Please try again.', 'error');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   // ── Render: preview ───────────────────────────────────────────────────────────
   if (showPreview) {
     return (
