@@ -43,6 +43,7 @@ import { UploaderInfo, MediaItem, Announcement } from '@/types/general/home';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { uploaderLabel } from '@/utils/home/home';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { THEME } from '@/constants/theme';
 const DETAIL_MEDIA_WIDTH = SCREEN_WIDTH - 40; // px-5 padding on both sides
 const HEADER_HEIGHT = Platform.OS === 'ios' ? 96 : (StatusBar.currentHeight ?? 24) + 60;
 
@@ -64,12 +65,17 @@ function timeAgo(iso: string, lang: string) {
 function Avatar({ name, size = 40 }: { name: string; size?: number }) {
   return (
     <View
-      style={{ width: size, height: size, borderRadius: size / 2 }}
-      className="bg-blue-100 items-center justify-center"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: `${THEME.primary}1A`, // ~10% opacity
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
       <Text
-        style={{ fontSize: size * 0.38 }}
-        className="text-blue-600 font-black"
+        style={{ fontSize: size * 0.38, color: THEME.primary, fontWeight: '900' }}
       >
         {name[0]?.toUpperCase() ?? 'L'}
       </Text>
@@ -79,8 +85,26 @@ function Avatar({ name, size = 40 }: { name: string; size?: number }) {
 
 function Tag({ label }: { label: string }) {
   return (
-    <View className="self-start rounded-full bg-blue-50 border border-blue-100 px-3 py-1">
-      <Text className="text-blue-600 text-[10px] font-bold tracking-wider uppercase">
+    <View
+      style={{
+        alignSelf: 'flex-start',
+        borderRadius: 999,
+        backgroundColor: `${THEME.primary}0D`, // ~5% opacity
+        borderWidth: 1,
+        borderColor: `${THEME.primary}1A`,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+      }}
+    >
+      <Text
+        style={{
+          color: THEME.primary,
+          fontSize: 10,
+          fontWeight: '700',
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+        }}
+      >
         {label}
       </Text>
     </View>
@@ -100,7 +124,7 @@ function CarouselDots({ count, active }: { count: number; active: number }) {
             width: i === active ? 22 : 7,
             height: 7,
             borderRadius: 4,
-            backgroundColor: i === active ? '#2563EB' : '#CBD5E1',
+            backgroundColor: i === active ? THEME.primary : '#CBD5E1',
           }}
         />
       ))}
@@ -330,6 +354,12 @@ export default function AnnouncementDetailScreen() {
 
   const name = data ? uploaderLabel(data.uploader) : '';
 
+  // Derive a soft tint from THEME.primary for backgrounds/borders
+  const primaryTint  = `${THEME.primary}0D`; // ~5 % opacity
+  const primaryLight = `${THEME.primary}1A`; // ~10 % opacity
+  const primaryMid   = `${THEME.primary}26`; // ~15 % opacity
+  const shadowPrimary = THEME.primary;
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
 
@@ -337,14 +367,14 @@ export default function AnnouncementDetailScreen() {
       <Animated.View
         style={{
           opacity: headerOpacity,
-          backgroundColor: '#2563EB',
+          backgroundColor: THEME.primary,
           paddingHorizontal: 20,
           paddingTop: 12,
           paddingBottom: 14,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          shadowColor: '#1D4ED8',
+          shadowColor: shadowPrimary,
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.2,
           shadowRadius: 12,
@@ -423,9 +453,18 @@ export default function AnnouncementDetailScreen() {
           <TouchableOpacity
             onPress={refetch}
             activeOpacity={0.8}
-            className="bg-blue-50 border border-blue-100 rounded-full px-6 py-3"
+            style={{
+              backgroundColor: primaryTint,
+              borderWidth: 1,
+              borderColor: primaryLight,
+              borderRadius: 999,
+              paddingHorizontal: 24,
+              paddingVertical: 12,
+            }}
           >
-            <Text className="text-blue-600 text-[13px] font-bold">{t('announcements.retry')}</Text>
+            <Text style={{ color: THEME.primary, fontSize: 13, fontWeight: '700' }}>
+              {t('announcements.retry')}
+            </Text>
           </TouchableOpacity>
         </View>
       ) : data ? (
@@ -463,10 +502,17 @@ export default function AnnouncementDetailScreen() {
             {/* Meta chips */}
             <View className="flex-row flex-wrap gap-2 mb-5">
               {/* Date */}
-              <View className="flex-row items-center gap-1.5 bg-white border border-slate-100 rounded-xl px-3 py-2"
-                style={{ shadowColor: '#94A3B8', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 }}
+              <View
+                className="flex-row items-center gap-1.5 bg-white border border-slate-100 rounded-xl px-3 py-2"
+                style={{
+                  shadowColor: '#94A3B8',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.06,
+                  shadowRadius: 4,
+                  elevation: 1,
+                }}
               >
-                <CalendarDays size={12} color="#2563EB" />
+                <CalendarDays size={12} color={THEME.primary} />
                 <Text className="text-slate-600 text-[12px] font-semibold">
                   {formatDate(data.created_at)}
                 </Text>
@@ -492,8 +538,8 @@ export default function AnnouncementDetailScreen() {
               className="flex-row items-center gap-4 bg-white rounded-2xl p-4"
               style={{
                 borderWidth: 1,
-                borderColor: '#E8EFFE',
-                shadowColor: '#1A56DB',
+                borderColor: primaryLight,
+                shadowColor: THEME.primary,
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.06,
                 shadowRadius: 10,
@@ -513,10 +559,15 @@ export default function AnnouncementDetailScreen() {
                 </Text>
               </View>
               <View
-                className="rounded-xl p-2.5"
-                style={{ backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#DBEAFE' }}
+                style={{
+                  borderRadius: 12,
+                  padding: 10,
+                  backgroundColor: primaryTint,
+                  borderWidth: 1,
+                  borderColor: primaryLight,
+                }}
               >
-                <User size={16} color="#2563EB" />
+                <User size={16} color={THEME.primary} />
               </View>
             </View>
 

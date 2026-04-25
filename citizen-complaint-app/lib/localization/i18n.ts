@@ -403,7 +403,9 @@ const resources = {
           gender: "GENDER",
           barangay: "BARANGAY",
           fullAddress: "FULL ADDRESS",
-          yearsOld: "years old"
+          yearsOld: "years old",
+          male: "Male",
+          female: "Female",
         },
         accountInfo: {
           title: "Account Information",
@@ -503,8 +505,27 @@ const resources = {
       "title": "My Complaints",
       "back": "Back"
     },
+
+    "titles": {
+   "noise_disturbance": "Noise Disturbance",
+  "illegal_dumping": "Illegal Dumping",
+  "road_damage": "Road Damage",
+  "street_light_outage": "Street Light Outage",
+  "flooding_drainage": "Flooding",
+  "illegal_construction": "Illegal Construction",
+  "stray_animals": "Stray Animals",
+  "public_intoxication": "Public Intoxication",
+  "illegal_vending": "Illegal Vending",
+  "water_supply_issue": "Water Supply Issue",
+  "garbage_collection": "Garbage Collection",
+  "vandalism": "Vandalism"
+},
+
+"pagination": {
+  "showing": "Showing {{start}}–{{end}} of {{total}} complaints"
+},
     "search": {
-      "placeholder": "Search Barangay..."
+      "placeholder": "Search Complaints..."
     },
     "filter": {
       "label": "Filter",
@@ -581,7 +602,9 @@ const resources = {
         "custom_title_hint": "Briefly describe your complaint in a few words",
          "profile_location_title": "Profile Location Required",
     "profile_location_desc": "You haven't set your location yet. Tap here to update your profile before submitting.",
-
+  "custom_title_validation_spaces": "Title cannot be blank or spaces only.",
+  "custom_title_validation_repeated_chars": "Title contains too many repeated characters.",
+  "custom_title_validation_repeated_words": "Title contains too many repeated words.",
     "details_description": "Describe your complaint clearly. Include when it happened, who is affected, and any relevant details that will help the barangay address it promptly.",
 
     "next_step_hint": "Next: Pin where the incident happened on the map.",
@@ -842,19 +865,34 @@ const resources = {
       },
       "announcements": {
         "heading": "Announcements",
-        "all": "All",
+        "all": "View All",
+        "back": "Back",
+        "title": "Announcements",
+    "count": "announcements found",
+    "search_placeholder": "Search announcements...",
+    "loading": "Loading announcements...",
+    "error_title": "Something went wrong",
+    "error_subtitle": "We couldn't load announcements. Please try again.",
+    "retry": "Try Again",
+    "empty_title": "No announcements found",
+    "empty_subtitle": "Try adjusting your search.",
+    "badge": "New",
+    "unknown": "Unknown",
+    "prev": "Prev",
+    "next": "Next",
+    "video": "video",
+    "videos": "videos",
         "tag": "Announcement",
         "posted_by": "Posted by",
         "read_more": "Read",
         "see_more": "See More",
         "remaining": "more",
         "end_of_list": "— End of list —",
-        "loading": "Loading announcements…",
-        "empty_title": "No Announcements",
+      
         "empty_body": "There are no announcements at this time.",
-        "error_title": "Something Went Wrong",
+     
         "error_body": "Could not load announcements.",
-        "retry": "Try Again"
+      
       },
       "media": {
         "tap_to_watch": "Tap to watch",
@@ -1385,6 +1423,8 @@ const resources = {
         personalInfo: {
           title: "Personal na Impormasyon",
           email: "EMAIL",
+          male: "lalaki",
+          female: "babae",
           fullName: "BUONG PANGALAN",
           age: "EDAD",
           gender: "KASARIAN",
@@ -1510,8 +1550,28 @@ const resources = {
       "title": "Aking mga Reklamo",
       "back": "Bumalik"
     },
+
+    "titles": {
+   "noise_disturbance": "Ingay na Nakakagambala",
+  "illegal_dumping": "Ilegal na Pagtatapon ng Basura",
+  "road_damage": "Pinsala sa Daan",
+  "street_light_outage": "Sirang Ilaw sa Lansangan",
+  "flooding_drainage": "Pagbaha",
+  "illegal_construction": "Ilegal na Konstruksyon",
+  "stray_animals": "Mga Ligaw na Hayop",
+  "public_intoxication": "Pagkalasing sa Pampublikong Lugar",
+  "illegal_vending": "Ilegal na Pagbebenta",
+  "water_supply_issue": "Problema sa Suplay ng Tubig",
+  "garbage_collection": "Koleksyon ng Basura",
+  "vandalism": "Vandalismo"
+},
+
+
+"pagination": {
+  "showing": "Ipinapakita ang {{start}}–{{end}} sa {{total}} mga reklamo"
+},
     "search": {
-      "placeholder": "Maghanap ng Barangay..."
+      "placeholder": "Maghanap sa iyong mga reklamo..."
     },
     "filter": {
       "label": "Salain",
@@ -1707,7 +1767,9 @@ const resources = {
         "details_label": "Detalye ng Reklamo",
          "profile_location_title": "Kailangang I-set ang Lokasyon sa Profile",
     "profile_location_desc": "Hindi mo pa naitatakda ang iyong lokasyon. I-tap ito para i-update ang iyong profile bago magsumite.",
-
+ "custom_title_validation_spaces": "Ang pamagat ay hindi maaaring blangko o may mga espasyo lamang.",
+  "custom_title_validation_repeated_chars": "Ang pamagat ay naglalaman ng napakaraming paulit-ulit na mga character.",
+  "custom_title_validation_repeated_words": "Ang pamagat ay naglalaman ng napakaraming paulit-ulit na mga salita.",
     "details_description": "Ilarawan nang malinaw ang iyong reklamo. Ilagay kung kailan ito nangyari, sino ang apektado, at iba pang detalye upang agad itong matugunan ng barangay.",
 
     "next_step_hint": "Sunod: I-pin ang lugar kung saan nangyari ang insidente sa mapa.",
@@ -1835,19 +1897,35 @@ const resources = {
       },
       "announcements": {
         "heading": "Mga Anunsyo",
-        "all": "Lahat",
+        "all": "Tingnan Lahat",
+       "back": "Bumalik",
+           "title": "Mga Anunsyo",
+    "count": "anunsyo ang nahanap",
+    "search_placeholder": "Maghanap ng anunsyo...",
+    "loading": "Nilo-load ang mga anunsyo...",
+    "error_title": "May naganap na error",
+    "error_subtitle": "Hindi ma-load ang mga anunsyo. Subukan muli.",
+    "retry": "Subukan Muli",
+    "empty_title": "Walang nahanap na anunsyo",
+    "empty_subtitle": "Subukan baguhin ang iyong paghahanap.",
+    "badge": "Bago",
+    "unknown": "Hindi Kilala",
+    "prev": "Nakaraan",
+    "next": "Susunod",
+    "video": "video",
+    "videos": "mga video",
         "tag": "Anunsyo",
         "read_more": "Basahin",
         "see_more": "Tignan Pa",
         "remaining": "pa",
         "posted_by": "Ipinost ni",
         "end_of_list": "— Katapusan ng listahan —",
-        "loading": "Nilo-load ang mga anunsyo…",
-        "empty_title": "Walang Anunsyo",
+    
         "empty_body": "Wala pang anunsyo sa kasalukuyan.",
-        "error_title": "May Pagkakamali",
+      
         "error_body": "Hindi ma-load ang mga anunsyo.",
-        "retry": "Subukan Muli"
+       
+        
       },
       "media": {
         "tap_to_watch": "I-tap para manood",

@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity,
   Image, ActivityIndicator, TextInput, Animated, StatusBar,
 } from 'react-native';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { CalendarDays, MapPin, Clock, Search, ChevronLeft, ChevronRight, X, ArrowRight } from 'lucide-react-native';
@@ -12,6 +12,7 @@ import ErrorScreen from '@/screen/general/ErrorScreen';
 import { getEventErrorType } from '@/utils/event/eventError';
 import { THEME } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
+
 interface EventMedia { id: number; media_url: string; media_type: string; uploaded_at: string; }
 interface EventData  { id: number; event_name: string; description?: string; date: string; location?: string; media: EventMedia[]; }
 
@@ -21,6 +22,8 @@ const ACCENTS = [
   { color: '#6D28D9', dark: '#3B0764', text: '#DDD6FE' },
   { color: '#047857', dark: '#064E3B', text: '#A7F3D0' },
 ];
+
+const PAGE_SIZE = 10;
 
 function formatDate(isoDate: string) {
   const d = new Date(isoDate);
@@ -147,13 +150,140 @@ function EventRow({ event, index, onPress }: { event: EventData; index: number; 
     : <AnnouncementEventCard event={event} index={index} onPress={onPress} />;
 }
 
+// ── Pagination Bar ────────────────────────────────────────────────────────────
+function PaginationBar({
+  currentPage,
+  totalPages,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+
+  // Build visible page numbers with ellipsis logic
+  const getPageNumbers = (): (number | '...')[] => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const pages: (number | '...')[] = [1];
+    if (currentPage > 3) pages.push('...');
+    const start = Math.max(2, currentPage - 1);
+    const end   = Math.min(totalPages - 1, currentPage + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (currentPage < totalPages - 2) pages.push('...');
+    pages.push(totalPages);
+    return pages;
+  };
+
+  const pages = getPageNumbers();
+
+  return (
+    <View style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 20,
+      paddingHorizontal: 16,
+      gap: 6,
+    }}>
+      {/* Prev */}
+      <TouchableOpacity
+        onPress={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          backgroundColor: currentPage === 1 ? '#F1F5F9' : '#fff',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: currentPage === 1 ? '#E2E8F0' : '#CBD5E1',
+          shadowColor: '#0F172A',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: currentPage === 1 ? 0 : 0.06,
+          shadowRadius: 3,
+          elevation: currentPage === 1 ? 0 : 2,
+        }}
+      >
+        <ChevronLeft size={16} color={currentPage === 1 ? '#CBD5E1' : '#475569'} />
+      </TouchableOpacity>
+
+      {/* Page numbers */}
+      {pages.map((page, i) =>
+        page === '...' ? (
+          <View key={`ellipsis-${i}`} style={{ width: 28, alignItems: 'center' }}>
+            <Text style={{ color: '#94A3B8', fontSize: 13, fontWeight: '500' }}>···</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            key={page}
+            onPress={() => onPageChange(page as number)}
+            style={{
+              minWidth: 36,
+              height: 36,
+              paddingHorizontal: 6,
+              borderRadius: 10,
+              backgroundColor: currentPage === page ? THEME.primary : '#fff',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: currentPage === page ? THEME.primary : '#E2E8F0',
+              shadowColor: currentPage === page ? THEME.primary : '#0F172A',
+              shadowOffset: { width: 0, height: currentPage === page ? 2 : 1 },
+              shadowOpacity: currentPage === page ? 0.3 : 0.06,
+              shadowRadius: currentPage === page ? 6 : 3,
+              elevation: currentPage === page ? 4 : 1,
+            }}
+          >
+            <Text style={{
+              color: currentPage === page ? '#fff' : '#475569',
+              fontSize: 13,
+              fontWeight: currentPage === page ? '700' : '500',
+            }}>
+              {page}
+            </Text>
+          </TouchableOpacity>
+        )
+      )}
+
+      {/* Next */}
+      <TouchableOpacity
+        onPress={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          backgroundColor: currentPage === totalPages ? '#F1F5F9' : '#fff',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: currentPage === totalPages ? '#E2E8F0' : '#CBD5E1',
+          shadowColor: '#0F172A',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: currentPage === totalPages ? 0 : 0.06,
+          shadowRadius: 3,
+          elevation: currentPage === totalPages ? 0 : 2,
+        }}
+      >
+        <ChevronRight size={16} color={currentPage === totalPages ? '#CBD5E1' : '#475569'} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function EventsScreen() {
   const router = useRouter();
-  const [query, setQuery]     = useState('');
-  const [focused, setFocused] = useState(false);
+  const [query, setQuery]       = useState('');
+  const [focused, setFocused]   = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const {t} = useTranslation();
+  const listRef  = useRef<FlatList>(null);
+  const { t } = useTranslation();
 
   const { data: events = [], isLoading, isError, error, refetch, isFetching } = useQuery<EventData[]>({
     queryKey: ['events'],
@@ -165,9 +295,32 @@ export default function EventsScreen() {
     retry: 2,
   });
 
-  const filtered = query
-    ? events.filter((e) => e.event_name.toLowerCase().includes(query.toLowerCase()) || e.location?.toLowerCase().includes(query.toLowerCase()))
-    : events;
+  const filtered = useMemo(
+    () => query
+      ? events.filter((e) =>
+          e.event_name.toLowerCase().includes(query.toLowerCase()) ||
+          e.location?.toLowerCase().includes(query.toLowerCase()))
+      : events,
+    [events, query],
+  );
+
+  // Reset to page 1 whenever the search query changes
+  useEffect(() => { setCurrentPage(1); }, [query]);
+
+  const usePagination = filtered.length >= PAGE_SIZE;
+  const totalPages    = usePagination ? Math.ceil(filtered.length / PAGE_SIZE) : 1;
+
+  const paginatedData = useMemo(
+    () => usePagination
+      ? filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+      : filtered,
+    [filtered, currentPage, usePagination],
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
 
   useEffect(() => {
     if (!isLoading) {
@@ -196,7 +349,6 @@ export default function EventsScreen() {
               <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{filtered.length}</Text>
             </View>
           )}
-          {/* Subtle refetch spinner when background-refreshing */}
           {isFetching && !isLoading && (
             <ActivityIndicator size="small" color={THEME.primary} />
           )}
@@ -224,6 +376,21 @@ export default function EventsScreen() {
                   <X size={14} color="#64748B" />
                 </TouchableOpacity>
               )}
+            </View>
+          </View>
+        )}
+
+        {/* Pagination summary pill — shown when pagination is active */}
+        {!isLoading && !isError && usePagination && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingBottom: 10, gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F1F5F9', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 }}>
+              <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '500' }}>
+                Page {currentPage} of {totalPages}
+              </Text>
+              <View style={{ width: 3, height: 3, borderRadius: 2, backgroundColor: '#CBD5E1' }} />
+              <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '500' }}>
+                {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} events
+              </Text>
             </View>
           </View>
         )}
@@ -265,17 +432,29 @@ export default function EventsScreen() {
         </View>
       ) : (
         <FlatList
-          data={filtered}
+          ref={listRef}
+          data={paginatedData}
           keyExtractor={(item) => String(item.id)}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 48 }}
+          contentContainerStyle={{ paddingTop: 16, paddingBottom: 16 }}
           renderItem={({ item, index }) => (
-            <EventRow event={item} index={index} onPress={() => router.push(`/event/${item.id}`)} />
+            <EventRow
+              event={item}
+              index={index}
+              onPress={() => router.push(`/event/${item.id}`)}
+            />
           )}
-          ListHeaderComponent={
-            <Text style={{ paddingHorizontal: 16, marginBottom: 12, color: '#64748B', fontSize: 11, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase' }}>
-              {t('viewAllEvents.forQuery', { query: query })}
-            </Text>
+          
+          ListFooterComponent={
+            usePagination ? (
+              <PaginationBar
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
+            ) : (
+              <View style={{ height: 32 }} />
+            )
           }
         />
       )}

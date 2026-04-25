@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, TextInput, Keyboard } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, TextInput, Keyboard, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { barangayApiClient } from '@/lib/client/barangay';
@@ -7,20 +7,48 @@ import { ErrorScreen } from '@/screen/general/ErrorScreen';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { ChevronRight, FileText, Search, X } from 'lucide-react-native';
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Barangay } from '@/types/general/barangay';
 import { getBarangayCoords, DEFAULT_COORDS } from '@/constants/general/barangay';
 import { THEME } from '@/constants/theme';
 import GeneralToast from '@/components/Toast/GeneralToast';
 import useToastStore from '@/store/useGlobalModal';
+
 export default function ComplaintsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
-  const { setToastVisible,toastVisible, toastMessage, toastType, showToast } = useToastStore();
+  const flatListRef = useRef<FlatList>(null);
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+  const { setToastVisible, toastVisible, toastMessage, toastType, showToast } = useToastStore();
+
+  // Bouncing arrow animation — loops while button is visible
+  useEffect(() => {
+    if (!showScrollTop) {
+      bounceAnim.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceAnim, {
+          toValue: -5,
+          duration: 420,
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounceAnim, {
+          toValue: 0,
+          duration: 420,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [showScrollTop]);
 
   const { data, isPending, error, refetch } = useQuery({
     queryKey: ['barangays'],
@@ -53,6 +81,15 @@ export default function ComplaintsScreen() {
   const handleClearSearch = useCallback(() => {
     setSearchQuery('');
     Keyboard.dismiss();
+  }, []);
+
+  const handleScroll = useCallback((event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    setShowScrollTop(offsetY > 300);
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, []);
 
   const handleBarangayPress = (barangay: Barangay) => {
@@ -165,7 +202,11 @@ export default function ComplaintsScreen() {
             style={{ flex: 1, paddingVertical: 14, fontSize: 16, color: '#111827' }}
           />
           {isSearchFocused && (
-            <TouchableOpacity onPress={handleClearSearch} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} className="ml-2 bg-gray-200 rounded-full p-1.5">
+            <TouchableOpacity
+              onPress={handleClearSearch}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              className="ml-2 bg-gray-200 rounded-full p-1.5"
+            >
               <X size={14} color="#6B7280" />
             </TouchableOpacity>
           )}
@@ -184,20 +225,25 @@ export default function ComplaintsScreen() {
               {t('complaintsScreen.list.sectionLabel')}
             </Text>
             {isSearchActive ? (
-              <Text style={{ fontSize: 12, color: THEME.primary, fontWeight: '500' }}>{resultCount} of {totalCount} results</Text>
+              <Text style={{ fontSize: 12, color: THEME.primary, fontWeight: '500' }}>
+                {resultCount} of {totalCount} results
+              </Text>
             ) : (
               <Text className="text-xs text-gray-400 font-medium">{totalCount} barangays</Text>
             )}
           </View>
 
           <FlatList
+            ref={flatListRef}
             data={filteredData}
             renderItem={renderBarangayItem}
             keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={{ paddingBottom: 16, paddingTop: 8 }}
+            contentContainerStyle={{ paddingBottom: 100, paddingTop: 8 }}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -215,10 +261,26 @@ export default function ComplaintsScreen() {
                     <View className="bg-gray-100 rounded-full p-4 mb-3">
                       <Search size={28} color="#9CA3AF" />
                     </View>
-                    <Text className="text-gray-700 font-semibold text-base text-center mb-1">No barangays found</Text>
-                    <Text className="text-gray-400 text-sm text-center">No results for "{searchQuery}". Try a different name or address.</Text>
-                    <TouchableOpacity onPress={handleClearSearch} style={{ marginTop: 16, borderWidth: 1, borderColor: THEME.primary, borderRadius: 8, paddingHorizontal: 20, paddingVertical: 8 }}>
-                      <Text style={{ color: THEME.primary, fontSize: 14, fontWeight: '500' }}>Clear search</Text>
+                    <Text className="text-gray-700 font-semibold text-base text-center mb-1">
+                      No barangays found
+                    </Text>
+                    <Text className="text-gray-400 text-sm text-center">
+                      No results for "{searchQuery}". Try a different name or address.
+                    </Text>
+                    <TouchableOpacity
+                      onPress={handleClearSearch}
+                      style={{
+                        marginTop: 16,
+                        borderWidth: 1,
+                        borderColor: THEME.primary,
+                        borderRadius: 8,
+                        paddingHorizontal: 20,
+                        paddingVertical: 8,
+                      }}
+                    >
+                      <Text style={{ color: THEME.primary, fontSize: 14, fontWeight: '500' }}>
+                        Clear search
+                      </Text>
                     </TouchableOpacity>
                   </>
                 ) : (
@@ -229,12 +291,58 @@ export default function ComplaintsScreen() {
           />
         </View>
       )}
-       <GeneralToast
+
+      {/* Scroll to top — perfectly centered floating pill with bouncing arrow */}
+      {showScrollTop && (
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: 'absolute',
+            bottom: 28,
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+          }}
+        >
+          <TouchableOpacity
+            onPress={scrollToTop}
+            activeOpacity={0.82}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              backgroundColor: THEME.primary,
+              paddingHorizontal: 22,
+              paddingVertical: 12,
+              borderRadius: 99,
+              shadowColor: THEME.primary,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.4,
+              shadowRadius: 14,
+              elevation: 10,
+            }}
+          >
+            {/* Bouncing arrow icon */}
+            <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
+              <ChevronRight
+                size={18}
+                color="white"
+                style={{ transform: [{ rotate: '-90deg' }] }}
+              />
+            </Animated.View>
+            <Text style={{ color: 'white', fontSize: 14, fontWeight: '600', letterSpacing: 0.3 }}>
+              Back to top
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <GeneralToast
         visible={toastVisible}
         onHide={() => setToastVisible(false)}
         message={toastMessage}
         type={toastType}
-      /> 
+      />
     </SafeAreaView>
   );
 }

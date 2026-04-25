@@ -23,6 +23,7 @@ import { THEME } from '@/constants/theme';
 import { useAttachmentViewer } from '@/hooks/general/useAttachmentViewer';
 import { AttachmentViewer } from '@/components/media/AttachmentViewer';
 import { ActivityIndicator } from 'react-native';
+import { useState } from 'react';
 // ─── Validation Constants ──────────────────────────────────────────────────────
 // Minimum enforces meaningful complaints (prevents "noise" or "pothole" alone).
 // Maximum keeps records manageable for barangay staff across high-volume usage.
@@ -42,25 +43,48 @@ function getDetailsValidationState(length: number, dirty: boolean): DetailsValid
   return 'good';
 }
 
+
+// ─── Custom Title Validation ───────────────────────────────────────────────────
+// Returns an error string or null if the value is valid.
+// Pass `t` from useTranslation into the validator
+export function validateCustomTitle(value: string, t: (key: string) => string): string | null {
+  if (value.trim() === '') {
+    return t('complaint_form.custom_title_validation_spaces');
+  }
+  if (/(.)\1{4,}/.test(value)) {
+    return t('complaint_form.custom_title_validation_repeated_chars');
+  }
+  const words = value.trim().toLowerCase().split(/\s+/);
+  if (words.length >= 2) {
+    const freq: Record<string, number> = {};
+    for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
+    const maxCount = Math.max(...Object.values(freq));
+    if (maxCount >= 3 || maxCount / words.length >= 0.5) {
+      return t('complaint_form.custom_title_validation_repeated_words');
+    }
+  }
+  return null;
+}
+
 function getDetailsCounterStyle(state: DetailsValidationState): {
   color: string;
   fontWeight?: 'bold';
 } {
   switch (state) {
-    case 'good':    return { color: '#059669' };
+    case 'good': return { color: '#059669' };
     case 'warning': return { color: '#D97706', fontWeight: 'bold' };
-    case 'error':   return { color: '#DC2626', fontWeight: 'bold' };
-    default:        return { color: '#9CA3AF' };
+    case 'error': return { color: '#DC2626', fontWeight: 'bold' };
+    default: return { color: '#9CA3AF' };
   }
 }
 
 function getDetailsBorderColor(state: DetailsValidationState, hasError: boolean): string {
   if (hasError) return '#EF4444';
   switch (state) {
-    case 'good':    return '#059669';
+    case 'good': return '#059669';
     case 'warning': return '#D97706';
-    case 'error':   return '#DC2626';
-    default:        return '#E5E7EB';
+    case 'error': return '#DC2626';
+    default: return '#E5E7EB';
   }
 }
 
@@ -214,9 +238,11 @@ export function FormStep({
 }: FormStepProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const [customTitleLocalError, setCustomTitleLocalError] = useState<string | null>(null);
+
 
   const isOtherSelected = selectedPreset?.key === OTHER_KEY;
-const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer();
+  const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer();
   // ── Details validation state ──────────────────────────────────────────────
   const detailsState = getDetailsValidationState(message.length, messageWasTouched || !!messageError);
   const detailsBorderColor = getDetailsBorderColor(detailsState, !!messageError);
@@ -226,9 +252,17 @@ const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer()
     switch (type) {
       case 'image': return <ImageIcon size={20} color={THEME.primary} />;
       case 'video': return <Video size={20} color={THEME.primary} />;
-      default:      return <FileText size={20} color={THEME.primary} />;
+      default: return <FileText size={20} color={THEME.primary} />;
     }
   };
+const handleCustomTitleChange = (text: string) => {
+  onChangeCustomTitle(text);
+  if (text.length > 0) {
+    setCustomTitleLocalError(validateCustomTitle(text, t)); // ← pass t
+  } else {
+    setCustomTitleLocalError(null);
+  }
+};
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
@@ -287,13 +321,19 @@ const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer()
           {isOtherSelected && (
             <View className="mt-3">
               <View
-                className={`flex-row items-center bg-white border-2 rounded-2xl px-4 py-3.5 ${titleError ? 'border-red-400' : ''}`}
-                style={!titleError ? { borderColor: THEME.primary } : undefined}
+                className={`flex-row items-center bg-white border-2 rounded-2xl px-4 py-3.5`}
+                style={{
+                  borderColor: customTitleLocalError
+                    ? '#EF4444'
+                    : titleError
+                      ? '#EF4444'
+                      : THEME.primary,
+                }}
               >
-                <PenLine size={18} color={THEME.primary} />
+                <PenLine size={18} color={customTitleLocalError ? '#EF4444' : THEME.primary} />
                 <TextInput
                   value={customTitle}
-                  onChangeText={onChangeCustomTitle}
+                  onChangeText={handleCustomTitleChange}   // ← was onChangeCustomTitle
                   placeholder={t('complaint_form.custom_title_placeholder')}
                   placeholderTextColor="#9CA3AF"
                   maxLength={100}
@@ -302,9 +342,23 @@ const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer()
                 />
                 <Text className="text-xs text-gray-400 ml-2">{customTitle.length}/100</Text>
               </View>
-              <Text className="text-sm mt-1.5 ml-1" style={{ color: THEME.primary }}>
-                {t('complaint_form.custom_title_hint')}
-              </Text>
+
+              {/* Local validation error takes priority; parent titleError is a fallback */}
+              {customTitleLocalError ? (
+                <View className="flex-row items-center gap-1.5 mt-1.5">
+                  <AlertCircle size={14} color="#EF4444" />
+                  <Text className="text-sm text-red-500">{customTitleLocalError}</Text>
+                </View>
+              ) : titleError ? (
+                <View className="flex-row items-center gap-1.5 mt-1.5">
+                  <AlertCircle size={14} color="#EF4444" />
+                  <Text className="text-sm text-red-500">{titleError}</Text>
+                </View>
+              ) : (
+                <Text className="text-sm mt-1.5 ml-1" style={{ color: THEME.primary }}>
+                  {t('complaint_form.custom_title_hint')}
+                </Text>
+              )}
             </View>
           )}
 
@@ -324,7 +378,7 @@ const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer()
             {t('complaint_form.details_label')} <Text className="text-red-500">*</Text>
           </Text>
 
-        
+
 
           <Text className="text-sm text-gray-500 mb-3 leading-5">
             {t('complaint_form.details_description')}
@@ -383,46 +437,46 @@ const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer()
           <Text className="text-base font-bold text-gray-800 mb-1">{t('complaint_form.attachments_label')}</Text>
           <Text className="text-sm text-gray-500 mb-4 leading-5">{t('complaint_form.attachments_hint')}</Text>
 
-         
-{attachments.map((attachment) => (
-  <TouchableOpacity
-    key={attachment.id}
-    onPress={() => openAttachment(attachment)}   // ← tap name/row to open
-    activeOpacity={0.75}
-    className="bg-white border border-gray-200 rounded-2xl p-4 mb-2.5 flex-row items-center"
-  >
-    <View className="p-2.5 rounded-xl mr-3" style={{ backgroundColor: `${THEME.primary}15` }}>
-      {getAttachmentIcon(attachment.type)}
-    </View>
-    <View className="flex-1">
-      <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>
-        {attachment.name}
-      </Text>
-      {attachment.size && (
-        <Text className="text-xs text-gray-500 mt-0.5">
-          {formatFileSize(attachment.size)}
-          {'  ·  '}
-          <Text style={{ color: THEME.primary }}>
-            {attachment.type === 'image' ? 'Tap to view' : attachment.type === 'video' ? 'Tap to play' : 'Tap to open'}
-          </Text>
-        </Text>
-      )}
-    </View>
-    {/* Loading spinner while file is opening */}
-    {isOpening ? (
-      <ActivityIndicator size="small" color={THEME.primary} style={{ marginLeft: 8 }} />
-    ) : (
-      <TouchableOpacity
-        onPress={() => onRemoveAttachment(attachment.id)}
-        className="p-2 bg-red-50 rounded-xl ml-2"
-        hitSlop={8}
-      >
-        <X size={18} color="#EF4444" />
-      </TouchableOpacity>
-    )}
-  </TouchableOpacity>
-))}
- 
+
+          {attachments.map((attachment) => (
+            <TouchableOpacity
+              key={attachment.id}
+              onPress={() => openAttachment(attachment)}   // ← tap name/row to open
+              activeOpacity={0.75}
+              className="bg-white border border-gray-200 rounded-2xl p-4 mb-2.5 flex-row items-center"
+            >
+              <View className="p-2.5 rounded-xl mr-3" style={{ backgroundColor: `${THEME.primary}15` }}>
+                {getAttachmentIcon(attachment.type)}
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-semibold text-gray-900" numberOfLines={1}>
+                  {attachment.name}
+                </Text>
+                {attachment.size && (
+                  <Text className="text-xs text-gray-500 mt-0.5">
+                    {formatFileSize(attachment.size)}
+                    {'  ·  '}
+                    <Text style={{ color: THEME.primary }}>
+                      {attachment.type === 'image' ? 'Tap to view' : attachment.type === 'video' ? 'Tap to play' : 'Tap to open'}
+                    </Text>
+                  </Text>
+                )}
+              </View>
+              {/* Loading spinner while file is opening */}
+              {isOpening ? (
+                <ActivityIndicator size="small" color={THEME.primary} style={{ marginLeft: 8 }} />
+              ) : (
+                <TouchableOpacity
+                  onPress={() => onRemoveAttachment(attachment.id)}
+                  className="p-2 bg-red-50 rounded-xl ml-2"
+                  hitSlop={8}
+                >
+                  <X size={18} color="#EF4444" />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+          ))}
+
 
           {attachments.length < 3 && (
             <TouchableOpacity
@@ -554,9 +608,9 @@ const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer()
             </View>
             <View className="px-4 py-4">
               {[
-                { onPress: onPickImage,    bg: `${THEME.primary}10`, iconBg: THEME.primary, icon: <ImageIcon size={24} color="#ffffff" />, label: t('complaint_form.attachment_photo'),    hint: t('complaint_form.attachment_photo_hint'),    tag: 'JPG, PNG' },
-                { onPress: onPickVideo,    bg: '#f5f3ff',            iconBg: '#7c3aed',     icon: <Video size={24} color="#ffffff" />,     label: t('complaint_form.attachment_video'),    hint: t('complaint_form.attachment_video_hint'),    tag: 'MP4, MOV' },
-                { onPress: onPickDocument, bg: '#f0fdf4',            iconBg: '#16a34a',     icon: <FileText size={24} color="#ffffff" />,  label: t('complaint_form.attachment_document'), hint: t('complaint_form.attachment_document_hint'), tag: 'ANY' },
+                { onPress: onPickImage, bg: `${THEME.primary}10`, iconBg: THEME.primary, icon: <ImageIcon size={24} color="#ffffff" />, label: t('complaint_form.attachment_photo'), hint: t('complaint_form.attachment_photo_hint'), tag: 'JPG, PNG' },
+                { onPress: onPickVideo, bg: '#f5f3ff', iconBg: '#7c3aed', icon: <Video size={24} color="#ffffff" />, label: t('complaint_form.attachment_video'), hint: t('complaint_form.attachment_video_hint'), tag: 'MP4, MOV' },
+                { onPress: onPickDocument, bg: '#f0fdf4', iconBg: '#16a34a', icon: <FileText size={24} color="#ffffff" />, label: t('complaint_form.attachment_document'), hint: t('complaint_form.attachment_document_hint'), tag: 'ANY' },
               ].map((opt, i) => (
                 <TouchableOpacity
                   key={i}
@@ -586,7 +640,7 @@ const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer()
           </Pressable>
         </Pressable>
       </Modal>
-<AttachmentViewer viewer={viewer} onClose={closeViewer} />
+      <AttachmentViewer viewer={viewer} onClose={closeViewer} />
     </SafeAreaView>
   );
 }

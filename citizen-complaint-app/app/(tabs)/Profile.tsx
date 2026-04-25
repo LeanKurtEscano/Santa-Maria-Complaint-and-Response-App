@@ -499,7 +499,7 @@ export default function ProfileScreen() {
                     </Text>
                   </View>
                   <Text className="text-base text-neutral-900 capitalize">
-                    {userData.gender}
+                    {t(`profile.personalInfo.${userData.gender.toLowerCase()}`)}
                   </Text>
                 </View>
                 <View className="h-px bg-neutral-200 my-4" />

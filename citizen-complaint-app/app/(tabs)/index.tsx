@@ -202,7 +202,7 @@ export default function HomeScreen() {
             Icon={Megaphone}
             title={t('announcements.heading')}
             actionLabel={t('announcements.all')}
-            onAction={() => {}}
+            onAction={() => router.push('/announcements/all')}
           />
           <AnnouncementsList
             data={data}

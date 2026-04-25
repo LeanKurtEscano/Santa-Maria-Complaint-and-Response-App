@@ -253,20 +253,22 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
           >
             {message}
           </Text>
-
-          {/* Dismiss hint */}
-          <Text
-            style={{
-              color: '#d1d5db',
-              fontSize: 11,
-              textAlign: 'center',
-              marginTop: 14,
-              letterSpacing: 0.3,
-            }}
-          >
-            Tap anywhere to dismiss
-          </Text>
         </Animated.View>
+
+        {/* Dismiss hint — outside the card */}
+        <Animated.Text
+          style={{
+            opacity: opacityAnim,
+            color: 'rgba(255,255,255,0.55)',
+            fontSize: 12,
+            textAlign: 'center',
+            marginTop: 20,
+            letterSpacing: 0.6,
+            fontWeight: '400',
+          }}
+        >
+          Tap anywhere to dismiss
+        </Animated.Text>
       </Pressable>
     </Modal>
   );

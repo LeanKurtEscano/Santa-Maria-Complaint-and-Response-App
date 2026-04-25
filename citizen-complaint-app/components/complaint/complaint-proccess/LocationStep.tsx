@@ -211,6 +211,8 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         setBoundaryError(null);
       } else if (data.type === 'pinOutOfBounds') {
         setBoundaryError('Pin must be placed within the barangay boundary.');
+         setPinned({ lat: barangayLat, lng: barangayLng });
+        setLocationMode('barangay');
       }
     } catch {}
   };

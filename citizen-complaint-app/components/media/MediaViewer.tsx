@@ -22,6 +22,7 @@ import {
 import { X, Play, Pause, Volume2, VolumeX } from 'lucide-react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useTranslation } from 'react-i18next';
+import { THEME } from '@/constants/theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const IMAGE_H = SCREEN_H * 0.78;
@@ -95,20 +96,13 @@ export function ImageViewer({ visible, uri, onClose }: ImageViewerProps) {
     animateTo(1, 0, 0);
   }, [animateTo]);
 
-  // Double-tap: zoom into the tapped point, or reset if already zoomed
   const handleDoubleTap = useCallback(
     (tapX: number, tapY: number) => {
       if (currentScale.current > 1) {
         animateTo(1, 0, 0);
       } else {
-        // tapX/tapY are locationX/Y — coords within the Animated.View (SCREEN_W x IMAGE_H).
-        // Clamp strictly inside the image so a tap outside never pans off-screen.
         const clampedTapX = Math.max(0, Math.min(SCREEN_W, tapX));
         const clampedTapY = Math.max(0, Math.min(IMAGE_H,  tapY));
-
-        // Translate the tapped point to the view center.
-        // Multiply by (ZOOM_SCALE - 1) not ZOOM_SCALE — this is the delta the
-        // transform needs to shift, not the final absolute position.
         const offsetX = (SCREEN_W / 2 - clampedTapX) * (ZOOM_SCALE - 1);
         const offsetY = (IMAGE_H  / 2 - clampedTapY) * (ZOOM_SCALE - 1);
         const clamped = clampOffset(offsetX, offsetY, ZOOM_SCALE);
@@ -122,7 +116,6 @@ export function ImageViewer({ visible, uri, onClose }: ImageViewerProps) {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder:  (_, gs) =>
-        // Only claim move if the user is actually dragging (avoids eating taps)
         Math.abs(gs.dx) > 2 || Math.abs(gs.dy) > 2,
 
       onPanResponderGrant: (evt) => {
@@ -142,7 +135,6 @@ export function ImageViewer({ visible, uri, onClose }: ImageViewerProps) {
         const touches = evt.nativeEvent.touches;
 
         if (touches.length >= 2) {
-          // ── Pinch zoom ────────────────────────────────────────────────────
           const dx   = touches[0].pageX - touches[1].pageX;
           const dy   = touches[0].pageY - touches[1].pageY;
           const dist = Math.sqrt(dx * dx + dy * dy);
@@ -152,14 +144,11 @@ export function ImageViewer({ visible, uri, onClose }: ImageViewerProps) {
             scaleAtStart.current = currentScale.current;
           }
 
-          const ratio    = dist / initialDist.current;
-          const raw      = scaleAtStart.current * ratio;
+          const ratio = dist / initialDist.current;
+          const raw   = scaleAtStart.current * ratio;
 
-          // Rubber-band resistance below 1×: compress the scale so it never
-          // reaches MIN_SCALE, giving a springy "you can't go further" feel
           let next: number;
           if (raw < 1) {
-            // resistance curve: each unit below 1 costs progressively more
             const overshoot = 1 - raw;
             const dampened  = overshoot / (1 + overshoot * 3);
             next = Math.max(MIN_SCALE, 1 - dampened);
@@ -170,7 +159,6 @@ export function ImageViewer({ visible, uri, onClose }: ImageViewerProps) {
           currentScale.current = next;
           scale.setValue(next);
 
-          // When shrinking below 1× keep translation at 0 (image is centered)
           if (next <= 1) {
             currentX.current = 0;
             currentY.current = 0;
@@ -185,7 +173,6 @@ export function ImageViewer({ visible, uri, onClose }: ImageViewerProps) {
           }
 
         } else if (touches.length === 1 && currentScale.current > 1) {
-          // ── Pan while zoomed ──────────────────────────────────────────────
           const dx = touches[0].pageX - panStartX.current;
           const dy = touches[0].pageY - panStartY.current;
 
@@ -204,26 +191,20 @@ export function ImageViewer({ visible, uri, onClose }: ImageViewerProps) {
       onPanResponderRelease: (evt, gs) => {
         initialDist.current = null;
 
-        // Spring back to 1× if pinched below threshold
         if (currentScale.current < SNAP_BACK_BELOW) {
           animateTo(1, 0, 0);
           return;
         }
 
-        // ── Double-tap detection ──────────────────────────────────────────
-        // Only fire if the gesture was a tap (no real movement)
         const isTap = Math.abs(gs.dx) < 8 && Math.abs(gs.dy) < 8;
         if (isTap) {
           const now  = Date.now();
-          // locationX/Y = coords relative to the Animated.View (the image container)
-          // This ensures the tap point maps correctly to image-space, not screen-space.
           const tapX = evt.nativeEvent.locationX;
           const tapY = evt.nativeEvent.locationY;
 
           if (now - lastTapTime.current < DOUBLE_TAP_DELAY) {
-            // Double tap!
             handleDoubleTap(tapX, tapY);
-            lastTapTime.current = 0; // reset so a 3rd tap doesn't re-trigger
+            lastTapTime.current = 0;
           } else {
             lastTapTime.current = now;
             lastTapX.current    = tapX;
@@ -264,7 +245,6 @@ export function ImageViewer({ visible, uri, onClose }: ImageViewerProps) {
         style={{ flex: 1, opacity: bgOpacity, backgroundColor: 'rgba(0,0,0,0.95)' }}
         className="items-center justify-center"
       >
-        {/* Close button */}
         <TouchableOpacity
           onPress={handleClose}
           activeOpacity={0.8}
@@ -273,12 +253,10 @@ export function ImageViewer({ visible, uri, onClose }: ImageViewerProps) {
           <X size={20} color="white" />
         </TouchableOpacity>
 
-        {/* Hint */}
         <Text className="absolute bottom-10 left-0 right-0 text-center text-white/30 text-xs font-medium">
           {t('media.zoom_hint')}
         </Text>
 
-        {/* Zoomable image */}
         <Animated.View
           style={{
             transform: [{ scale }, { translateX }, { translateY }],
@@ -313,12 +291,16 @@ export function VideoPlayer({ visible, uri, onClose }: VideoPlayerProps) {
 
   const [muted,        setMuted]        = useState(false);
   const [progress,     setProgress]     = useState(0);
-  const [position,     setPosition]     = useState(0);
-  const [duration,     setDuration]     = useState(0);
+  const [position,     setPosition]     = useState(0);   // ms
+  const [duration,     setDuration]     = useState(0);   // ms
   const [showControls, setShowControls] = useState(true);
 
   const hideTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trackWidth = SCREEN_W - 40;
+
+  // Keep a ref so timeUpdate can always read the latest duration without
+  // stale-closure issues
+  const durationRef = useRef(0);
 
   const player = useVideoPlayer(uri ? { uri } : null, (p) => {
     p.loop                    = true;
@@ -326,18 +308,59 @@ export function VideoPlayer({ visible, uri, onClose }: VideoPlayerProps) {
     p.timeUpdateEventInterval = 0.25;
   });
 
+  // Sync muted flag
   React.useEffect(() => {
     if (player) player.muted = muted;
   }, [muted, player]);
 
+  // ── Duration: read from player.duration as soon as the video is ready ──────
+  // `statusChange` fires with status === 'readyToPlay' once metadata is loaded,
+  // at which point player.duration is reliable.
   React.useEffect(() => {
     if (!player) return;
-    const sub = player.addListener('timeUpdate', (e) => {
-      setPosition((e.currentTime ?? 0) * 1000);
-      setDuration((e.duration     ?? 0) * 1000);
-      setProgress(e.duration ? e.currentTime / e.duration : 0);
+
+    const statusSub = player.addListener('statusChange', (e) => {
+      if (e.status === 'readyToPlay') {
+        // player.duration is in seconds
+        const durMs = (player.duration ?? 0) * 1000;
+        if (durMs > 0) {
+          durationRef.current = durMs;
+          setDuration(durMs);
+        }
+      }
     });
-    return () => sub.remove();
+
+    return () => statusSub.remove();
+  }, [player]);
+
+  // ── Position + progress: update on every tick ─────────────────────────────
+  React.useEffect(() => {
+    if (!player) return;
+
+    const timeSub = player.addListener('timeUpdate', (e) => {
+      const posMs = (e.currentTime ?? 0) * 1000;
+      setPosition(posMs);
+
+      // Try to get duration from the event first, fall back to player.duration,
+      // then fall back to the cached ref.
+      const rawDur =
+        (e.duration && e.duration > 0)
+          ? e.duration * 1000
+          : (player.duration && player.duration > 0)
+            ? player.duration * 1000
+            : durationRef.current;
+
+      if (rawDur > 0) {
+        // Update duration state if it has changed (e.g. live stream)
+        if (rawDur !== durationRef.current) {
+          durationRef.current = rawDur;
+          setDuration(rawDur);
+        }
+        setProgress(posMs / rawDur);
+      }
+    });
+
+    return () => timeSub.remove();
   }, [player]);
 
   const touchControls = () => {
@@ -347,8 +370,10 @@ export function VideoPlayer({ visible, uri, onClose }: VideoPlayerProps) {
   };
 
   const formatMs = (ms: number) => {
-    const s = Math.floor(ms / 1000);
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    return `${mins}:${String(secs).padStart(2, '0')}`;
   };
 
   const handlePlayPause = () => {
@@ -359,9 +384,10 @@ export function VideoPlayer({ visible, uri, onClose }: VideoPlayerProps) {
 
   const handleSeek = (x: number) => {
     touchControls();
-    if (!player || !duration) return;
+    const dur = durationRef.current;
+    if (!player || !dur) return;
     const ratio = Math.max(0, Math.min(1, x / trackWidth));
-    player.currentTime = (ratio * duration) / 1000;
+    player.currentTime = (ratio * dur) / 1000;
     setProgress(ratio);
   };
 
@@ -369,6 +395,8 @@ export function VideoPlayer({ visible, uri, onClose }: VideoPlayerProps) {
     player?.pause();
     setProgress(0);
     setPosition(0);
+    setDuration(0);
+    durationRef.current = 0;
     setShowControls(true);
     onClose();
   };
@@ -406,6 +434,7 @@ export function VideoPlayer({ visible, uri, onClose }: VideoPlayerProps) {
             </View>
           )}
 
+          {/* Top bar: close + mute */}
           <View className="absolute top-0 left-0 right-0 flex-row items-center justify-between px-5 pt-12 pb-4">
             <TouchableOpacity
               onPress={handleClose}
@@ -427,19 +456,29 @@ export function VideoPlayer({ visible, uri, onClose }: VideoPlayerProps) {
             </TouchableOpacity>
           </View>
 
+          {/* Bottom bar: time + seek bar */}
           <View className="absolute bottom-0 left-0 right-0 px-5 pb-10">
             <View className="flex-row justify-between mb-2">
-              <Text className="text-white/50 text-xs font-medium">{formatMs(position)}</Text>
-              <Text className="text-white/50 text-xs font-medium">{formatMs(duration)}</Text>
+              <Text className="text-white/50 text-xs font-medium">
+                {formatMs(position)}
+              </Text>
+              <Text className="text-white/50 text-xs font-medium">
+                {duration > 0 ? formatMs(duration) : '--:--'}
+              </Text>
             </View>
+
             <TouchableWithoutFeedback onPress={(e) => handleSeek(e.nativeEvent.locationX)}>
               <View
                 className="h-1.5 bg-white/20 rounded-full overflow-hidden"
                 style={{ width: trackWidth }}
               >
                 <View
-                  className="h-full bg-blue-400 rounded-full"
-                  style={{ width: `${progress * 100}%` }}
+                  style={{
+                    height: '100%',
+                    width: `${progress * 100}%`,
+                    backgroundColor: THEME.primary,
+                    borderRadius: 999,
+                  }}
                 />
               </View>
             </TouchableWithoutFeedback>

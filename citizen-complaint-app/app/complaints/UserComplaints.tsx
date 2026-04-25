@@ -18,8 +18,10 @@ import { useRouter } from "expo-router";
 import {
   AlertCircle,
   ArrowLeft,
+  ArrowRight,
   Building2,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Filter,
@@ -41,12 +43,34 @@ import {
   View,
 } from "react-native";
 
+const PAGE_SIZE = 10;
+
+// ─── Complaint Card ───────────────────────────────────────────────────────────
 
 function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: () => void }) {
-  const { t } = useTranslation();
+
+ const { t } = useTranslation();
   const catKey = complaint.category?.category_name ?? "";
-  const catLabel = getCategoryLabel(catKey, complaint.title);
- 
+
+  // Category label — catKey is already snake_case, just look it up directly
+  // If "other", fall back to getCategoryLabel (shows "Other")
+  const isOther = catKey === "other";
+  const catLabel = isOther
+    ? getCategoryLabel(catKey, complaint.title)
+    : t(`complaints.titles.${catKey}`, { defaultValue: getCategoryLabel(catKey, complaint.title) });
+
+  // Title key: "Road Damage / Pothole" → "road_damage"
+  const titleKey = complaint.title
+    ?.split("/")[0]
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+
+  const translatedTitle = isOther
+    ? complaint.title
+    : t(`complaints.titles.${titleKey}`, { defaultValue: complaint.title });
+
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -73,16 +97,16 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
             >
               {catLabel}
             </Text>
-            <StatusBadge 
-  status={complaint.status} 
-  is_rejected_by_lgu={complaint.is_rejected_by_lgu}
-  is_rejected_by_department={complaint.is_rejected_by_department}
-/>
+            <StatusBadge
+              status={complaint.status}
+              is_rejected_by_lgu={complaint.is_rejected_by_lgu}
+              is_rejected_by_department={complaint.is_rejected_by_department}
+            />
           </View>
 
           {/* Title */}
           <Text className="text-sm font-bold text-gray-900 mb-1" numberOfLines={1}>
-            {complaint.title}
+             {translatedTitle}
           </Text>
 
           {/* Description */}
@@ -128,6 +152,159 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
   );
 }
 
+// ─── Pagination Bar ───────────────────────────────────────────────────────────
+
+function PaginationBar({
+  currentPage,
+  totalPages,
+  totalItems,
+  pageSize,
+  onPrev,
+  onNext,
+  onPageSelect,
+}: {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  onPrev: () => void;
+  onNext: () => void;
+  onPageSelect: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+   
+
+  const { t } = useTranslation();
+  const startItem = (currentPage - 1) * pageSize + 1;
+  const endItem = Math.min(currentPage * pageSize, totalItems);
+
+  // Build page number buttons — show at most 5 around current
+  const getPageNumbers = () => {
+    const pages: (number | "...")[] = [];
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push("...");
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (currentPage < totalPages - 2) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  };
+
+  return (
+    <View
+      style={{
+        backgroundColor: "#ffffff",
+        borderTopWidth: 1,
+        borderTopColor: "#f3f4f6",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        paddingBottom: 24,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 4,
+      }}
+    >
+      {/* Items range label */}
+      <Text
+        style={{
+          textAlign: "center",
+          fontSize: 11,
+          color: "#9ca3af",
+          marginBottom: 10,
+          fontWeight: "500",
+        }}
+      >
+          {t("complaints.pagination.showing", { start: startItem, end: endItem, total: totalItems })}
+      </Text>
+
+      {/* Controls row */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        {/* Prev button */}
+        <TouchableOpacity
+          onPress={onPrev}
+          disabled={currentPage === 1}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: currentPage === 1 ? "#f9fafb" : `${THEME.primary}15`,
+            borderWidth: 1,
+            borderColor: currentPage === 1 ? "#e5e7eb" : `${THEME.primary}30`,
+          }}
+        >
+          <ChevronLeft size={16} color={currentPage === 1 ? "#d1d5db" : THEME.primary} />
+        </TouchableOpacity>
+
+        {/* Page number pills */}
+        {getPageNumbers().map((p, idx) =>
+          p === "..." ? (
+            <Text
+              key={`ellipsis-${idx}`}
+              style={{ fontSize: 13, color: "#9ca3af", paddingHorizontal: 2 }}
+            >
+              ···
+            </Text>
+          ) : (
+            <TouchableOpacity
+              key={p}
+              onPress={() => onPageSelect(p as number)}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: currentPage === p ? THEME.primary : "#f9fafb",
+                borderWidth: 1,
+                borderColor: currentPage === p ? THEME.primary : "#e5e7eb",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "700",
+                  color: currentPage === p ? "#ffffff" : "#374151",
+                }}
+              >
+                {p}
+              </Text>
+            </TouchableOpacity>
+          )
+        )}
+
+        {/* Next button */}
+        <TouchableOpacity
+          onPress={onNext}
+          disabled={currentPage === totalPages}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: currentPage === totalPages ? "#f9fafb" : `${THEME.primary}15`,
+            borderWidth: 1,
+            borderColor: currentPage === totalPages ? "#e5e7eb" : `${THEME.primary}30`,
+          }}
+        >
+          <ChevronRight size={16} color={currentPage === totalPages ? "#d1d5db" : THEME.primary} />
+        </TouchableOpacity>
+      </View>
+
+     
+    </View>
+  );
+}
+
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
 function EmptyState({ filtered }: { filtered: boolean }) {
@@ -170,7 +347,19 @@ function LoadingState() {
 
 // ─── Filter Modal ─────────────────────────────────────────────────────────────
 
-function FilterModal({ visible, onClose, selectedStatuses, onToggleStatus, onClear }) {
+function FilterModal({
+  visible,
+  onClose,
+  selectedStatuses,
+  onToggleStatus,
+  onClear,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  selectedStatuses: string[];
+  onToggleStatus: (status: string) => void;
+  onClear: () => void;
+}) {
   const { t } = useTranslation();
 
   return (
@@ -190,7 +379,7 @@ function FilterModal({ visible, onClose, selectedStatuses, onToggleStatus, onCle
           </TouchableOpacity>
         </View>
 
-        {/* ── Filter Chips ── */}
+        {/* Filter Chips */}
         <View className="flex-row flex-wrap gap-2 mb-6">
           {ALL_STATUSES.map((s) => {
             const cfg = getStatusConfig(s);
@@ -257,6 +446,7 @@ export default function UserComplaints() {
   const [search, setSearch] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [filterVisible, setFilterVisible] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data, isPending, error, refetch } = useQuery<Complaint[]>({
     queryKey: ["my-complaints"],
@@ -265,8 +455,6 @@ export default function UserComplaints() {
       return response.data;
     },
   });
-
-  console.log("Fetched complaints:", data);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -278,6 +466,14 @@ export default function UserComplaints() {
     setSelectedStatuses((prev) =>
       prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
     );
+    // Reset to page 1 when filter changes
+    setCurrentPage(1);
+  };
+
+  // Reset page on search change
+  const handleSearchChange = (text: string) => {
+    setSearch(text);
+    setCurrentPage(1);
   };
 
   const filtered = useMemo(() => {
@@ -295,8 +491,19 @@ export default function UserComplaints() {
     });
   }, [data, search, selectedStatuses]);
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+
+  const paginated = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, currentPage]);
+
   const activeFilterCount = selectedStatuses.length;
   const isFiltered = search.length > 0 || activeFilterCount > 0;
+
+  const goToPrev = () => setCurrentPage((p) => Math.max(1, p - 1));
+  const goToNext = () => setCurrentPage((p) => Math.min(totalPages, p + 1));
+  const goToPage = (page: number) => setCurrentPage(page);
 
   if (error) {
     const appError = handleApiError(new Error(t("complaints.error.message")));
@@ -356,10 +563,10 @@ export default function UserComplaints() {
             placeholder={t("complaints.search.placeholder")}
             placeholderTextColor="#9ca3af"
             value={search}
-            onChangeText={setSearch}
+            onChangeText={handleSearchChange}
           />
           {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch("")}>
+            <TouchableOpacity onPress={() => handleSearchChange("")}>
               <XCircle size={16} color="#9ca3af" />
             </TouchableOpacity>
           )}
@@ -397,45 +604,44 @@ export default function UserComplaints() {
         </View>
 
         {/* Active Filter Pills */}
-       {/* Active Filter Pills */}
-{selectedStatuses.length > 0 && (
-  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-    {selectedStatuses.map((s) => {
-      const cfg = getStatusConfig(s);
-      return (
-        <TouchableOpacity
-          key={s}
-          onPress={() => toggleStatus(s)}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 4,
-            paddingHorizontal: 8,
-            paddingVertical: 3,
-            borderRadius: 20,
-            alignSelf: "flex-start",
-            backgroundColor: cfg.badge,
-            borderWidth: 1,
-            borderColor: cfg.border,
-          }}
-        >
-          <View
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 999,
-              backgroundColor: cfg.dot,
-            }}
-          />
-          <Text style={{ fontSize: 12, fontWeight: "600", color: cfg.text }}>
-            {t(cfg.labelKey)}
-          </Text>
-          <XCircle size={10} color={cfg.dot} />
-        </TouchableOpacity>
-      );
-    })}
-  </View>
-)}
+        {selectedStatuses.length > 0 && (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+            {selectedStatuses.map((s) => {
+              const cfg = getStatusConfig(s);
+              return (
+                <TouchableOpacity
+                  key={s}
+                  onPress={() => toggleStatus(s)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 4,
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 20,
+                    alignSelf: "flex-start",
+                    backgroundColor: cfg.badge,
+                    borderWidth: 1,
+                    borderColor: cfg.border,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 999,
+                      backgroundColor: cfg.dot,
+                    }}
+                  />
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: cfg.text }}>
+                    {t(cfg.labelKey)}
+                  </Text>
+                  <XCircle size={10} color={cfg.dot} />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
       </View>
 
       {/* Content */}
@@ -443,9 +649,9 @@ export default function UserComplaints() {
         <LoadingState />
       ) : (
         <FlatList
-          data={filtered}
+          data={paginated}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 16 }}
           showsVerticalScrollIndicator={false}
           onRefresh={handleRefresh}
           refreshing={refreshing}
@@ -459,13 +665,29 @@ export default function UserComplaints() {
         />
       )}
 
+      {/* Pagination — only rendered when there are 10+ complaints */}
+      {!isPending && filtered.length >= PAGE_SIZE && (
+        <PaginationBar
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPrev={goToPrev}
+          onNext={goToNext}
+          onPageSelect={goToPage}
+        />
+      )}
+
       {/* Filter Modal */}
       <FilterModal
         visible={filterVisible}
         onClose={() => setFilterVisible(false)}
         selectedStatuses={selectedStatuses}
         onToggleStatus={toggleStatus}
-        onClear={() => setSelectedStatuses([])}
+        onClear={() => {
+          setSelectedStatuses([]);
+          setCurrentPage(1);
+        }}
       />
     </View>
   );
