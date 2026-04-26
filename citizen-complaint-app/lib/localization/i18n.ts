@@ -556,11 +556,13 @@ const resources = {
       "message": "Failed to fetch complaints"
     }
   },
-
-  chatbot: {
+  
+  "chatbot": {
     "ask": "Ask a question?",
      "info": "Ask me about Santa Maria, Laguna — complaints, services, documents, and more.",
      "greeting": "Hello! I'm MaryBot 👋\n\nYour FAQ assistant for the Municipality of Santa Maria, Laguna.\n\nHow can I help you?",
+     "typing": "MaryBot is typing...",
+      "askInput": "Type your question here...",
       "frequentQuestions": "Frequently Asked Questions",
       "suggestions": {
       "howToFileComplaint": "📋 How to file a complaint?",
@@ -568,7 +570,15 @@ const resources = {
       "barangayClearance": "📄 Barangay clearance",
       "municipalServices": "🏛️ Municipal services",
       "officeHours": "⏰ Office hours",
-      "contactNumbers": "📞 Contact numbers"
+      "contactNumbers": "📞 Contact numbers",
+    
+     
+    },
+     "placeholder": {
+      "offline": "No internet connection...",
+      "slow": "Slow connection...",
+      "busy": "Waiting for response...",
+      "default": "Ask about Santa Maria..."
     }
   },
 
@@ -1960,18 +1970,28 @@ const resources = {
         }
       },
 
-      chatbot:{
+      "chatbot":{
         "ask": "Tanong?",
         "info": "Tanungin mo ako tungkol sa Santa Maria, Laguna — reklamo, serbisyo, dokumento, at higit pa",
         "greeting": "Kamusta! Ako si MaryBot 👋\n\nAng iyong FAQ assistant para sa Munisipalidad ng Santa Maria, Laguna.\n\nAno ang maipaglilingkod ko sa iyo?",
          "frequentQuestions": "Mga Madalas na Tanong",
+          "askInput": "I-type ang iyong tanong...",
+         "typing": "Nagtatype...",
           "suggestions": {
       "howToFileComplaint": "📋 Paano mag-file ng reklamo?",
       "complaintStatus": "🔍 Status ng aking reklamo",
       "barangayClearance": "📄 Barangay clearance",
       "municipalServices": "🏛️ Mga serbisyo ng munisipyo",
       "officeHours": "⏰ Oras ng opisina",
-      "contactNumbers": "📞 Mga contact numbers"
+      "contactNumbers": "📞 Mga contact numbers",
+   
+     
+    },
+     "placeholder": {
+      "offline": "Walang koneksyon sa internet...",
+      "slow": "Mabagal ang koneksyon...",
+      "busy": "Naghihintay sa sagot...",
+      "default": "Magtanong tungkol sa Santa Maria..."
     }
       },
 

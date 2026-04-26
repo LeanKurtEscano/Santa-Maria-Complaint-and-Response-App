@@ -923,7 +923,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                       : isSlow
                         ? 'Mabagal ang koneksyon'
                         : isBusy
-                          ? 'Nagtytype...'
+                          ? t('chatbot.typing')
                           : 'FAQ · Santa Maria, Laguna'}
                   </Text>
                 </View>
@@ -1104,13 +1104,13 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                         if (text.length <= MAX_CHARS) setInput(text);
                       }}
                       placeholder={
-                        isOffline
-                          ? 'Walang koneksyon sa internet...'
-                          : isSlow
-                            ? 'Mabagal ang koneksyon...'
-                            : isBusy
-                              ? 'Naghihintay sa sagot...'
-                              : 'Magtanong tungkol sa Santa Maria...'
+                       isOffline
+    ? t('chatbot.placeholder.offline')
+    : isSlow
+      ? t('chatbot.placeholder.slow')
+      : isBusy
+        ? t('chatbot.placeholder.busy')
+        : t('chatbot.askInput')
                       }
                       placeholderTextColor={isOffline ? '#EF4444' : '#94A3B8'}
                       multiline
