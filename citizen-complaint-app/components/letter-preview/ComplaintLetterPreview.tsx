@@ -247,7 +247,7 @@ export default function ComplaintLetterPreview({
     userData?.first_name && userData?.last_name
       ? `${userData.first_name} ${userData.last_name}`
       : 'Complainant';
-  const fullAddress = userData?.full_address || userData?.barangay || 'N/A';
+  //const fullAddress = userData?.full_address || userData?.barangay || 'N/A';
  
   // ── Attachment viewer ─────────────────────────────────────────────────────
   const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer();
@@ -370,11 +370,12 @@ export default function ComplaintLetterPreview({
             label={t('complaintPreview.sections.fullName')}
             value={fullName}
           />
-          <DetailRow
+          {/*  <DetailRow
             icon={<MapPin size={15} color="#4B5563" />}
             label={t('complaintPreview.sections.address')}
             value={fullAddress}
-          />
+          />*/}
+         
           <DetailRow
             icon={<Building2 size={15} color="#4B5563" />}
             label={t('complaintPreview.sections.filedTo')}

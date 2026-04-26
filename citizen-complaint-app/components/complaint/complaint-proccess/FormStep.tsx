@@ -176,6 +176,7 @@ function DetailsHint({ state, length }: { state: DetailsValidationState; length:
 interface FormStepProps {
   presets: PresetTitle[];
   barangayName: string;
+  isCategoriesLoading?: boolean;
   hasProfileLocation: boolean;
   selectedPreset: PresetTitle | null;
   customTitle: string;
@@ -234,6 +235,7 @@ export function FormStep({
   onBack,
   onNext,
   messageWasTouched = false,
+  isCategoriesLoading ,
   onMessageBlur,
 }: FormStepProps) {
   const { t } = useTranslation();
@@ -255,14 +257,14 @@ export function FormStep({
       default: return <FileText size={20} color={THEME.primary} />;
     }
   };
-const handleCustomTitleChange = (text: string) => {
-  onChangeCustomTitle(text);
-  if (text.length > 0) {
-    setCustomTitleLocalError(validateCustomTitle(text, t)); // ← pass t
-  } else {
-    setCustomTitleLocalError(null);
-  }
-};
+  const handleCustomTitleChange = (text: string) => {
+    onChangeCustomTitle(text);
+    if (text.length > 0) {
+      setCustomTitleLocalError(validateCustomTitle(text, t)); // ← pass t
+    } else {
+      setCustomTitleLocalError(null);
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
@@ -308,14 +310,25 @@ const handleCustomTitleChange = (text: string) => {
             {t('complaint_form.title_description')}
           </Text>
           <TouchableOpacity
-            onPress={onOpenTitlePicker}
-            className={`flex-row items-center justify-between bg-white rounded-2xl px-4 py-4 border-2 ${titleError ? 'border-red-400' : 'border-gray-200'}`}
+            onPress={isCategoriesLoading ? undefined : onOpenTitlePicker}
+            className={`flex-row items-center justify-between bg-white rounded-2xl px-4 py-4 border-2 ${titleError ? 'border-red-400' : 'border-gray-200'
+              }`}
             style={{ shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}
           >
-            <Text numberOfLines={1} className={`flex-1 text-base ${selectedPreset ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
-              {selectedPreset ? t(selectedPreset.key) : t('complaint_form.title_placeholder')}
-            </Text>
-            <ChevronDown size={20} color="#6B7280" />
+            {isCategoriesLoading ? (
+              <View className="flex-row items-center gap-2 flex-1">
+                <ActivityIndicator size="small" color={THEME.primary} />
+                <Text className="text-base text-gray-400">{t('complaint_form.loading_categories')}</Text>
+              </View>
+            ) : (
+              <Text
+                numberOfLines={1}
+                className={`flex-1 text-base ${selectedPreset ? 'text-gray-900 font-medium' : 'text-gray-400'}`}
+              >
+                {selectedPreset ? t(selectedPreset.key) : t('complaint_form.title_placeholder')}
+              </Text>
+            )}
+            <ChevronDown size={20} color={isCategoriesLoading ? '#D1D5DB' : '#6B7280'} />
           </TouchableOpacity>
 
           {isOtherSelected && (

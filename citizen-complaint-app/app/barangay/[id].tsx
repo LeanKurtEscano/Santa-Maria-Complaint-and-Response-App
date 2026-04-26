@@ -348,6 +348,7 @@ const handleSubmit = async () => {
         selectedPreset={selectedPreset}
         customTitle={customTitle}
         titleError={titleError}
+        isCategoriesLoading={categoriesLoading}
         showTitlePicker={showTitlePicker}
         onOpenTitlePicker={() => setShowTitlePicker(true)}
         onCloseTitlePicker={() => setShowTitlePicker(false)}

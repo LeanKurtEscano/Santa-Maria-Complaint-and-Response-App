@@ -45,6 +45,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
 
 const MAX_CHARS = 250;
+const ACTION_COOLDOWN_MS = 800;
 
 const formatTime = (d: Date) =>
   d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -333,7 +334,6 @@ function MessageBubble({
   useEffect(() => {
     if (!msg.streaming) {
       setDisplayedText(msg.text);
-      // detectIntents already handles priority internally — no extra filtering needed here
       if (!isUser) setIntents(detectIntents(msg.text));
       return;
     }
@@ -341,8 +341,10 @@ function MessageBubble({
     let i = 0;
     const tick = () => {
       i++;
-      setDisplayedText(msg.text.slice(0, i));
-      onTextUpdate?.(msg.id, msg.text.slice(0, i));
+      const partial = msg.text.slice(0, i);
+      setDisplayedText(partial);
+      // FIX: notify parent on every tick so it can scroll
+      onTextUpdate?.(msg.id, partial);
 
       if (i < msg.text.length) {
         const ch = msg.text[i - 1];
@@ -615,6 +617,11 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
+  // ── Cooldown state ──
+  const [isCoolingDown, setIsCoolingDown] = useState(false);
+  const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelScaleAnim = useRef(new Animated.Value(1)).current;
+
   const listRef = useRef<FlatList>(null);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const inputRef = useRef<TextInput>(null);
@@ -632,11 +639,45 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const isNearLimit = charCount >= MAX_CHARS - 30;
   const isAtLimit = charCount >= MAX_CHARS;
 
-  const scrollToBottomIfNear = useCallback((animated = true) => {
-    if (isNearBottomRef.current) {
-      setTimeout(() => listRef.current?.scrollToEnd({ animated }), 80);
+  // ── FIX: Two-tier scroll helpers ─────────────────────────────────────────────
+  // scrollToBottom: always scrolls, regardless of position (used after user sends)
+  const scrollToBottom = useCallback((animated = true) => {
+    setTimeout(() => listRef.current?.scrollToEnd({ animated }), 60);
+    if (Platform.OS === 'android') {
+      setTimeout(() => listRef.current?.scrollToEnd({ animated }), 250);
     }
   }, []);
+
+  // scrollToBottomIfNear: only scrolls when user is close to bottom (used during streaming)
+  const scrollToBottomIfNear = useCallback((animated = true) => {
+    if (isNearBottomRef.current) scrollToBottom(animated);
+  }, [scrollToBottom]);
+
+  // ── Shared cooldown trigger ──────────────────────────────────────────────────
+  const startCooldown = useCallback(() => {
+    setIsCoolingDown(true);
+
+    Animated.sequence([
+      Animated.timing(cancelScaleAnim, {
+        toValue: 0.82,
+        duration: 80,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cancelScaleAnim, {
+        toValue: 1,
+        duration: 400,
+        easing: Easing.out(Easing.back(1.5)),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    if (cooldownRef.current) clearTimeout(cooldownRef.current);
+    cooldownRef.current = setTimeout(() => {
+      setIsCoolingDown(false);
+      cooldownRef.current = null;
+    }, ACTION_COOLDOWN_MS);
+  }, [cancelScaleAnim]);
 
   // Modal open / close lifecycle
   useEffect(() => {
@@ -657,6 +698,9 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
       isSendingRef.current = false;
       currentBotIdRef.current = null;
       cancelledIdsRef.current.clear();
+
+      if (cooldownRef.current) { clearTimeout(cooldownRef.current); cooldownRef.current = null; }
+      setIsCoolingDown(false);
 
       Animated.timing(slideAnim, {
         toValue: SCREEN_HEIGHT, duration: 300,
@@ -681,8 +725,10 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     [router, onClose]
   );
 
-  // Cancel streaming / typing
+  // ── Cancel streaming / typing ────────────────────────────────────────────────
   const handleCancel = useCallback(() => {
+    if (isCoolingDown) return;
+
     generationRef.current += 1;
 
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
@@ -704,15 +750,19 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     }
 
     isSendingRef.current = false;
-  }, []);
+    startCooldown();
+  }, [isCoolingDown, startCooldown]);
 
-  // Send message
+  // ── Send message ─────────────────────────────────────────────────────────────
   const sendMessage = useCallback(
     async (text: string, isSuggestion = false) => {
       const trimmed = text.trim();
       if (!trimmed || isOffline) return;
-      if (isSendingRef.current) return;
+
+      if (isSendingRef.current || isCoolingDown) return;
       isSendingRef.current = true;
+
+      startCooldown();
 
       if (isTyping || isStreaming) handleCancel();
 
@@ -729,8 +779,11 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
         streaming: false,
       };
       setMessages((prev) => [...prev, userMsg]);
+
+      // FIX: Always force-scroll when user sends — they expect to see their own message
       isNearBottomRef.current = true;
-      scrollToBottomIfNear();
+      scrollToBottom();
+
       setIsTyping(true);
 
       let reply: string;
@@ -778,7 +831,10 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
         streaming: true,
       };
       setMessages((prev) => [...prev, botMsg]);
-      scrollToBottomIfNear();
+
+      // FIX: Force-scroll when bot message first appears
+      isNearBottomRef.current = true;
+      scrollToBottom();
 
       const estimatedDuration = reply.length * 13;
       streamFinishRef.current = setTimeout(() => {
@@ -792,18 +848,18 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
         isSendingRef.current = false;
       }, estimatedDuration);
     },
-    [isTyping, isStreaming, handleCancel, scrollToBottomIfNear, sessionId, isOffline]
+    [isTyping, isStreaming, handleCancel, scrollToBottom, sessionId, isOffline, isCoolingDown, startCooldown]
   );
 
   const isBusy = isTyping || isStreaming;
-  const sendDisabled = isOffline || !input.trim();
+  const sendDisabled = isOffline || !input.trim() || isCoolingDown;
   const kavOffset = Platform.OS === 'android' ? STATUS_BAR_HEIGHT : insets.top;
 
   return (
     <Modal visible={visible} transparent={false} animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
         <Animated.View style={{ flex: 1, transform: [{ translateY: slideAnim }] }}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={kavOffset}>
+          <KeyboardAvoidingView style={{ flex: 1 }}  keyboardVerticalOffset={kavOffset}    behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 
             {/* ── Header ── */}
             <View
@@ -883,10 +939,20 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               contentContainerStyle={{ paddingTop: 8, paddingBottom: 12 }}
               showsVerticalScrollIndicator={false}
               maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+              onContentSizeChange={() => {
+                // FIX: let scrollToBottomIfNear handle this — avoids double-scroll
+                scrollToBottomIfNear(true);
+              }}
+              onLayout={() => {
+                if (isNearBottomRef.current) {
+                  listRef.current?.scrollToEnd({ animated: false });
+                }
+              }}
               onScroll={(e) => {
                 const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+                // FIX: Increased threshold from 120 → 200 for more generous auto-scroll zone
                 isNearBottomRef.current =
-                  contentOffset.y + layoutMeasurement.height >= contentSize.height - 120;
+                  contentOffset.y + layoutMeasurement.height >= contentSize.height - 200;
               }}
               scrollEventThrottle={100}
               ListHeaderComponent={
@@ -908,6 +974,8 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                     onTextUpdate={(id, text) => {
                       if (id === currentBotIdRef.current) {
                         displayedTextRef.current = text;
+                        // FIX: Scroll on each typewriter tick so the list follows the bot as it types
+                        scrollToBottomIfNear();
                       }
                     }}
                   />
@@ -978,7 +1046,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                     <SuggestionChip
                       text={t(`chatbot.suggestions.${item}`)}
                       onPress={() => sendMessage(t(`chatbot.suggestions.${item}`), true)}
-                      disabled={isBusy || isOffline}
+                      disabled={isBusy || isOffline || isCoolingDown}
                     />
                   )}
                 />
@@ -993,24 +1061,22 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                   paddingBottom: Math.max(insets.bottom, 12),
                 }}
               >
-                {/* Character counter — only appears when within 30 chars of limit */}
-              
-                  <View style={{ alignItems: 'flex-end', paddingHorizontal: 4, marginBottom: 4 }}>
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: '600',
-                        color: isAtLimit
-                          ? '#DC2626'
-                          : charCount >= MAX_CHARS - 10
-                            ? '#F97316'
-                            : '#94A3B8',
-                      }}
-                    >
-                      {charCount}/{MAX_CHARS}
-                    </Text>
-                  </View>
-              
+                {/* Character counter */}
+                <View style={{ alignItems: 'flex-end', paddingHorizontal: 4, marginBottom: 4 }}>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '600',
+                      color: isAtLimit
+                        ? '#DC2626'
+                        : charCount >= MAX_CHARS - 10
+                          ? '#F97316'
+                          : '#94A3B8',
+                    }}
+                  >
+                    {charCount}/{MAX_CHARS}
+                  </Text>
+                </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
                   {/* Text input */}
@@ -1062,35 +1128,47 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
 
                   {/* Cancel / Send button */}
                   {isBusy ? (
-                    <TouchableOpacity
-                      onPress={handleCancel}
-                      activeOpacity={0.8}
-                      style={{
-                        width: 44, height: 44, borderRadius: 22,
-                        alignItems: 'center', justifyContent: 'center',
-                        backgroundColor: '#FEE2E2',
-                        borderWidth: 1.5, borderColor: '#FECACA',
-                      }}
-                    >
-                      <Square size={16} color="#EF4444" fill="#EF4444" />
-                    </TouchableOpacity>
+                    <Animated.View style={{ transform: [{ scale: cancelScaleAnim }] }}>
+                      <TouchableOpacity
+                        onPress={handleCancel}
+                        disabled={isCoolingDown}
+                        activeOpacity={0.8}
+                        style={{
+                          width: 44, height: 44, borderRadius: 22,
+                          alignItems: 'center', justifyContent: 'center',
+                          backgroundColor: isCoolingDown ? '#F1F5F9' : '#FEE2E2',
+                          borderWidth: 1.5,
+                          borderColor: isCoolingDown ? '#E2E8F0' : '#FECACA',
+                          opacity: isCoolingDown ? 0.5 : 1,
+                        }}
+                      >
+                        <Square
+                          size={16}
+                          color={isCoolingDown ? '#94A3B8' : '#EF4444'}
+                          fill={isCoolingDown ? '#94A3B8' : '#EF4444'}
+                        />
+                      </TouchableOpacity>
+                    </Animated.View>
                   ) : (
-                    <TouchableOpacity
-                      onPress={() => sendMessage(input)}
-                      disabled={sendDisabled}
-                      activeOpacity={0.8}
-                      style={{
-                        width: 44, height: 44, borderRadius: 22,
-                        alignItems: 'center', justifyContent: 'center',
-                        backgroundColor: sendDisabled ? '#E2E8F0' : THEME.primary,
-                        shadowColor: sendDisabled ? 'transparent' : THEME.primaryDark,
-                        shadowOpacity: 0.35, shadowRadius: 8,
-                        shadowOffset: { width: 0, height: 3 },
-                        elevation: sendDisabled ? 0 : 4,
-                      }}
-                    >
-                      <Send size={18} color={sendDisabled ? '#94A3B8' : '#FFFFFF'} style={{ marginLeft: 2 }} />
-                    </TouchableOpacity>
+                    <Animated.View style={{ transform: [{ scale: cancelScaleAnim }] }}>
+                      <TouchableOpacity
+                        onPress={() => sendMessage(input)}
+                        disabled={sendDisabled}
+                        activeOpacity={0.8}
+                        style={{
+                          width: 44, height: 44, borderRadius: 22,
+                          alignItems: 'center', justifyContent: 'center',
+                          backgroundColor: sendDisabled ? '#E2E8F0' : THEME.primary,
+                          shadowColor: sendDisabled ? 'transparent' : THEME.primaryDark,
+                          shadowOpacity: 0.35, shadowRadius: 8,
+                          shadowOffset: { width: 0, height: 3 },
+                          elevation: sendDisabled ? 0 : 4,
+                          opacity: isCoolingDown ? 0.5 : 1,
+                        }}
+                      >
+                        <Send size={18} color={sendDisabled ? '#94A3B8' : '#FFFFFF'} style={{ marginLeft: 2 }} />
+                      </TouchableOpacity>
+                    </Animated.View>
                   )}
                 </View>
               </View>

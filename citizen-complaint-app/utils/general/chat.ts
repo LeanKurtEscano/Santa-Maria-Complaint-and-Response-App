@@ -8,7 +8,7 @@ export function getFaqReply(input: string): string {
     return '📋 Para mag-file ng reklamo sa Santa Maria:\n\n1️⃣ Buksan ang "Mga Reklamo" tab sa ibaba\n2️⃣ I-tap ang "Magsumite ng Reklamo"\n3️⃣ Piliin ang kategorya ng iyong reklamo\n4️⃣ Isulat ang detalye — maging tiyak at malinaw\n5️⃣ Mag-attach ng larawan/dokumento kung mayroon\n6️⃣ I-tap ang Submit\n\nTatanggap ka ng notification kapag may update. ✅';
   }
   if (l.includes('status') || (l.includes('reklamo') && (l.includes('track') || l.includes('ano na') || l.includes('update')))) {
-    return '🔍 Makikita ang status ng iyong reklamo sa "Mga Reklamo" tab.\n\nMga estado:\n🔵 Isinumite — natanggap na\n🟡 Sa Proseso — isinasaalang-alang\n🟢 Nalutas — naresolba na\n🔴 Tinanggihan — may kulang na info\n\nMatanggap ka ng push notification sa bawat pagbabago. 📲';
+    return '🔍 Makikita ang status ng iyong reklamo sa "Mga Reklamo" tab.\n\nMga estado:\n🔵 Isinumite — natanggap na\n🟡 Sinusuri — isinasaalang-alang\n🟢 Nalutas — naresolba na\n🔴 Tinanggihan — may kulang na info\n\nMatanggap ka ng push notification sa bawat pagbabago. 📲';
   }
   if (l.includes('clearance') || l.includes('barangay clearance')) {
     return '🏘️ Para makakuha ng Barangay Clearance:\n\n📍 Pumunta sa iyong barangay hall\n🕗 8:00 AM – 5:00 PM, Lunes–Biyernes\n\n📄 Mga kailangan:\n• Valid ID (kahit isa)\n• Proof of residency (kung bago)\n\n💵 Bayad: ₱50–₱100\n⏱️ Oras ng pagproseso: 15–30 minuto\n\n💡 Tip: Pumunta nang maaga para maiwasan ang pila!';

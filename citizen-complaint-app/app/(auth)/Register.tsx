@@ -326,6 +326,8 @@ export default function RegisterScreen({ navigation }: any) {
   const loadSavedRegistrationData = async () => {
     try {
       const savedData = await AsyncStorage.getItem('registrationFormData');
+      const stored = await AsyncStorage.getItem('registrationData');
+console.log('Stored registration data:', JSON.parse(stored));
       if (savedData) {
         const parsedData = JSON.parse(savedData);
         const { idFrontImage, idBackImage, selfieImage, ...dataWithoutImages } = parsedData;
@@ -339,6 +341,9 @@ export default function RegisterScreen({ navigation }: any) {
       }
     } catch (error) { }
   };
+
+
+  
 
   const saveFormData = async () => {
     try {

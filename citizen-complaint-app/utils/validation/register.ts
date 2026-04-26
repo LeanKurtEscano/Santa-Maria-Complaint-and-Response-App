@@ -26,8 +26,9 @@ export const validateFirstName = (firstName: string, t: TFunction): string => {
 };
 
 export const validateMiddleName = (middleName: string, t: TFunction): string => {
-  const regex = /^[A-Za-z]+([ -][A-Za-z]+)*$/;
-  const invalidCharsRegex = /[^A-Za-z\s-]/;
+  // Allows letters + space + hyphen + apostrophe + dot
+  const regex = /^[A-Za-z]+([ .'-][A-Za-z]+)*$/;
+
   const repeatedCharRegex = /(.)\1{2,}/;
   const maxLength = 50;
   const minLength = 2;
@@ -36,16 +37,37 @@ export const validateMiddleName = (middleName: string, t: TFunction): string => 
 
   const trimmed = middleName.trim();
 
-  if (trimmed.length < minLength) return t('registerValidation.middleNameMinLength');
-  if (trimmed.length > maxLength) return t('registerValidation.middleNameMaxLength', { max: maxLength });
-  if (invalidCharsRegex.test(trimmed)) return t('registerValidation.middleNameInvalidChars');
-  if (!regex.test(trimmed)) return t('registerValidation.middleNameLettersOnly');
-  if (repeatedCharRegex.test(trimmed.toLowerCase())) return t('registerValidation.middleNameRepeatedChars');
+  if (trimmed.length < minLength) {
+    return t('registerValidation.middleNameMinLength');
+  }
 
-  const tokens = trimmed.toLowerCase().split(/[\s-]+/);
+  if (trimmed.length > maxLength) {
+    return t('registerValidation.middleNameMaxLength', { max: maxLength });
+  }
+
+  // Main validation (blocks numbers + invalid chars automatically)
+  if (!regex.test(trimmed)) {
+    return t('registerValidation.middleNameInvalidFormat');
+  }
+
+  // Prevent excessive repeated characters (e.g., "aaa")
+  if (repeatedCharRegex.test(trimmed.toLowerCase())) {
+    return t('registerValidation.middleNameRepeatedChars');
+  }
+
+  // Normalize tokens (split by space, hyphen, dot, apostrophe)
+  const tokens = trimmed.toLowerCase().split(/[ .'-]+/).filter(Boolean);
   const uniqueTokens = new Set(tokens);
-  if (uniqueTokens.size < tokens.length) return t('registerValidation.middleNameRepeatedWords');
-  if (tokens.every((token) => token.length === 1)) return t('registerValidation.middleNameSingleLetters');
+
+  // Prevent repeated words
+  if (uniqueTokens.size < tokens.length) {
+    return t('registerValidation.middleNameRepeatedWords');
+  }
+
+  // Prevent all single-letter tokens (e.g., "A B C")
+  if (tokens.length > 1 && tokens.every(token => token.length === 1)) {
+    return t('registerValidation.middleNameSingleLetters');
+  }
 
   return "";
 };
