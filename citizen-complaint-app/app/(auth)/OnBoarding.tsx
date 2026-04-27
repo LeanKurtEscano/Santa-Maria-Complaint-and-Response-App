@@ -10,11 +10,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
 import { MapPin, BarChart2, Bell, ArrowRight } from 'lucide-react-native';
 import { THEME } from '@/constants/theme';
 import { Image } from 'react-native';
-
+import { router } from 'expo-router';
 const { width: W } = Dimensions.get('window');
 
 // ─── Feature data ────────────────────────────────────────────────────────────
@@ -49,7 +48,7 @@ function makeAnim() {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function OnboardingScreen() {
-  const router = useRouter();
+
 
   // 9 elements: logo, appName, tagline, divider, feat0, feat1, feat2, cta, loginRow
   const anims = useRef(Array.from({ length: 9 }, makeAnim)).current;
@@ -180,7 +179,7 @@ export default function OnboardingScreen() {
 
           <Animated.View style={[styles.loginRow, a(8)]}>
             <Text style={styles.loginMuted}>Already have an account?</Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/login')} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => router.push('/(auth)')} activeOpacity={0.7}>
               <Text style={[styles.loginLink, { color: THEME.primary }]}> Log In</Text>
             </TouchableOpacity>
           </Animated.View>

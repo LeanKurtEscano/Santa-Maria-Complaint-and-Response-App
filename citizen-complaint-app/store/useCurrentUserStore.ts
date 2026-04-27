@@ -53,9 +53,14 @@ export const useCurrentUser = create<UserState>((set, get) => ({
 
   clearUser: async () => {
     try {
-      await SecureStore.deleteItemAsync('complaint_token');
-      await SecureStore.deleteItemAsync('complaint_refresh_token');
+      
       set({ userData: null, loading: false, isAuthenticated: false });
+      set({ userData: null, loading: false, isAuthenticated: false });
+
+  Promise.all([
+    SecureStore.deleteItemAsync('complaint_token'),
+    SecureStore.deleteItemAsync('complaint_refresh_token'),
+  ]).catch(() => {});
     } catch {
       set({ userData: null, loading: false, isAuthenticated: false });
     }
@@ -167,12 +172,14 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       selfie_with_id: data.selfie_with_id,
       is_verified: data.is_verified === true || data.is_verified === 1 || data.is_verified === "true",
       push_notifications_enabled: data.push_notifications_enabled === true || data.push_notifications_enabled === 1 || data.push_notifications_enabled === "true",
-      can_submit_complaints: data.can_submit_complaints === undefined
-      ? true  // default: allow submission
-      : data.can_submit_complaints === true || data.can_submit_complaints === 1 || data.can_submit_complaints === "true",
-      is_suspended: data.is_suspended === undefined
-      ? false  // default: not suspended
-      : data.is_suspended === true || data.is_suspended === 1 || data.is_suspended === "true",
+     can_submit_complaints: data.can_submit_complaints == null
+  ? true
+  : data.can_submit_complaints === true || data.can_submit_complaints === 1 || data.can_submit_complaints === "true",
+
+is_suspended: data.is_suspended == null
+  ? false
+  : data.is_suspended === true || data.is_suspended === 1 || data.is_suspended === "true",
+      //false
     };
 
     set({ userData: mappedUser, loading: false, isAuthenticated: true });

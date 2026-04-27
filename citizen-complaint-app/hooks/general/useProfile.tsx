@@ -77,8 +77,7 @@ export const useProfileLogic = () => {
 
   // ✅ No Alert here — confirmation is handled by LogoutConfirmModal in the UI
   const handleLogout = async () => {
-    await secureStorage.deleteItemAsync('complaint_token');
-    await secureStorage.deleteItemAsync('complaint_refresh_token');
+  
     clearUser();
   };
 

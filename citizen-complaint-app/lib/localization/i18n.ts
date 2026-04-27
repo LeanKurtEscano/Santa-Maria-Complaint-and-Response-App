@@ -1013,6 +1013,7 @@ const resources = {
   "middleNameRepeatedChars": "Middle name must not contain repeated characters.",
   "middleNameRepeatedWords": "Middle name must not contain repeated words.",
   "middleNameSingleLetters": "Middle name must not consist of single letters.",
+   "middleNameInvalidFormat": "Middle name must not contain numbers or invalid characters.",
 
   "lastNameRequired": "Last name is required.",
   "lastNameMinLength": "Last name must be at least 2 characters long.",
@@ -2084,7 +2085,7 @@ const resources = {
   "middleNameRepeatedChars": "Ang gitnang pangalan ay hindi dapat may paulit-ulit na karakter.",
   "middleNameRepeatedWords": "Ang gitnang pangalan ay hindi dapat may paulit-ulit na salita.",
   "middleNameSingleLetters": "Ang gitnang pangalan ay hindi dapat binubuo ng iisang letra.",
-
+ "middleNameInvalidFormat": "Middle name must not contain numbers or invalid characters.",
   "lastNameRequired": "Kailangan ang apelyido.",
   "lastNameMinLength": "Ang apelyido ay dapat hindi mas maikli sa 2 karakter.",
   "lastNameMaxLength": "Ang apelyido ay dapat hindi hihigit sa {{max}} karakter.",

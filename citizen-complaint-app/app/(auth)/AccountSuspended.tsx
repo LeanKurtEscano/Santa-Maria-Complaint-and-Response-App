@@ -26,8 +26,10 @@ export default function SuspendedScreen() {
           <Text className="text-sm text-neutral-500 text-center leading-6 mb-10">
             {t('suspended.description')}
           </Text>
-          <TouchableOpacity
-            onPress={() => {/* open mail or support link */}}
+          {/*
+          
+             <TouchableOpacity
+            onPress={() => 
             className="bg-red-500 rounded-xl py-4 px-8 items-center w-full mb-3"
             activeOpacity={0.85}
           >
@@ -35,6 +37,9 @@ export default function SuspendedScreen() {
               {t('suspended.contactSupport')}
             </Text>
           </TouchableOpacity>
+          
+          */}
+       
           <TouchableOpacity
             onPress={handleGoBack}
             className="rounded-xl py-4 px-8 items-center w-full border border-neutral-200"

@@ -174,4 +174,17 @@ export const TYPE_CONFIG: Record<
     titleKey: "notifications.title.rejected",
     messageKey: "notifications.message.rejected_by_barangay",
   },
+
+  spam_detected: {
+  icon: "warning-outline",
+  iconColor: "#EF4444",
+  badgeClass: "bg-red-50 border border-red-100",
+  badgeTextClass: "text-red-500",
+  iconBgClass: "bg-red-50",
+  dotClass: "bg-red-500",
+  labelKey: "notifications.type.spam_detected",
+  titleKey: "notifications.title.spam_detected",
+  messageKey: "notifications.message.spam_detected",
+},
+
 };

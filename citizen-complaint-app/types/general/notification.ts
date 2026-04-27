@@ -11,9 +11,10 @@ export type NotificationType =
   | "existing_incident"
   | "rejected_by_lgu"
   | "rejected_by_department"
-  | "rejected_by_barangay";
+  | "rejected_by_barangay"
+  | "spam_detected"; 
 
-
+  
 export interface Notification {
   id: number;
   user_id: number;

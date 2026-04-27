@@ -46,5 +46,10 @@ export function getFaqReply(input: string): string {
   if (l.includes('salamat') || l.includes('thank')) {
     return 'Walang anuman! 🙏 Lagi kaming handa para tumulong. Kung mayroon pang ibang katanungan, huwag mag-atubiling magtanong. Mabuhay ang Santa Maria! 🇵🇭';
   }
+
+  if (l.includes('Office') || l.includes('Office') || l.includes('Opisina') || l.includes('Tanggapan') || l.includes('hours')) { 
+
+    return `Bukas ang tanggapan ng munisipyo mula Lunes hanggang Biyernes, 8:00 AM – 5:00 PM, kasama ang mga serbisyong may kaugnayan sa barangay.`
+  }
   return 'Pasensya na, hindi ko pa ganap na naiintindihan ang iyong tanong. 😔\n\nNarito ako para sa mga tanong tungkol sa:\n• Pagsasampa ng reklamo\n• Mga dokumento at permit\n• Mga serbisyo ng munisipyo\n• Oras ng opisina at contact\n• Lokasyon ng Santa Maria\n\nSubukan mong i-rephrase ang iyong tanong, o piliin mula sa mga mungkahi sa itaas. 👆';
 }
