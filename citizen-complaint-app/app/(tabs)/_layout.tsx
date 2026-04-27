@@ -6,11 +6,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '@/constants/theme';
+import { useCurrentUser } from '@/store/useCurrentUserStore';
 
 export default function TabsLayout() {
   const [isConnected, setIsConnected] = useState<boolean | null>(true);
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const { fetchCurrentUser } = useCurrentUser();
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -30,6 +32,11 @@ export default function TabsLayout() {
   return (
     <View style={{ flex: 1 }}>
       <Tabs
+        screenListeners={{
+          tabPress: async () => {
+            await fetchCurrentUser(true);
+          },
+        }}
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: THEME.primary,
@@ -40,7 +47,7 @@ export default function TabsLayout() {
             borderTopColor: '#E5E7EB',
             height: tabBarHeight,
             paddingBottom: bottomInset,
-            paddingTop: isConnected === false ? 36 : 8, // push icons down to make room for banner
+            paddingTop: isConnected === false ? 36 : 8,
             elevation: 8,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: -2 },
@@ -55,11 +62,9 @@ export default function TabsLayout() {
           tabBarIconStyle: {
             marginTop: Platform.OS === 'android' ? 4 : 0,
           },
-          // Render the offline banner as the tab bar background
           tabBarBackground: () =>
             isConnected === false ? (
               <View style={{ flex: 1 }}>
-                {/* Offline banner pinned to top of tab bar */}
                 <View
                   style={{
                     backgroundColor: '#EF4444',
@@ -80,7 +85,6 @@ export default function TabsLayout() {
                     ⚠️ Please fix your internet connection
                   </Text>
                 </View>
-                {/* White fill for the rest of the tab bar */}
                 <View style={{ flex: 1, backgroundColor: '#FFFFFF' }} />
               </View>
             ) : (

@@ -75,6 +75,14 @@ function RootLayoutNav() {
     return;
   }
 
+    if (userData && userData.is_suspended) {
+    if (segments[1] !== "AccountSuspended") {
+      router.replace("/(auth)/AccountSuspended");
+    }
+    return;
+  }
+
+
   // ✅ Authenticated but NOT verified
   if (userData && !userData.is_verified) {
     if (segments[1] !== "NotVerified") {
