@@ -167,6 +167,12 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       selfie_with_id: data.selfie_with_id,
       is_verified: data.is_verified === true || data.is_verified === 1 || data.is_verified === "true",
       push_notifications_enabled: data.push_notifications_enabled === true || data.push_notifications_enabled === 1 || data.push_notifications_enabled === "true",
+      can_submit_complaints: data.can_submit_complaints === undefined
+      ? true  // default: allow submission
+      : data.can_submit_complaints === true || data.can_submit_complaints === 1 || data.can_submit_complaints === "true",
+      is_suspended: data.is_suspended === undefined
+      ? false  // default: not suspended
+      : data.is_suspended === true || data.is_suspended === 1 || data.is_suspended === "true",
     };
 
     set({ userData: mappedUser, loading: false, isAuthenticated: true });

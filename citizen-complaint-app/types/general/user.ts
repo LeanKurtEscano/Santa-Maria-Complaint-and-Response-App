@@ -26,5 +26,7 @@ export interface User {
   front_id: string | null;
   back_id: string | null;
   selfie_with_id: string | null;
-  push_notifications_enabled?: boolean; // Optional field for notification settings
+  push_notifications_enabled?: boolean;
+  can_submit_complaints?: boolean;
+  is_suspended?: boolean; // Optional field for notification settings
 }

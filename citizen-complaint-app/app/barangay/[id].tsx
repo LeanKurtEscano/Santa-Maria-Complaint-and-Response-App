@@ -279,8 +279,21 @@ const handleSubmit = async () => {
       }
     }
   } catch (error: any) {
-    const detail = error?.response?.data?.detail;
-    showToast(detail ?? 'Something went wrong. Please try again.', 'error');
+
+    
+    const status = error?.response?.status;
+  const detail = error?.response?.data?.detail;
+
+  if (status === 403) {
+    showGlobalToast(
+      "Your complaint submission access has been temporarily disabled. This action was taken because multiple submitted complaints were flagged and confirmed as spam, invalid, or incorrect reports by the support team.",
+      'error'
+    );
+    fetchCurrentUser(true);
+    return;
+  }
+
+  showToast(detail ?? 'Something went wrong. Please try again.', 'error');
   } finally {
     setIsSubmitting(false);
   }
@@ -295,6 +308,7 @@ const handleSubmit = async () => {
           message={message}
           attachments={attachments}
           onConfirmSubmit={handleSubmit}
+          canSubmitComplaints={userData?.can_submit_complaints ?? true}
           onBack={() => {
             setShowPreview(false);
             setStep('location');

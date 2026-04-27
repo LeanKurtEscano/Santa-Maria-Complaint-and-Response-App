@@ -98,4 +98,4 @@ export type TextRun =
   | { type: 'bold'; value: string }
   | { type: 'url'; value: string };
 
-export const RICH_REGEX = /\*\*(.+?)\*\*|https?:\/\/[^\s<>"')\]]+/g;
+export const RICH_REGEX = /\*\*(.+?)\*\*|\*(.+?)\*|https?:\/\/[^\s<>"')\]]+/g;

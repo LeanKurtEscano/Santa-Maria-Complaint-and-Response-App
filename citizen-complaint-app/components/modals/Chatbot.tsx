@@ -190,6 +190,7 @@ function parseTextRuns(text: string): TextRun[] {
   while ((match = RICH_REGEX.exec(text)) !== null) {
     if (match.index > last) runs.push({ type: 'text', value: text.slice(last, match.index) });
     if (match[1] !== undefined) runs.push({ type: 'bold', value: match[1] });
+    else if (match[2] !== undefined) runs.push({ type: 'bold', value: match[2] });
     else runs.push({ type: 'url', value: match[0] });
     last = match.index + match[0].length;
   }
@@ -325,14 +326,25 @@ function MessageBubble({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
-  const [displayedText, setDisplayedText] = useState(msg.streaming ? '' : msg.text);
+  // FIX: If already streamed (restored from cache or finished), show full text immediately.
+  const [displayedText, setDisplayedText] = useState(
+    msg.streamed || !msg.streaming ? msg.text : ''
+  );
   const streamRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [cursorVisible, setCursorVisible] = useState(true);
+  const [cursorVisible, setCursorVisible] = useState(false);
   const [intents, setIntents] = useState<ActionIntent[]>([]);
+
+  // FIX: Detect intents immediately for already-streamed messages
+  useEffect(() => {
+    if (!isUser && (msg.streamed || !msg.streaming)) {
+      setIntents(detectIntents(msg.text));
+    }
+  }, []);
 
   // Typewriter effect
   useEffect(() => {
-    if (!msg.streaming) {
+    // FIX: Skip typewriter if already streamed or not streaming
+    if (msg.streamed || !msg.streaming) {
       setDisplayedText(msg.text);
       if (!isUser) setIntents(detectIntents(msg.text));
       return;
@@ -343,7 +355,6 @@ function MessageBubble({
       i++;
       const partial = msg.text.slice(0, i);
       setDisplayedText(partial);
-      // FIX: notify parent on every tick so it can scroll
       onTextUpdate?.(msg.id, partial);
 
       if (i < msg.text.length) {
@@ -357,14 +368,17 @@ function MessageBubble({
     return () => {
       if (streamRef.current) clearTimeout(streamRef.current);
     };
-  }, [msg.text, msg.streaming]);
+  }, [msg.text, msg.streaming, msg.streamed]); // FIX: added msg.streamed to deps
 
-  // Cursor blink
+  // Cursor blink — FIX: also guard on msg.streamed
   useEffect(() => {
-    if (!msg.streaming) return;
+    if (!msg.streaming || msg.streamed) {
+      setCursorVisible(false);
+      return;
+    }
     const blink = setInterval(() => setCursorVisible((v) => !v), 500);
     return () => clearInterval(blink);
-  }, [msg.streaming]);
+  }, [msg.streaming, msg.streamed]); // FIX: added msg.streamed to deps
 
   // Entrance animation
   useEffect(() => {
@@ -386,7 +400,8 @@ function MessageBubble({
       );
     }
 
-    const cursor = msg.streaming ? (cursorVisible ? '▍' : ' ') : '';
+    // FIX: cursor only shows when actively streaming AND not yet streamed
+    const cursor = msg.streaming && !msg.streamed && cursorVisible ? '▍' : '';
     const runs = parseTextRuns(displayedText);
 
     return (
@@ -429,7 +444,6 @@ function MessageBubble({
         marginBottom: isLast ? 12 : 3,
       }}
     >
-      {/* Bot avatar placeholder space */}
       {!isUser && (
         <View style={{ width: 32, height: 32, flexShrink: 0, marginRight: 8, marginBottom: 2 }}>
           {showAvatar && (
@@ -447,7 +461,6 @@ function MessageBubble({
       )}
 
       <View style={{ maxWidth: '75%', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
-        {/* Bubble */}
         <View
           style={
             isUser
@@ -471,7 +484,6 @@ function MessageBubble({
           {renderContent()}
         </View>
 
-        {/* Action buttons — shown only after streaming finishes */}
         {!isUser && !msg.streaming && intents.length > 0 && (
           <View style={{ marginTop: 2, gap: 4 }}>
             {intents.map((intent) => (
@@ -480,7 +492,6 @@ function MessageBubble({
           </View>
         )}
 
-        {/* Timestamp */}
         {isLast && !msg.streaming && (
           <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 4, marginHorizontal: 2 }}>
             {formatTime(msg.timestamp)}
@@ -488,7 +499,6 @@ function MessageBubble({
         )}
       </View>
 
-      {/* User avatar */}
       {isUser && (
         <View
           style={{
@@ -608,6 +618,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
       text: t('chatbot.greeting'),
       timestamp: new Date(),
       streaming: false,
+      streamed: true, // FIX: initial greeting is already "done"
     },
   ];
 
@@ -634,13 +645,17 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const cancelledIdsRef = useRef<Set<string>>(new Set());
   const displayedTextRef = useRef<string>('');
 
-  // Character count helpers
+  // ── Session cache — persists across modal opens within 30 minutes ──
+  const sessionCacheRef = useRef<{
+    sessionId: string;
+    messages: Message[];
+    closedAt: Date;
+  } | null>(null);
+
   const charCount = input.length;
   const isNearLimit = charCount >= MAX_CHARS - 30;
   const isAtLimit = charCount >= MAX_CHARS;
 
-  // ── FIX: Two-tier scroll helpers ─────────────────────────────────────────────
-  // scrollToBottom: always scrolls, regardless of position (used after user sends)
   const scrollToBottom = useCallback((animated = true) => {
     setTimeout(() => listRef.current?.scrollToEnd({ animated }), 60);
     if (Platform.OS === 'android') {
@@ -648,12 +663,10 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     }
   }, []);
 
-  // scrollToBottomIfNear: only scrolls when user is close to bottom (used during streaming)
   const scrollToBottomIfNear = useCallback((animated = true) => {
     if (isNearBottomRef.current) scrollToBottom(animated);
   }, [scrollToBottom]);
 
-  // ── Shared cooldown trigger ──────────────────────────────────────────────────
   const startCooldown = useCallback(() => {
     setIsCoolingDown(true);
 
@@ -679,16 +692,34 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     }, ACTION_COOLDOWN_MS);
   }, [cancelScaleAnim]);
 
-  // Modal open / close lifecycle
+  // ── Modal open / close lifecycle ─────────────────────────────────────────────
   useEffect(() => {
     if (visible) {
-      setSessionId(uuidv4());
-      setMessages(makeInitialMessages());
+      const now = new Date();
+      const cache = sessionCacheRef.current;
+      const withinWindow =
+        cache !== null &&
+        now.getTime() - cache.closedAt.getTime() < 30 * 60 * 1000;
+
+      if (withinWindow) {
+        setSessionId(cache!.sessionId);
+        setMessages(cache!.messages);
+      } else {
+        setSessionId(uuidv4());
+        setMessages(makeInitialMessages());
+      }
+
       isNearBottomRef.current = true;
       Animated.spring(slideAnim, { toValue: 0, tension: 50, friction: 10, useNativeDriver: true }).start();
       setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
     } else {
-      setSessionId(null);
+      // FIX: freeze streaming + mark all as streamed before caching
+      sessionCacheRef.current = {
+        sessionId: sessionId ?? uuidv4(),
+        messages: messages.map((m) => ({ ...m, streaming: false, streamed: true })),
+        closedAt: new Date(),
+      };
+
       setInput('');
       setIsTyping(false);
       setIsStreaming(false);
@@ -698,6 +729,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
       isSendingRef.current = false;
       currentBotIdRef.current = null;
       cancelledIdsRef.current.clear();
+      displayedTextRef.current = '';
 
       if (cooldownRef.current) { clearTimeout(cooldownRef.current); cooldownRef.current = null; }
       setIsCoolingDown(false);
@@ -709,7 +741,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     }
   }, [visible]);
 
-  // Action button handler
   const handleAction = useCallback(
     (intent: ActionIntent) => {
       const routes: Record<ActionIntent, string> = {
@@ -725,7 +756,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     [router, onClose]
   );
 
-  // ── Cancel streaming / typing ────────────────────────────────────────────────
   const handleCancel = useCallback(() => {
     if (isCoolingDown) return;
 
@@ -740,9 +770,10 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     if (currentBotIdRef.current) {
       const idToFreeze = currentBotIdRef.current;
       const partial = displayedTextRef.current;
+      // FIX: mark as streamed: true so it won't retype on next open
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === idToFreeze ? { ...m, streaming: false, text: partial } : m
+          m.id === idToFreeze ? { ...m, streaming: false, streamed: true, text: partial } : m
         )
       );
       currentBotIdRef.current = null;
@@ -753,7 +784,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     startCooldown();
   }, [isCoolingDown, startCooldown]);
 
-  // ── Send message ─────────────────────────────────────────────────────────────
   const sendMessage = useCallback(
     async (text: string, isSuggestion = false) => {
       const trimmed = text.trim();
@@ -777,10 +807,10 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
         text: trimmed,
         timestamp: new Date(),
         streaming: false,
+        streamed: true, // FIX: user messages are always "done"
       };
       setMessages((prev) => [...prev, userMsg]);
 
-      // FIX: Always force-scroll when user sends — they expect to see their own message
       isNearBottomRef.current = true;
       scrollToBottom();
 
@@ -829,18 +859,19 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
         text: reply,
         timestamp: new Date(),
         streaming: true,
+        streamed: false, // FIX: explicitly false — this one should animate
       };
       setMessages((prev) => [...prev, botMsg]);
 
-      // FIX: Force-scroll when bot message first appears
       isNearBottomRef.current = true;
       scrollToBottom();
 
       const estimatedDuration = reply.length * 13;
       streamFinishRef.current = setTimeout(() => {
         if (generationRef.current !== myGeneration) return;
+        // FIX: mark streamed: true when animation completes
         setMessages((prev) =>
-          prev.map((m) => (m.id === botId ? { ...m, streaming: false } : m))
+          prev.map((m) => (m.id === botId ? { ...m, streaming: false, streamed: true } : m))
         );
         setIsStreaming(false);
         streamFinishRef.current = null;
@@ -859,7 +890,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     <Modal visible={visible} transparent={false} animationType="none" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
         <Animated.View style={{ flex: 1, transform: [{ translateY: slideAnim }] }}>
-          <KeyboardAvoidingView style={{ flex: 1 }}  keyboardVerticalOffset={kavOffset}    behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1 }} keyboardVerticalOffset={kavOffset} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 
             {/* ── Header ── */}
             <View
@@ -896,7 +927,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                   >
                     <Bot size={20} color="white" />
                   </View>
-                  {/* Status dot */}
                   <View
                     style={{
                       position: 'absolute', bottom: 1, right: 1,
@@ -940,7 +970,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               showsVerticalScrollIndicator={false}
               maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
               onContentSizeChange={() => {
-                // FIX: let scrollToBottomIfNear handle this — avoids double-scroll
                 scrollToBottomIfNear(true);
               }}
               onLayout={() => {
@@ -950,7 +979,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               }}
               onScroll={(e) => {
                 const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-                // FIX: Increased threshold from 120 → 200 for more generous auto-scroll zone
                 isNearBottomRef.current =
                   contentOffset.y + layoutMeasurement.height >= contentSize.height - 200;
               }}
@@ -974,7 +1002,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                     onTextUpdate={(id, text) => {
                       if (id === currentBotIdRef.current) {
                         displayedTextRef.current = text;
-                        // FIX: Scroll on each typewriter tick so the list follows the bot as it types
                         scrollToBottomIfNear();
                       }
                     }}
@@ -1061,7 +1088,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                   paddingBottom: Math.max(insets.bottom, 12),
                 }}
               >
-                {/* Character counter */}
                 <View style={{ alignItems: 'flex-end', paddingHorizontal: 4, marginBottom: 4 }}>
                   <Text
                     style={{
@@ -1079,7 +1105,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-                  {/* Text input */}
                   <View
                     style={{
                       flex: 1, backgroundColor: '#F1F5F9', borderRadius: 24,
@@ -1104,13 +1129,13 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                         if (text.length <= MAX_CHARS) setInput(text);
                       }}
                       placeholder={
-                       isOffline
-    ? t('chatbot.placeholder.offline')
-    : isSlow
-      ? t('chatbot.placeholder.slow')
-      : isBusy
-        ? t('chatbot.placeholder.busy')
-        : t('chatbot.askInput')
+                        isOffline
+                          ? t('chatbot.placeholder.offline')
+                          : isSlow
+                            ? t('chatbot.placeholder.slow')
+                            : isBusy
+                              ? t('chatbot.placeholder.busy')
+                              : t('chatbot.askInput')
                       }
                       placeholderTextColor={isOffline ? '#EF4444' : '#94A3B8'}
                       multiline
@@ -1126,7 +1151,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                     />
                   </View>
 
-                  {/* Cancel / Send button */}
                   {isBusy ? (
                     <Animated.View style={{ transform: [{ scale: cancelScaleAnim }] }}>
                       <TouchableOpacity

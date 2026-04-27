@@ -4,4 +4,4 @@ import { getAccessToken } from "@/utils/general/token";
 
 const IP_URL = process.env.EXPO_PUBLIC_IP_URL;
 
-export const categoryApiClient = createApiClient(createApi(`${IP_URL}/api/v1/super-admin`,`${IP_URL}/api/v1/auth`,getAccessToken));
+export const categoryApiClient = createApiClient(createApi(`${IP_URL}/api/v1/categories`,`${IP_URL}/api/v1/auth`,getAccessToken));

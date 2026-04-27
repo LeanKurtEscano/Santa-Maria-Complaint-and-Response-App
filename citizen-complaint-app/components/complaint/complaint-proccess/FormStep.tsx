@@ -24,14 +24,15 @@ import { useAttachmentViewer } from '@/hooks/general/useAttachmentViewer';
 import { AttachmentViewer } from '@/components/media/AttachmentViewer';
 import { ActivityIndicator } from 'react-native';
 import { useState } from 'react';
+
 // ─── Validation Constants ──────────────────────────────────────────────────────
 // Minimum enforces meaningful complaints (prevents "noise" or "pothole" alone).
 // Maximum keeps records manageable for barangay staff across high-volume usage.
 export const COMPLAINT_DETAILS_MIN_LENGTH = 40;
-export const COMPLAINT_DETAILS_MAX_LENGTH = 1400;
+export const COMPLAINT_DETAILS_MAX_LENGTH = 300;
 
-const DETAILS_WARN_THRESHOLD = Math.floor(COMPLAINT_DETAILS_MAX_LENGTH * 0.9);  // 1800 — "you're close to the limit"
-const DETAILS_GOOD_THRESHOLD = COMPLAINT_DETAILS_MIN_LENGTH;                    // 50   — minimum satisfied
+const DETAILS_WARN_THRESHOLD = Math.floor(COMPLAINT_DETAILS_MAX_LENGTH * 0.9);  // 270 — "you're close to the limit"
+const DETAILS_GOOD_THRESHOLD = COMPLAINT_DETAILS_MIN_LENGTH;                    // 40  — minimum satisfied
 
 type DetailsValidationState = 'idle' | 'too_short' | 'good' | 'warning' | 'error';
 
@@ -59,10 +60,39 @@ export function validateCustomTitle(value: string, t: (key: string) => string): 
     const freq: Record<string, number> = {};
     for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
     const maxCount = Math.max(...Object.values(freq));
-    if (maxCount >= 3 || maxCount / words.length >= 0.5) {
+    if (maxCount >= 3) {
       return t('complaint_form.custom_title_validation_repeated_words');
     }
   }
+  return null;
+}
+
+export function validateComplaintDetails(value: string, t: (key: string) => string): string | null {
+  // Repeated characters: 5 or more of the same character in a row
+  if (/(.)\1{4,}/.test(value)) {
+    return t('complaint_form.details_validation_repeated_chars');
+  }
+
+  const words = value.trim().toLowerCase().split(/\s+/);
+
+  if (words.length >= 5) {
+    // For longer inputs: flag if same word appears 3+ times OR makes up 60%+ of all words
+    const freq: Record<string, number> = {};
+    for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
+    const maxCount = Math.max(...Object.values(freq));
+    if (maxCount >= 3 || maxCount / words.length >= 0.6) {
+      return t('complaint_form.details_validation_repeated_words');
+    }
+  } else if (words.length >= 2) {
+    // For short phrases (< 5 words): only flag blatant spam like "tapon tapon tapon"
+    const freq: Record<string, number> = {};
+    for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
+    const maxCount = Math.max(...Object.values(freq));
+    if (maxCount >= 3) {
+      return t('complaint_form.details_validation_repeated_words');
+    }
+  }
+
   return null;
 }
 
@@ -235,19 +265,21 @@ export function FormStep({
   onBack,
   onNext,
   messageWasTouched = false,
-  isCategoriesLoading ,
+  isCategoriesLoading,
   onMessageBlur,
 }: FormStepProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const [customTitleLocalError, setCustomTitleLocalError] = useState<string | null>(null);
-
+  const [detailsLocalError, setDetailsLocalError] = useState<string | null>(null);
 
   const isOtherSelected = selectedPreset?.key === OTHER_KEY;
   const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer();
+
   // ── Details validation state ──────────────────────────────────────────────
-  const detailsState = getDetailsValidationState(message.length, messageWasTouched || !!messageError);
-  const detailsBorderColor = getDetailsBorderColor(detailsState, !!messageError);
+  const hasDetailsError = !!detailsLocalError || !!messageError;
+  const detailsState = getDetailsValidationState(message.length, messageWasTouched || hasDetailsError);
+  const detailsBorderColor = getDetailsBorderColor(detailsState, hasDetailsError);
   const counterStyle = getDetailsCounterStyle(detailsState);
 
   const getAttachmentIcon = (type: string) => {
@@ -257,12 +289,23 @@ export function FormStep({
       default: return <FileText size={20} color={THEME.primary} />;
     }
   };
+
   const handleCustomTitleChange = (text: string) => {
     onChangeCustomTitle(text);
     if (text.length > 0) {
-      setCustomTitleLocalError(validateCustomTitle(text, t)); // ← pass t
+      setCustomTitleLocalError(validateCustomTitle(text, t));
     } else {
       setCustomTitleLocalError(null);
+    }
+  };
+
+  // ── Details change handler with inline validation ─────────────────────────
+  const handleMessageChange = (text: string) => {
+    onChangeMessage(text);
+    if (text.length > 0) {
+      setDetailsLocalError(validateComplaintDetails(text, t));
+    } else {
+      setDetailsLocalError(null);
     }
   };
 
@@ -346,7 +389,7 @@ export function FormStep({
                 <PenLine size={18} color={customTitleLocalError ? '#EF4444' : THEME.primary} />
                 <TextInput
                   value={customTitle}
-                  onChangeText={handleCustomTitleChange}   // ← was onChangeCustomTitle
+                  onChangeText={handleCustomTitleChange}
                   placeholder={t('complaint_form.custom_title_placeholder')}
                   placeholderTextColor="#9CA3AF"
                   maxLength={100}
@@ -391,8 +434,6 @@ export function FormStep({
             {t('complaint_form.details_label')} <Text className="text-red-500">*</Text>
           </Text>
 
-
-
           <Text className="text-sm text-gray-500 mb-3 leading-5">
             {t('complaint_form.details_description')}
           </Text>
@@ -400,7 +441,7 @@ export function FormStep({
           {/* Textarea */}
           <TextInput
             value={message}
-            onChangeText={onChangeMessage}
+            onChangeText={handleMessageChange}
             onBlur={onMessageBlur}
             placeholder={t('complaint_form.details_placeholder')}
             placeholderTextColor="#9CA3AF"
@@ -424,8 +465,13 @@ export function FormStep({
           {/* Counter row + inline hint */}
           <View className="flex-row items-start justify-between mt-1">
             <View className="flex-1 mr-2">
-              {/* Server-side / parent-driven error takes priority */}
-              {messageError ? (
+              {/* Local details error takes highest priority, then server/parent error, then hint */}
+              {detailsLocalError ? (
+                <View className="flex-row items-center gap-1.5 mt-0.5">
+                  <AlertCircle size={14} color="#EF4444" />
+                  <Text className="text-sm text-red-500">{detailsLocalError}</Text>
+                </View>
+              ) : messageError ? (
                 <View className="flex-row items-center gap-1.5 mt-0.5">
                   <AlertCircle size={14} color="#EF4444" />
                   <Text className="text-sm text-red-500">{messageError}</Text>
@@ -450,11 +496,10 @@ export function FormStep({
           <Text className="text-base font-bold text-gray-800 mb-1">{t('complaint_form.attachments_label')}</Text>
           <Text className="text-sm text-gray-500 mb-4 leading-5">{t('complaint_form.attachments_hint')}</Text>
 
-
           {attachments.map((attachment) => (
             <TouchableOpacity
               key={attachment.id}
-              onPress={() => openAttachment(attachment)}   // ← tap name/row to open
+              onPress={() => openAttachment(attachment)}
               activeOpacity={0.75}
               className="bg-white border border-gray-200 rounded-2xl p-4 mb-2.5 flex-row items-center"
             >
@@ -489,7 +534,6 @@ export function FormStep({
               )}
             </TouchableOpacity>
           ))}
-
 
           {attachments.length < 3 && (
             <TouchableOpacity
@@ -653,6 +697,7 @@ export function FormStep({
           </Pressable>
         </Pressable>
       </Modal>
+
       <AttachmentViewer viewer={viewer} onClose={closeViewer} />
     </SafeAreaView>
   );

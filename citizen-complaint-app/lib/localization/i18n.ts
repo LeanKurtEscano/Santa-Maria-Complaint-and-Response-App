@@ -58,6 +58,13 @@ const resources = {
     "refreshHint": "Pull down to refresh"
   },
 
+  "suspended": {
+  "title": "Account Suspended",
+  "description": "Your account has been suspended. Please contact our support team for assistance.",
+  "contactSupport": "Contact Support",
+  "goBackButton": "Go Back"
+},
+
   "complaintStatus": {
     "status": {
       "submitted": "Submitted",
@@ -612,6 +619,9 @@ const resources = {
         "custom_title_placeholder": "Enter your complaint title",
         "custom_title_hint": "Briefly describe your complaint in a few words",
          "profile_location_title": "Profile Location Required",
+          "details_validation_repeated_chars": "Please avoid repeating the same character or symbol multiple times.",
+    "details_validation_repeated_words": "Your description repeats the same word too often. Try describing the issue differently.",
+    "details_validation_no_meaningful_content": "Please describe the issue using actual words, not just numbers or symbols.",
     "profile_location_desc": "You haven't set your location yet. Tap here to update your profile before submitting.",
   "custom_title_validation_spaces": "Title cannot be blank or spaces only.",
   "custom_title_validation_repeated_chars": "Title contains too many repeated characters.",
@@ -1230,6 +1240,13 @@ const resources = {
     "goBackButton": "Bumalik sa Pag-login",
     "refreshHint": "I-drag pababa para i-refresh"
   },
+
+  "suspended": {
+  "title": "Nasuspinde ang Account",
+  "description": "Ang iyong account ay nasuspinde. Mangyaring makipag-ugnayan sa aming support team para sa tulong.",
+  "contactSupport": "Makipag-ugnayan sa Support",
+  "goBackButton": "Bumalik"
+},
       // Registration
       personalInfo: 'Personal na Impormasyon',
       firstName: 'Pangalan',
@@ -1783,7 +1800,9 @@ const resources = {
   "custom_title_validation_repeated_chars": "Ang pamagat ay naglalaman ng napakaraming paulit-ulit na mga character.",
   "custom_title_validation_repeated_words": "Ang pamagat ay naglalaman ng napakaraming paulit-ulit na mga salita.",
     "details_description": "Ilarawan nang malinaw ang iyong reklamo. Ilagay kung kailan ito nangyari, sino ang apektado, at iba pang detalye upang agad itong matugunan ng barangay.",
-
+     "details_validation_repeated_chars": "Mangyaring huwag paulit-ulitin ang parehong karakter o simbolo nang maraming beses.",
+    "details_validation_repeated_words": "Paulit-ulit ang salita sa iyong paglalarawan. Subukang ilarawan ang problema sa ibang paraan.",
+    "details_validation_no_meaningful_content": "Mangyaring ilarawan ang isyu gamit ang tunay na mga salita, hindi lang mga numero o simbolo.",
     "next_step_hint": "Sunod: I-pin ang lugar kung saan nangyari ang insidente sa mapa.",
      "next_step":"Susunod: I-pin ang Lokasyon sa Mapa",
     "attachment_photo_tag": "JPG, PNG",

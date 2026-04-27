@@ -10,6 +10,8 @@ import { THEME } from "@/constants/theme";
 import { Complaint } from "@/types/complaints/complaint";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import ComplaintLetterModal from "@/components/modals/ComplaintLetterModal";
+import { Download } from "lucide-react-native";
 import {
   AlertTriangle,
   ArrowDownUp,
@@ -1329,11 +1331,13 @@ function ResponsesSection({
   );
 }
 
+
 export default function ComplaintDetail() {
   const router = useRouter();
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
-
+  const [showLetter, setShowLetter] = useState(false);
+ 
   const { data, error, isLoading, isFetching, refetch } =
     useQuery<ComplaintWithLinks>({
       queryKey: ["complaintDetail", id],
@@ -1343,7 +1347,7 @@ export default function ComplaintDetail() {
       },
       enabled: !!id,
     });
-
+ 
   if (error) {
     const appError = handleApiError(
       new Error(t("complaintDetail.error.message"))
@@ -1356,36 +1360,27 @@ export default function ComplaintDetail() {
       />
     );
   }
-
+ 
   if (isLoading) return <LoadingState />;
   if (!data) return null;
-
+ 
   const status = (data.status ?? "submitted") as ComplaintStatus;
-
+ 
   const isResolved =
     status === "resolved_by_barangay" ||
     status === "resolved_by_lgu" ||
     status === "resolved_by_department";
-
+ 
   const isRejectedByBarangay = status === "rejected";
   const isRejectedByLgu = !!data.is_rejected_by_lgu && !isResolved;
   const isRejectedByDepartment = !!data.is_rejected_by_department && !isResolved;
-
-  const steps = getTrackerSteps(
-    status,
-    isRejectedByLgu,
-    isRejectedByDepartment,
-    t
-  );
-  const statusDisplay = getStatusDisplay(
-    status,
-    isRejectedByLgu,
-    isRejectedByDepartment,
-    t
-  );
-
+ 
+  const steps = getTrackerSteps(status, isRejectedByLgu, isRejectedByDepartment, t);
+  const statusDisplay = getStatusDisplay(status, isRejectedByLgu, isRejectedByDepartment, t);
+ 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9fafb" }}>
+ 
       {/* ── Header ── */}
       <View
         style={{
@@ -1397,14 +1392,8 @@ export default function ComplaintDetail() {
           paddingHorizontal: 16,
         }}
       >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 8,
-          }}
-        >
+        {/* Back + Complaint ID */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 8 }}>
           <TouchableOpacity
             onPress={() => router.back()}
             style={{
@@ -1419,27 +1408,20 @@ export default function ComplaintDetail() {
           >
             <ChevronLeft size={24} color="#374151" strokeWidth={2.5} />
           </TouchableOpacity>
-
           <Text style={{ fontSize: 13, color: "#9ca3af", fontWeight: "600" }}>
             {t("complaintDetail.header.complaintId", { id: data.id })}
           </Text>
         </View>
-
+ 
+        {/* Title + Status badge */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <Text
-            style={{
-              flex: 1,
-              fontSize: 17,
-              fontWeight: "800",
-              color: "#111827",
-              lineHeight: 24,
-            }}
+            style={{ flex: 1, fontSize: 17, fontWeight: "800", color: "#111827", lineHeight: 24 }}
             numberOfLines={1}
             ellipsizeMode="tail"
           >
             {data.title}
           </Text>
-
           <View
             style={{
               backgroundColor: statusDisplay.bg,
@@ -1462,8 +1444,33 @@ export default function ComplaintDetail() {
             </Text>
           </View>
         </View>
+ 
+        {/* ── Download Complaint Button ── */}
+        <TouchableOpacity
+          onPress={() => setShowLetter(true)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 12,
+            backgroundColor: "#f0f4ff",
+            borderRadius: 12,
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            alignSelf: "flex-start",
+            borderWidth: 1,
+            borderColor: "#c7d9ff",
+          }}
+          activeOpacity={0.7}
+        >
+          <Download size={16} color={THEME.primary} strokeWidth={2.5} />
+          <Text style={{ fontSize: 14, fontWeight: "700", color: THEME.primary }}>
+            Download Complaint
+          </Text>
+        </TouchableOpacity>
       </View>
-
+ 
+      {/* ── Scrollable Content ── */}
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
@@ -1477,18 +1484,15 @@ export default function ComplaintDetail() {
           />
         }
       >
-        {/* ── Rejection Banners ── */}
+        {/* Rejection Banners */}
         {isRejectedByBarangay && <RejectionBanner by="barangay" />}
         {isRejectedByLgu && <RejectionBanner by="lgu" />}
         {isRejectedByDepartment && <RejectionBanner by="department" />}
-
-        {/* ── Progress Tracker ── */}
-        <ProgressTracker
-          steps={steps}
-          title={t("complaintDetail.tracker.title")}
-        />
-
-        {/* ── Complaint Info ── */}
+ 
+        {/* Progress Tracker */}
+        <ProgressTracker steps={steps} title={t("complaintDetail.tracker.title")} />
+ 
+        {/* Complaint Info */}
         <SectionCard
           title={t("complaintDetail.sections.complaintInfo")}
           icon={<FileText size={18} color={THEME.primary} strokeWidth={2.5} />}
@@ -1500,9 +1504,7 @@ export default function ComplaintDetail() {
           />
           {data.description && (
             <InfoRow
-              icon={
-                <MessageSquare size={18} color={THEME.primary} strokeWidth={2} />
-              }
+              icon={<MessageSquare size={18} color={THEME.primary} strokeWidth={2} />}
               label={t("complaintDetail.fields.description")}
               value={data.description}
             />
@@ -1520,8 +1522,8 @@ export default function ComplaintDetail() {
             value={`${formatDate(data.created_at)}  •  ${formatTime(data.created_at)}`}
           />
         </SectionCard>
-
-        {/* ── Barangay ── */}
+ 
+        {/* Barangay */}
         {data.barangay && (
           <SectionCard
             title={t("complaintDetail.sections.barangay")}
@@ -1549,62 +1551,16 @@ export default function ComplaintDetail() {
             />
           </SectionCard>
         )}
-
-        {/* ── Department
-        
-          {data.department && (
-          <SectionCard
-            title={t("complaintDetail.sections.department")}
-            icon={<Building2 size={18} color={THEME.primary} strokeWidth={2.5} />}
-          >
-            <InfoRow
-              icon={<Building2 size={18} color={THEME.primary} strokeWidth={2} />}
-              label={t("complaintDetail.fields.departmentName")}
-              value={data.department.department_name}
-            />
-            {data.department.department_address && (
-              <InfoRow
-                icon={<MapPin size={18} color={THEME.primary} strokeWidth={2} />}
-                label={t("complaintDetail.fields.address")}
-                value={data.department.department_address}
-              />
-            )}
-            {data.department.department_contact_number && (
-              <InfoRow
-                icon={<Phone size={18} color={THEME.primary} strokeWidth={2} />}
-                label={t("complaintDetail.fields.contactNumber")}
-                value={data.department.department_contact_number}
-              />
-            )}
-            {data.department.department_email && (
-              <InfoRow
-                icon={<Mail size={18} color={THEME.primary} strokeWidth={2} />}
-                label={t("complaintDetail.fields.email")}
-                value={data.department.department_email}
-              />
-            )}
-          </SectionCard>
-        )}
-        ── */}
-      
-
-        {/* ── Remarks ── */}
+ 
+        {/* Remarks */}
         {(data.incident_links ?? []).length > 0 && (
           <ResponsesSection incidentLinks={data.incident_links!} />
         )}
       </ScrollView>
-
+ 
       {/* ── Floating Feedback Button (resolved only) ── */}
       {isResolved && (
-        <View
-          style={{
-            position: "absolute",
-            bottom: 32,
-            left: 16,
-            right: 16,
-            zIndex: 10,
-          }}
-        >
+        <View style={{ position: "absolute", bottom: 32, left: 16, right: 16, zIndex: 10 }}>
           <TouchableOpacity
             onPress={() =>
               router.push({
@@ -1635,6 +1591,15 @@ export default function ComplaintDetail() {
           </TouchableOpacity>
         </View>
       )}
+ 
+      {/* ── Letter Modal ── */}
+      <ComplaintLetterModal
+        visible={showLetter}
+        onClose={() => setShowLetter(false)}
+        complaint={data}
+      />
+ 
     </View>
   );
 }
+ 

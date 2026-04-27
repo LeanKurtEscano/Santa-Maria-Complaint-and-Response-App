@@ -48,6 +48,7 @@ interface ComplaintLetterPreviewProps {
   toastMessage?: string;
   toastType?: 'success' | 'error' | 'info';
   isSubmitting?: boolean;
+  canSubmitComplaints?: boolean;
 }
  
 function formatDate(date: Date): string {
@@ -238,6 +239,7 @@ export default function ComplaintLetterPreview({
   onConfirmSubmit,
   onBack,
   isSubmitting = false,
+  canSubmitComplaints = true,
 }: ComplaintLetterPreviewProps) {
   const { t } = useTranslation();
   const { userData } = useCurrentUser();
@@ -266,7 +268,9 @@ export default function ComplaintLetterPreview({
     }
   };
  
-  const canSubmit = termsAccepted && !isSubmitting;
+
+
+const canSubmit = termsAccepted && !isSubmitting && (canSubmitComplaints ?? true);
  
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: THEME.primary }}>
@@ -786,6 +790,22 @@ export default function ComplaintLetterPreview({
                 : t('complaintPreview.status.notRead')}
             </Text>
           )}
+
+          {!canSubmitComplaints && (
+  <View style={{
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    width: '100%',
+  }}>
+    <Text style={{ fontSize: 11, color: '#DC2626', lineHeight: 17, textAlign: 'center' }}>
+      Your complaint submission access has been temporarily disabled.
+    </Text>
+  </View>
+)}
  
           <TouchableOpacity
             onPress={onConfirmSubmit}
