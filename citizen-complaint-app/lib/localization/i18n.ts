@@ -685,7 +685,7 @@ const resources = {
     "map_error_title": "Map failed to load",
     "map_error_desc": "Check your connection and try again.",
     "reload_map": "Reload Map",
-
+    "outside_boundary_error":"Pin must be placed within the barangay boundary.",
     "gps_error_permission": "Location permission denied. Please enable it in your device Settings.",
     "gps_error_unavailable": "Your position could not be determined. Make sure GPS is enabled.",
     "gps_error_timeout": "Location request timed out. Move to an open area and try again.",
@@ -700,7 +700,8 @@ const resources = {
     "or_hint": "or tap / drag pin on map",
 
     "confirm_location": "Confirm Location",
-
+"verifying_location": "Verifying your location…",
+"outside_boundary_warning": "You must be physically present within {{barangayName}} to submit a complaint for this area.",
     "next_title": "Next: Pin Location"
   },
 
@@ -1850,8 +1851,9 @@ const resources = {
 
       "location_step": {
     "title": "Saan ito nangyari?",
-   
-
+    "outside_boundary_error":"Ang pin ay dapat nasa loob ng boundary.",
+"verifying_location": "Bine-verify ang iyong lokasyon…",
+"outside_boundary_warning": "Kailangan mong personal na naroroon sa loob ng {{barangayName}} upang makapag-submit ng reklamo para sa lugar na ito.",
     "instruction": "I-tap ang mapa para maglagay ng pin, o gamitin ang iyong kasalukuyang lokasyon",
 
     "loading_map": "Ikinakarga ang mapa…",
