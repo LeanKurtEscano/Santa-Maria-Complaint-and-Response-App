@@ -34,6 +34,15 @@ interface OTPVerificationScreenProps {
 
 type ErrorType = 'invalid_otp' | 'expired_otp' | 'server' | 'validation' | 'generic' | null;
 
+// ── FIX #1: Ensure file URIs have the file:// prefix on Android ──────────────
+const ensureFileUri = (uri: string): string => {
+  if (!uri) return uri;
+  if (Platform.OS === 'android' && !uri.startsWith('file://') && !uri.startsWith('content://')) {
+    return `file://${uri}`;
+  }
+  return uri;
+};
+
 export default function OTPVerificationScreen({ navigation, route }: OTPVerificationScreenProps) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -183,6 +192,77 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     return String(errorData);
   };
 
+  // ── FIX #2: Safe AsyncStorage parser ─────────────────────────────────────
+  const safeParseRegistrationData = async (): Promise<any | null> => {
+    try {
+      const raw = await AsyncStorage.getItem('registrationData');
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  };
+
+  // ── FIX #3: Build FormData without manually setting Content-Type ──────────
+  // On Android, manually setting 'Content-Type: multipart/form-data' omits the
+  // boundary string, which causes the server to fail parsing the body.
+  // Let Axios/fetch set the header automatically so the boundary is included.
+  const buildRegistrationFormData = (registrationData: any, otpString: string, includeEmail: boolean) => {
+    const formData = new FormData();
+
+    const dataObject: any = {
+      password: registrationData.password,
+      first_name: registrationData.firstName,
+      last_name: registrationData.lastName,
+      middle_name: registrationData.middleName || null,
+      suffix: registrationData.suffix || null,
+      age: registrationData.age,
+      birthdate: formatDateForBackend(registrationData.dateOfBirth),
+      gender: registrationData.gender,
+      barangay: registrationData.barangay,
+      zip_code: registrationData.zipCode || registrationData.zone || null,
+      full_address: registrationData.streetAddress,
+      longitude: registrationData.longitude || null,
+      latitude: registrationData.latitude || null,
+      id_type: registrationData.idType,
+      id_number: registrationData.idNumber,
+      otp: otpString,
+    };
+
+    if (includeEmail) {
+      dataObject.email = registrationData.email;
+    } else {
+      dataObject.phone_number = registrationData.phoneNumber;
+    }
+
+    formData.append('data', JSON.stringify(dataObject));
+
+    // FIX #1 applied here — ensure file:// prefix on Android
+    if (registrationData.idFrontImage) {
+      formData.append('front_id', {
+        uri: ensureFileUri(registrationData.idFrontImage),
+        type: 'image/jpeg',
+        name: 'front_id.jpg',
+      } as any);
+    }
+    if (registrationData.idBackImage) {
+      formData.append('back_id', {
+        uri: ensureFileUri(registrationData.idBackImage),
+        type: 'image/jpeg',
+        name: 'back_id.jpg',
+      } as any);
+    }
+    if (registrationData.selfieImage) {
+      formData.append('selfie_with_id', {
+        uri: ensureFileUri(registrationData.selfieImage),
+        type: 'image/jpeg',
+        name: 'selfie_with_id.jpg',
+      } as any);
+    }
+
+    return formData;
+  };
+
   // ── Verify OTP ────────────────────────────────────────────────────────────
   const handleVerifyOtp = async () => {
     const otpString = otp.join('');
@@ -215,64 +295,19 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
       // ── Phone OTP flow ───────────────────────────────────────────────────
       } else if (isPhoneMode) {
-        const registrationDataString = await AsyncStorage.getItem('registrationData');
-        if (!registrationDataString) {
+        // FIX #2: safe parse with error guard
+        const registrationData = await safeParseRegistrationData();
+        if (!registrationData) {
           setErrorMessage(t('otpRegistrationDataNotFound'));
           setErrorType('generic');
           setIsVerifying(false);
           return;
         }
 
-        const registrationData = JSON.parse(registrationDataString);
-        const formData = new FormData();
+        const formData = buildRegistrationFormData(registrationData, otpString, false);
 
-        const dataObject = {
-          password: registrationData.password,
-          first_name: registrationData.firstName,
-          last_name: registrationData.lastName,
-          middle_name: registrationData.middleName || null,
-          suffix: registrationData.suffix || null,
-          age: registrationData.age,
-          birthdate: formatDateForBackend(registrationData.dateOfBirth),
-          phone_number: registrationData.phoneNumber,
-          gender: registrationData.gender,
-          barangay: registrationData.barangay,
-          zip_code: registrationData.zipCode || registrationData.zone || null,
-          full_address: registrationData.streetAddress,
-          longitude: registrationData.longitude || null,
-          latitude: registrationData.latitude || null,
-          id_type: registrationData.idType,
-          id_number: registrationData.idNumber,
-          otp: otpString,
-        };
-
-        formData.append('data', JSON.stringify(dataObject));
-
-        if (registrationData.idFrontImage) {
-          formData.append('front_id', {
-            uri: registrationData.idFrontImage,
-            type: 'image/jpeg',
-            name: 'front_id.jpg',
-          } as any);
-        }
-        if (registrationData.idBackImage) {
-          formData.append('back_id', {
-            uri: registrationData.idBackImage,
-            type: 'image/jpeg',
-            name: 'back_id.jpg',
-          } as any);
-        }
-        if (registrationData.selfieImage) {
-          formData.append('selfie_with_id', {
-            uri: registrationData.selfieImage,
-            type: 'image/jpeg',
-            name: 'selfie_with_id.jpg',
-          } as any);
-        }
-
-        const response = await authApiClient.post('/verify-phone-number-otp', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        // FIX #3: no manual Content-Type header — Axios sets it with boundary
+        const response = await authApiClient.post('/verify-phone-number-otp', formData);
 
         if (response.status === 201) {
           await AsyncStorage.removeItem('registrationData');
@@ -281,65 +316,19 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
       // ── Email OTP flow ───────────────────────────────────────────────────
       } else {
-        const registrationDataString = await AsyncStorage.getItem('registrationData');
-        if (!registrationDataString) {
+        // FIX #2: safe parse with error guard
+        const registrationData = await safeParseRegistrationData();
+        if (!registrationData) {
           setErrorMessage(t('otpRegistrationDataNotFound'));
           setErrorType('generic');
           setIsVerifying(false);
           return;
         }
 
-        const registrationData = JSON.parse(registrationDataString);
-        const formData = new FormData();
+        const formData = buildRegistrationFormData(registrationData, otpString, true);
 
-        const dataObject = {
-          email: registrationData.email,
-          password: registrationData.password,
-          first_name: registrationData.firstName,
-          last_name: registrationData.lastName,
-          middle_name: registrationData.middleName || null,
-          suffix: registrationData.suffix || null,
-          age: registrationData.age,
-          birthdate: formatDateForBackend(registrationData.dateOfBirth),
-         
-          gender: registrationData.gender,
-          barangay: registrationData.barangay,
-          zip_code: registrationData.zipCode || registrationData.zone || null,
-          full_address: registrationData.streetAddress,
-          longitude: registrationData.longitude || null,
-          latitude: registrationData.latitude || null,
-          id_type: registrationData.idType,
-          id_number: registrationData.idNumber,
-          otp: otpString,
-        };
-
-        formData.append('data', JSON.stringify(dataObject));
-
-        if (registrationData.idFrontImage) {
-          formData.append('front_id', {
-            uri: registrationData.idFrontImage,
-            type: 'image/jpeg',
-            name: 'front_id.jpg',
-          } as any);
-        }
-        if (registrationData.idBackImage) {
-          formData.append('back_id', {
-            uri: registrationData.idBackImage,
-            type: 'image/jpeg',
-            name: 'back_id.jpg',
-          } as any);
-        }
-        if (registrationData.selfieImage) {
-          formData.append('selfie_with_id', {
-            uri: registrationData.selfieImage,
-            type: 'image/jpeg',
-            name: 'selfie_with_id.jpg',
-          } as any);
-        }
-
-        const response = await authApiClient.post('/verify-otp', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        // FIX #3: no manual Content-Type header — Axios sets it with boundary
+        const response = await authApiClient.post('/verify-otp', formData);
 
         if (response.status === 201) {
           await AsyncStorage.removeItem('registrationData');
@@ -411,7 +400,6 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
   const maskPhone = (phoneNumber: string) => {
     if (!phoneNumber) return '';
-    // Show first 4 and last 2 digits, mask the middle
     const digits = phoneNumber.replace(/\D/g, '');
     if (digits.length < 6) return phoneNumber;
     return digits.slice(0, 4) + '****' + digits.slice(-2);
@@ -495,7 +483,6 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
                 className="rounded-full p-4 mb-4"
                 style={{ backgroundColor: THEME.primary }}
               >
-                {/* Show phone icon in phone mode, mail icon otherwise */}
                 {isPhoneMode
                   ? <Phone size={32} color="#FFFFFF" />
                   : <Mail size={32} color="#FFFFFF" />
@@ -513,7 +500,6 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
                 }
               </Text>
 
-              {/* Masked email or phone */}
               <Text
                 className="text-base font-semibold text-center mt-1"
                 style={{ color: THEME.primary }}

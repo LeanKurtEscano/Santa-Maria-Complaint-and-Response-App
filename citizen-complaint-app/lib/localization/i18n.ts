@@ -294,7 +294,7 @@ const resources = {
       uploadIdBack: 'Upload ID (Back)',
       uploadSelfie: 'Upload Selfie with ID',
       idVerificationNote: 'Please provide a valid government-issued ID for verification',
-
+        "invalidIdFormat": "Invalid format. Expected: {{format}}",
       // ID Types
       driversLicense: "Driver's License",
       passport: 'Passport',
@@ -304,7 +304,7 @@ const resources = {
       votersId: "Voter's ID",
       postalId: 'Postal ID',
       barangayId: 'Barangay ID',
-
+       "studentId": "Student ID",
       // Buttons & Actions
       submit: 'Submit',
       cancel: 'Cancel',
@@ -1288,7 +1288,8 @@ const resources = {
       votersId: "Voter's ID",
       postalId: 'Postal ID',
       barangayId: 'Barangay ID',
-
+      "studentId": "Student ID",
+      "invalidIdFormat": "Hindi tamang format. Inaasahan: {{format}}",
       // Buttons & Actions
       submit: 'Isumite',
       cancel: 'Kanselahin',

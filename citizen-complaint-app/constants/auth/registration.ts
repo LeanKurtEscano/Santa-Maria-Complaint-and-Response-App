@@ -39,4 +39,5 @@ export const ID_TYPES = [
     'votersId',
     'postalId',
     'barangayId',
+    'studentId',
 ];

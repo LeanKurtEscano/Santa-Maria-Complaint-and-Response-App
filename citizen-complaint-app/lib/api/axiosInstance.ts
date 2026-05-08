@@ -28,9 +28,11 @@ export const createApi = (
 ): AxiosInstance => {
   const instance = axios.create({
     baseURL,
-    headers: {
-      "Content-Type": "application/json",
-    },
+    // ✅ FIX: No default Content-Type here — we set it per-request in the
+    // interceptor below based on whether the body is FormData or JSON.
+    // Previously, hardcoding 'application/json' here caused Android (OkHttp)
+    // to send the wrong Content-Type for multipart requests, while iOS
+    // (NSURLSession) silently corrected it — hiding the bug on iOS only.
     timeout: 20000,
   });
 
@@ -41,6 +43,15 @@ export const createApi = (
 
       if (!net.isConnected) {
         return Promise.reject({ code: "OFFLINE" });
+      }
+
+      // ✅ FIX: Only set application/json when the body is NOT FormData.
+      // For FormData (multipart/form-data), we let Axios set the Content-Type
+      // automatically so it includes the correct boundary string.
+      // Without the boundary, Android's OkHttp sends a malformed request
+      // that the server rejects — showing up as "verification failed".
+      if (!(config.data instanceof FormData)) {
+        config.headers['Content-Type'] = 'application/json';
       }
 
       if (getToken) {
@@ -70,17 +81,11 @@ export const createApi = (
       if (!originalConfig) return Promise.reject(error);
 
       // ── Handle 401 (access token expired) ──────────────────────────────────
-      // Only attempt refresh if:
-      //   1. The response is 401
-      //   2. We haven't already retried this request
-      //   3. A refreshUrl is configured
       if (
         error.response?.status === 401 &&
         !originalConfig._retry &&
         refreshUrl
       ) {
-        // If a refresh is already in flight, queue this request
-        // and resolve it once the refresh completes
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
@@ -92,7 +97,6 @@ export const createApi = (
             .catch((err) => Promise.reject(err));
         }
 
-        // Mark this request as already retried so we don't loop infinitely
         originalConfig._retry = true;
         isRefreshing = true;
 
@@ -100,12 +104,9 @@ export const createApi = (
           const refreshToken = await SecureStore.getItemAsync('complaint_refresh_token');
 
           if (!refreshToken) {
-            // No refresh token stored — user needs to log in again
-            // but we do NOT delete anything here, state is already empty
             throw new Error('NO_REFRESH_TOKEN');
           }
 
-          // Attempt to get a new access token using the refresh token
           const refreshResponse = await axios.post(
             `${refreshUrl}/refresh-token`,
             {},
@@ -121,24 +122,18 @@ export const createApi = (
           const newAccessToken = refreshResponse.data.access_token;
           const newRefreshToken = refreshResponse.data.refresh_token;
 
-          // Persist the new tokens
           await SecureStore.setItemAsync('complaint_token', newAccessToken);
 
-          // Only update refresh token if the backend rotated it
           if (newRefreshToken) {
             await SecureStore.setItemAsync('complaint_refresh_token', newRefreshToken);
           }
 
-          // Unblock all queued requests with the new access token
           processQueue(null, newAccessToken);
 
-          // Retry the original failed request with the new access token
           originalConfig.headers.Authorization = `Bearer ${newAccessToken}`;
           return instance(originalConfig);
 
         } catch (refreshError: any) {
-          // Refresh itself failed (e.g. refresh token is expired/revoked)
-          // Only NOW do we clear tokens and force logout
           const isRefreshTokenInvalid =
             refreshError.message === 'NO_REFRESH_TOKEN' ||
             refreshError.response?.status === 401 ||
@@ -149,8 +144,6 @@ export const createApi = (
             await SecureStore.deleteItemAsync('complaint_token');
             await SecureStore.deleteItemAsync('complaint_refresh_token');
 
-            // Notify the store so the UI redirects to login
-            // Lazy import avoids circular dependency
             const { useCurrentUser } = await import('@/store/useCurrentUserStore');
             useCurrentUser.getState().clearUser();
           }
