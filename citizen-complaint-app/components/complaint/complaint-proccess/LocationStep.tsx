@@ -145,7 +145,8 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         const { latitude, longitude } = loc.coords;
 
         // Silently update backend location
-        await userApiClient.put('/update-current-location', { latitude, longitude });
+        await userApiClient.put('/update-current-location', {   latitude: String(latitude),
+  longitude: String(longitude),});
 
         // Refresh userData so boundary check uses fresh coords
         await fetchCurrentUser(true);
