@@ -30,6 +30,7 @@ import useToastStore from '@/store/useGlobalModal';
 import { userApiClient } from '@/lib/client/user';
 import { useComplaintCategories } from '@/hooks/general/useCategories';
 // ─── Step type ────────────────────────────────────────────────────────────────
+import { emergencyClassifierClient } from '@/lib/client/emergency';
 type Step = 'instructions' | 'form' | 'location';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -176,9 +177,11 @@ const validateForm = (): boolean => {
     setIncidentLocation({ latitude: lat, longitude: lng });
     setShowPreview(true);
   };
-
 const handleSubmit = async () => {
   setIsSubmitting(true);
+  let submissionSuccess = false;
+  let emergencyResult: { is_emergency: boolean; agency: string; confidence: string; reason: string | null } | null = null;
+
   try {
     if (!incidentLocation) {
       showToast('Location unavailable. Please go back and try again.', 'error');
@@ -207,11 +210,8 @@ const handleSubmit = async () => {
       category_id:         resolvedCategoryId,
     };
 
-    console.log('Submitting complaint with data:', complaintData, 'and attachments:', attachments);
-
     const formData = new FormData();
     formData.append('data', JSON.stringify(complaintData));
-
     for (const attachment of attachments) {
       formData.append('attachments', {
         uri:  attachment.uri,
@@ -224,15 +224,44 @@ const handleSubmit = async () => {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
 
-    if (response.status === 201) {
-      showGlobalToast('Complaint submitted successfully!', 'success');
-      resetAttachments();
-      setSelectedPreset(null);
-      setCustomTitle('');
-      setMessage('');
-      setIncidentLocation(null);
+    if (response.status !== 201) return;
 
-      if (!userData?.push_notifications_enabled) {
+    // ── Submission succeeded past this point ─────────────────────────────────
+    submissionSuccess = true;
+    showGlobalToast('Complaint submitted successfully!', 'success');
+    resetAttachments();
+    setSelectedPreset(null);
+    setCustomTitle('');
+    setMessage('');
+    setIncidentLocation(null);
+
+    // ── Classify emergency — non-blocking, runs after successful submission ───
+    try {
+      const emergencyResponse = await emergencyClassifierClient.post('/classify', {
+        title:       resolvedTitle,
+        description: message,
+        category_id: resolvedCategoryId,
+      });
+
+      const data = emergencyResponse.data;
+
+      if (
+        data &&
+        typeof data.is_emergency === 'boolean' &&
+        typeof data.agency === 'string' &&
+        data.agency &&
+        data.is_emergency
+      ) {
+        emergencyResult = data;
+      }
+    } catch (err) {
+      // Classification failure is silent — user still navigates to Complaints
+      console.warn('Emergency classification failed:', err);
+    }
+
+    // ── Push notification prompt ─────────────────────────────────────────────
+    if (!userData?.push_notifications_enabled) {
+      await new Promise<void>((resolve) => {
         Alert.alert(
           '🔔 Stay Updated',
           'Do you want to receive notifications about your complaint status?',
@@ -240,25 +269,16 @@ const handleSubmit = async () => {
             {
               text: 'No Thanks',
               style: 'cancel',
-              onPress: () => {
-                setShowPreview(false);
-                setStep('instructions');
-                router.replace('/(tabs)/Complaints');
-              },
+              onPress: () => resolve(),
             },
             {
               text: 'Yes, Notify Me',
               onPress: async () => {
-                // Navigate instantly, don't wait for async work
-                setShowPreview(false);
-                setStep('instructions');
-                router.replace('/(tabs)/Complaints');
-
-                // Do notification work silently in the background
                 try {
                   const token = await askForNotificationPermission();
                   if (!token) {
                     showGlobalToast('Permission denied for notifications.', 'error');
+                    resolve();
                     return;
                   }
                   await userApiClient.post('/push-token', { token });
@@ -267,38 +287,54 @@ const handleSubmit = async () => {
                   showGlobalToast('Notifications enabled!', 'success');
                 } catch (err) {
                   showGlobalToast('Failed to enable notifications.', 'error');
+                } finally {
+                  resolve();
                 }
               },
             },
           ]
         );
+      });
+    }
+
+  } catch (error: any) {
+    const httpStatus = error?.response?.status;
+    const detail = error?.response?.data?.detail;
+
+    if (httpStatus === 403) {
+      showGlobalToast(
+        "Your complaint submission access has been temporarily disabled. This action was taken because multiple submitted complaints were flagged and confirmed as spam, invalid, or incorrect reports by the support team.",
+        'error'
+      );
+      fetchCurrentUser(true);
+      return;
+    }
+
+    showToast(detail ?? 'Something went wrong. Please try again.', 'error');
+
+  } finally {
+    setIsSubmitting(false);
+
+    // ── Only reset form + navigate if submission actually succeeded ──────────
+    if (submissionSuccess) {
+      setShowPreview(false);
+      setStep('instructions');
+
+      if (emergencyResult) {
+        router.replace({
+          pathname: '/(tabs)/Emergency',
+          params: {
+            agency:     emergencyResult.agency,
+            confidence: emergencyResult.confidence,
+            reason:     emergencyResult.reason ?? '',
+          },
+        });
       } else {
-        setShowPreview(false);
-        setStep('instructions');
         router.replace('/(tabs)/Complaints');
       }
     }
-  } catch (error: any) {
-
-    
-    const status = error?.response?.status;
-  const detail = error?.response?.data?.detail;
-
-  if (status === 403) {
-    showGlobalToast(
-      "Your complaint submission access has been temporarily disabled. This action was taken because multiple submitted complaints were flagged and confirmed as spam, invalid, or incorrect reports by the support team.",
-      'error'
-    );
-    fetchCurrentUser(true);
-    return;
-  }
-
-  showToast(detail ?? 'Something went wrong. Please try again.', 'error');
-  } finally {
-    setIsSubmitting(false);
   }
 };
-  // ── Render: preview ───────────────────────────────────────────────────────────
   if (showPreview) {
     return (
       <>

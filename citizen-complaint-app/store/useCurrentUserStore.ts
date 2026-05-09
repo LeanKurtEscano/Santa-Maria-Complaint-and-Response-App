@@ -1,10 +1,12 @@
 import { create } from "zustand";
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
 import { User } from "@/types/general/user";
 import { userApiClient } from "@/lib/client/user";
-import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+
+let isSyncing = false;
 
 const isTokenExpired = (token: string): boolean => {
   try {
@@ -28,7 +30,7 @@ interface UserState {
   setPushNotificationsEnabled: (enabled: boolean) => void;
   fetchCurrentUser: (background?: boolean) => Promise<void>;
   checkAuthStatus: () => Promise<void>;
-  syncPushToken: () => Promise<void>; // 👈 added to interface
+  syncPushToken: () => Promise<void>;
 }
 
 export const useCurrentUser = create<UserState>((set, get) => ({
@@ -36,11 +38,13 @@ export const useCurrentUser = create<UserState>((set, get) => ({
   loading: true,
   isAuthenticated: false,
 
-  setUserData: (user) => set({ userData: user, isAuthenticated: !!user }),
+  setUserData: (user) =>
+    set({ userData: user, isAuthenticated: !!user }),
 
   setPushNotificationsEnabled: (enabled: boolean) => {
     const currentUser = get().userData;
     if (!currentUser) return;
+
     set({
       userData: {
         ...currentUser,
@@ -52,35 +56,28 @@ export const useCurrentUser = create<UserState>((set, get) => ({
   setLoading: (loading) => set({ loading }),
 
   clearUser: async () => {
-    try {
-      
-      set({ userData: null, loading: false, isAuthenticated: false });
-      set({ userData: null, loading: false, isAuthenticated: false });
+    set({ userData: null, loading: false, isAuthenticated: false });
 
-  Promise.all([
-    SecureStore.deleteItemAsync('complaint_token'),
-    SecureStore.deleteItemAsync('complaint_refresh_token'),
-  ]).catch(() => {});
-    } catch {
-      set({ userData: null, loading: false, isAuthenticated: false });
-    }
+    await Promise.all([
+      SecureStore.deleteItemAsync("complaint_token"),
+      SecureStore.deleteItemAsync("complaint_refresh_token"),
+    ]).catch(() => {});
   },
 
   logout: async () => {
-    try {
-      await SecureStore.deleteItemAsync('complaint_token');
-      await SecureStore.deleteItemAsync('complaint_refresh_token');
-      set({ userData: null, loading: false, isAuthenticated: false });
-    } catch {
-      set({ userData: null, loading: false, isAuthenticated: false });
-    }
+    await SecureStore.deleteItemAsync("complaint_token");
+    await SecureStore.deleteItemAsync("complaint_refresh_token");
+    set({ userData: null, loading: false, isAuthenticated: false });
   },
 
+  // ✅ AUTH STATUS
   checkAuthStatus: async () => {
     try {
       set({ loading: true });
 
-      const refreshToken = await SecureStore.getItemAsync('complaint_refresh_token');
+      const refreshToken = await SecureStore.getItemAsync(
+        "complaint_refresh_token"
+      );
 
       if (!refreshToken) {
         set({ userData: null, loading: false, isAuthenticated: false });
@@ -88,64 +85,95 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       }
 
       if (isTokenExpired(refreshToken)) {
-        console.log("Refresh token expired, clearing session...");
         await get().clearUser();
         return;
       }
 
-      console.log("Refresh token valid, fetching user profile...");
       await get().fetchCurrentUser();
-
-      // 👇 After user is hydrated, silently sync push token
-      await get().syncPushToken();
-
-    } catch (error) {
+    } catch {
       set({ userData: null, loading: false, isAuthenticated: false });
     }
   },
 
-  // 👇 New method — silent, never blocks login, never requests permission
-  syncPushToken: async () => {
+  // ✅ FETCH USER + AUTO SYNC TOKEN (FIXED FLOW)
+  fetchCurrentUser: async (background = false) => {
     try {
-      const { userData } = get();
+      if (!background) set({ loading: true });
 
-      // Guard: must be logged in, verified, and have push enabled on server
-      if (!userData || !userData.is_verified || !userData.push_notifications_enabled) {
-        console.log("syncPushToken: skipped —", {
-          hasUser: !!userData,
-          isVerified: userData?.is_verified,
-          pushEnabled: userData?.push_notifications_enabled,
-        });
+      const token = await SecureStore.getItemAsync("complaint_token");
+
+      if (!token) {
+        set({ userData: null, loading: false, isAuthenticated: false });
         return;
       }
 
-      // Guard: must be a real device (not simulator)
-      if (!Device.isDevice) {
-        console.log("syncPushToken: skipped — not a physical device");
-        return;
+      const response = await userApiClient.get("/profile");
+
+      if (response.data) {
+        get().mapUserFromBackend(response.data);
+
+       
+        setTimeout(() => {
+          get().syncPushToken();
+        }, 300);
+      } else {
+        set({ userData: null, loading: false, isAuthenticated: false });
       }
-
-      // Guard: only sync if permission is already granted — never prompt here
-      const { status } = await Notifications.getPermissionsAsync();
-      if (status !== 'granted') {
-        console.log("syncPushToken: skipped — permission not granted");
-        return;
-      }
-
-      // Get current token and re-register silently
-      const { data: token } = await Notifications.getExpoPushTokenAsync();
-      await userApiClient.post('/push-token', { token });
-
-      console.log("syncPushToken: token synced successfully");
-    } catch {
-      // Silently fail — a token sync failure must never break login
-      console.log("syncPushToken: failed silently");
+    } catch (error) {
+      set({ loading: false });
+      throw error;
     }
   },
 
-  mapUserFromBackend: (data) => {
-    console.log("Mapping user data:", data);
+  
+  syncPushToken: async () => {
+    try {
+      if (isSyncing) return;
+      isSyncing = true;
 
+      const { userData } = get();
+
+      if (
+        !userData ||
+        !userData.is_verified ||
+        !userData.push_notifications_enabled
+      ) {
+        isSyncing = false;
+        return;
+      }
+
+      if (!Device.isDevice) {
+        isSyncing = false;
+        return;
+      }
+
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== "granted") {
+        isSyncing = false;
+        return;
+      }
+
+      const { data: token } =
+        await Notifications.getExpoPushTokenAsync();
+
+      if (!token || !token.startsWith("ExponentPushToken")) {
+        isSyncing = false;
+        return;
+      }
+
+      await userApiClient.post("/push-token", { token });
+
+      console.log("✅ Push token synced");
+
+      isSyncing = false;
+    } catch {
+      isSyncing = false;
+      console.log("⚠️ Push sync failed silently");
+    }
+  },
+
+
+  mapUserFromBackend: (data) => {
     const mappedUser: User = {
       id: data.id,
       email: data.email,
@@ -170,44 +198,36 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       front_id: data.front_id,
       back_id: data.back_id,
       selfie_with_id: data.selfie_with_id,
-      is_verified: data.is_verified === true || data.is_verified === 1 || data.is_verified === "true",
-      push_notifications_enabled: data.push_notifications_enabled === true || data.push_notifications_enabled === 1 || data.push_notifications_enabled === "true",
-     can_submit_complaints: data.can_submit_complaints == null
-  ? true
-  : data.can_submit_complaints === true || data.can_submit_complaints === 1 || data.can_submit_complaints === "true",
 
-is_suspended: data.is_suspended == null
-  ? false
-  : data.is_suspended === true || data.is_suspended === 1 || data.is_suspended === "true",
-      //false
+      is_verified:
+        data.is_verified === true ||
+        data.is_verified === 1 ||
+        data.is_verified === "true",
+
+      push_notifications_enabled:
+        data.push_notifications_enabled === true ||
+        data.push_notifications_enabled === 1 ||
+        data.push_notifications_enabled === "true",
+
+      can_submit_complaints:
+        data.can_submit_complaints == null
+          ? true
+          : data.can_submit_complaints === true ||
+            data.can_submit_complaints === 1 ||
+            data.can_submit_complaints === "true",
+
+      is_suspended:
+        data.is_suspended == null
+          ? false
+          : data.is_suspended === true ||
+            data.is_suspended === 1 ||
+            data.is_suspended === "true",
     };
 
-    set({ userData: mappedUser, loading: false, isAuthenticated: true });
-  },
-
-  fetchCurrentUser: async (background = false) => {
-    try {
-      if (!background) {
-        set({ loading: true });
-      }
-
-      const token = await SecureStore.getItemAsync('complaint_token');
-
-      if (!token) {
-        set({ userData: null, loading: false, isAuthenticated: false });
-        return;
-      }
-
-      const response = await userApiClient.get('/profile');
-
-      if (response.data) {
-        get().mapUserFromBackend(response.data);
-      } else {
-        set({ userData: null, loading: false, isAuthenticated: false });
-      }
-    } catch (error) {
-      set({ loading: false });
-      throw error;
-    }
+    set({
+      userData: mappedUser,
+      loading: false,
+      isAuthenticated: true,
+    });
   },
 }));

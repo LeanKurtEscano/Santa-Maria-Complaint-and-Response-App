@@ -1,7 +1,7 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import "../global.css";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, AppState, View } from "react-native";
 import { useCurrentUser } from "@/store/useCurrentUserStore";
 import { QueryClientProvider } from '@tanstack/react-query';
 import "../lib/localization/i18n";
@@ -39,6 +39,37 @@ function RootLayoutNav() {
    
   
   }, []);
+
+
+
+  // ✅ 🔥 FIX 1: LISTEN FOR NOTIFICATIONS
+  useEffect(() => {
+    const receivedSub = Notifications.addNotificationReceivedListener(notification => {
+      console.log("📩 Notification received:", notification);
+    });
+
+    const responseSub = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log("👉 Notification clicked:", response);
+    });
+
+    return () => {
+      receivedSub.remove();
+      responseSub.remove();
+    };
+  }, []);
+
+useEffect(() => {
+  const subscription = AppState.addEventListener("change", (state) => {
+    if (state === "active") {
+      console.log("🔄 App active → syncing push token");
+      useCurrentUser.getState().syncPushToken();
+    }
+  });
+
+  return () => {
+    subscription.remove();
+  };
+}, []);
 
   const initializeApp = async () => {
     try {

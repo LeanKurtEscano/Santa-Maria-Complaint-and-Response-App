@@ -59,6 +59,11 @@ export default function LoginScreen({ navigation }: any) {
             await SecureStore.setItemAsync('complaint_refresh_token', data.refresh_token);
             console.log('Login successful:', data);
             await fetchCurrentUser();
+
+            await useCurrentUser.getState().syncPushToken();
+
+    // small delay ensures backend receives token
+             await new Promise(res => setTimeout(res, 300));
             router.replace('/(tabs)');
         },
     });

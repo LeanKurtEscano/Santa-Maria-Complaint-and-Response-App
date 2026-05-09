@@ -31,6 +31,8 @@ import { useProfileLogic } from '@/hooks/general/useProfile';
 import { formatPHPhoneForUI } from '@/utils/general/phone';
 import { emergencyApiClient } from '@/lib/client/emergency';
 import { EmergencyAgency, EmergencyContactAPI, PendingContact, ServiceTheme } from '@/types/general/emergency';
+import { useEffect } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 const SERVICE_THEMES: Record<string, ServiceTheme> = {
   pnp: {
     Icon: ShieldAlert,
@@ -68,6 +70,12 @@ export default function EmergencyScreen() {
   const { userData } = useProfileLogic();
   const userLat = userData?.latitude ? parseFloat(userData.latitude) : null;
   const userLng = userData?.longitude ? parseFloat(userData.longitude) : null;
+
+
+  // ── Read route params ────────────────────────────────────────────────────────
+const params = useLocalSearchParams();
+
+
 
   // ── Fetch hotlines ───────────────────────────────────────────────────────────
   const {
@@ -119,6 +127,34 @@ export default function EmergencyScreen() {
 
   const handleCancelCall = () => setPendingContact(null);
 
+
+useEffect(() => {
+  if (!params.agency || isLoading || agencies.length === 0) return;
+
+  try {
+    const incomingAgency = (params.agency as string).toLowerCase();
+
+    const matchedAgency = agencies.find(
+      (a) => a.agency_name?.toLowerCase() === incomingAgency
+    );
+
+    if (!matchedAgency) return;
+
+    const contacts: EmergencyContactAPI[] = Array.isArray(matchedAgency.emergency_contacts)
+      ? matchedAgency.emergency_contacts
+      : [];
+
+    if (!contacts.length) return;
+
+    setPendingContact({
+      name: matchedAgency.agency_name ?? '',
+      phoneNumber: contacts[0].contact_number,
+    });
+
+  } catch (err) {
+    console.warn('Failed to parse emergency agency from params:', err);
+  }
+}, [params.agency, isLoading, agencies]);
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
