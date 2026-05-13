@@ -264,6 +264,18 @@ const resources = {
     }
   },
 
+
+
+  "hearingDate": {
+  "title": "Hearing Schedule",
+  "dateLabel": "Date",
+  "timeLabel": "Time",
+  "venue": "Venue",
+  "theBarangayHall": "the barangay hall",
+  "instruction": "Please go to {{barangay}} on {{date}} at {{time}} for your scheduled hearing. Make sure to arrive on time and bring any relevant documents.",
+  "noDate": "No hearing date scheduled yet."
+},
+
       // Registration
       personalInfo: 'Personal Information',
       firstName: 'First Name',
@@ -777,6 +789,7 @@ const resources = {
     },
  
     header: {
+        "downloadComplaint": "Download Complaint Form",
       complaintId: "Complaint #{{id}}",
     },
  
@@ -870,7 +883,8 @@ const resources = {
       "header": {
         "municipality": "Municipality of",
         "city": "Santa Maria",
-        "location": "Laguna, Philippines"
+        "location": "Laguna, Philippines",
+        "downloadComplaint": "Download Complaint Form"  ,
       },
       "stats": {
         "heading": "Your Complaints",
@@ -1672,6 +1686,7 @@ const resources = {
  
     header: {
       complaintId: "Reklamo #{{id}}",
+       "downloadComplaint": "I-download ang Complaint Form",
     },
  
     // ── Status chip labels ──────────────────────────────────────────────────
@@ -2148,7 +2163,15 @@ const resources = {
   "error_generic": "May naganap na hindi inaasahang error. Subukan ulit."
   },
 
-
+"hearingDate": {
+  "title": "Iskedyul ng Pagdinig",
+  "dateLabel": "Petsa",
+  "timeLabel": "Oras",
+  "venue": "Lugar",
+  "theBarangayHall": "barangay hall",
+  "instruction": "Mangyaring pumunta sa {{barangay}} sa {{date}} ng {{time}} para sa inyong nakatakdang pagdinig. Siguraduhing makarating sa tamang oras at magdala ng mga kinakailangang dokumento.",
+  "noDate": "Wala pang nakatakdang petsa ng pagdinig."
+},
 "postIncidentFeedback": {
 "title": "I-rate ang Iyong Karanasan",
 "heading": "Kumusta ang iyong karanasan?",

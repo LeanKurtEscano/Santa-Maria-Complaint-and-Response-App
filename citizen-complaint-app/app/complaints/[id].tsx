@@ -30,6 +30,7 @@ import {
   MapPin,
   MessageCircle,
   MessageSquare,
+  Navigation,
   Paperclip,
   Phone,
   Play,
@@ -41,6 +42,7 @@ import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Linking,
   Modal,
   ScrollView,
   Text,
@@ -88,6 +90,7 @@ interface IncidentLink {
 
 interface ComplaintWithLinks extends Complaint {
   incident_links?: IncidentLink[];
+  hearing_date?: string | null;
 }
 
 // ─── Complaint Status Types ───────────────────────────────────────────────────
@@ -126,7 +129,8 @@ function getTrackerSteps(
     status === "resolved_by_lgu" ||
     status === "resolved_by_department";
 
-  const isRejectedByBarangay = status === "rejected" || status === "rejected_by_barangay";
+  const isRejectedByBarangay =
+    status === "rejected" || status === "rejected_by_barangay";
 
   const statusOrder: Record<ComplaintStatus, number> = {
     submitted: 0,
@@ -345,7 +349,9 @@ function getStatusDisplay(
     },
   };
 
-  return map[status as Exclude<ComplaintStatus, "rejected" | "rejected_by_barangay">];
+  return map[
+    status as Exclude<ComplaintStatus, "rejected" | "rejected_by_barangay">
+  ];
 }
 
 // ─── Loading State ────────────────────────────────────────────────────────────
@@ -712,7 +718,12 @@ function RejectionBanner({ by }: { by: "barangay" | "lgu" | "department" }) {
       }}
     >
       <View
-        style={{ flexDirection: "row", alignItems: "center", gap: 14, padding: 18 }}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 14,
+          padding: 18,
+        }}
       >
         <View
           style={{
@@ -746,7 +757,281 @@ function RejectionBanner({ by }: { by: "barangay" | "lgu" | "department" }) {
   );
 }
 
-// ─── Media Viewer Modal (Image + Video) ──────────────────────────────────────
+// ─── Hearing Date Card ────────────────────────────────────────────────────────
+function HearingDateCard({
+  hearingDate,
+  barangay,
+}: {
+  hearingDate?: string | null;
+  barangay?: {
+    latitude: number;
+    longitude: number;
+    barangay_name: string;
+    barangay_address: string;
+  } | null;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <View
+      style={{
+        backgroundColor: "#fff",
+        borderRadius: 20,
+        marginHorizontal: 16,
+        marginBottom: 16,
+        borderWidth: 1.5,
+        borderColor: "#dbeafe",
+        shadowColor: "#3b82f6",
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 3,
+        overflow: "hidden",
+      }}
+    >
+      {/* Header */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
+          paddingHorizontal: 18,
+          paddingVertical: 14,
+          backgroundColor: "#eff6ff",
+          borderBottomWidth: 1,
+          borderBottomColor: "#dbeafe",
+        }}
+      >
+        <Calendar size={18} color="#2563eb" strokeWidth={2.5} />
+        <Text
+          style={{
+            fontSize: 15,
+            fontWeight: "700",
+            color: "#1e40af",
+            letterSpacing: 0.3,
+          }}
+        >
+          {t("hearingDate.title")}
+        </Text>
+      </View>
+
+      <View style={{ padding: 18 }}>
+        {hearingDate ? (
+          <>
+            {/* Date row */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 14,
+                marginBottom: 12,
+              }}
+            >
+              <View
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 16,
+                  backgroundColor: "#eff6ff",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderWidth: 1.5,
+                  borderColor: "#bfdbfe",
+                }}
+              >
+                <Calendar size={22} color="#2563eb" strokeWidth={2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: "#93c5fd",
+                    fontWeight: "600",
+                    marginBottom: 3,
+                  }}
+                >
+                  {t("hearingDate.dateLabel")}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 17,
+                    color: "#1e40af",
+                    fontWeight: "700",
+                    lineHeight: 23,
+                  }}
+                >
+                  {formatDate(hearingDate)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Time row */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 14,
+                marginBottom: 18,
+              }}
+            >
+              <View
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 16,
+                  backgroundColor: "#eff6ff",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderWidth: 1.5,
+                  borderColor: "#bfdbfe",
+                }}
+              >
+                <Clock size={22} color="#2563eb" strokeWidth={2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: "#93c5fd",
+                    fontWeight: "600",
+                    marginBottom: 3,
+                  }}
+                >
+                  {t("hearingDate.timeLabel")}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 17,
+                    color: "#1e40af",
+                    fontWeight: "700",
+                    lineHeight: 23,
+                  }}
+                >
+                  {formatTime(hearingDate)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Venue row */}
+            {barangay && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 14,
+                  marginBottom: 16,
+                  backgroundColor: "#f0f9ff",
+                  borderRadius: 14,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: "#e0f2fe",
+                }}
+              >
+                <MapPin size={18} color="#2563eb" strokeWidth={2.5} />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: "#93c5fd",
+                      fontWeight: "600",
+                      marginBottom: 2,
+                    }}
+                  >
+                    {t("hearingDate.venue")}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      color: "#1e40af",
+                      fontWeight: "600",
+                      lineHeight: 21,
+                    }}
+                  >
+                    {barangay.barangay_name}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: "#60a5fa",
+                      lineHeight: 19,
+                      marginTop: 1,
+                    }}
+                  >
+                    {barangay.barangay_address}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Instruction note */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 10,
+                backgroundColor: "#fefce8",
+                borderRadius: 14,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#fde68a",
+              }}
+            >
+              <AlertTriangle size={16} color="#d97706" strokeWidth={2.5} style={{ marginTop: 2 }} />
+              <Text
+                style={{
+                  flex: 1,
+                  fontSize: 14,
+                  color: "#92400e",
+                  lineHeight: 21,
+                }}
+              >
+                {t("hearingDate.instruction", {
+                  barangay: barangay?.barangay_name ?? t("hearingDate.theBarangayHall"),
+                  date: formatDate(hearingDate),
+                  time: formatTime(hearingDate),
+                })}
+              </Text>
+            </View>
+          </>
+        ) : (
+          <View
+            style={{
+              alignItems: "center",
+              paddingVertical: 20,
+              gap: 10,
+            }}
+          >
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 18,
+                backgroundColor: "#f0f9ff",
+                alignItems: "center",
+                justifyContent: "center",
+                borderWidth: 1.5,
+                borderColor: "#e0f2fe",
+              }}
+            >
+              <Calendar size={24} color="#bfdbfe" strokeWidth={2} />
+            </View>
+            <Text
+              style={{
+                fontSize: 15,
+                color: "#93c5fd",
+                fontStyle: "italic",
+                textAlign: "center",
+              }}
+            >
+              {t("hearingDate.noDate")}
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
 
 function MediaViewer({
   item,
@@ -828,7 +1113,14 @@ function MediaViewer({
           ) : (
             <Play size={13} color="#fff" strokeWidth={2} fill="#fff" />
           )}
-          <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700", letterSpacing: 0.5 }}>
+          <Text
+            style={{
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: "700",
+              letterSpacing: 0.5,
+            }}
+          >
             {item.type === "image" ? "PHOTO" : "VIDEO"}
           </Text>
         </View>
@@ -896,8 +1188,22 @@ function MediaViewer({
               >
                 {isPlaying ? (
                   <View style={{ flexDirection: "row", gap: 4 }}>
-                    <View style={{ width: 4, height: 18, backgroundColor: "#fff", borderRadius: 2 }} />
-                    <View style={{ width: 4, height: 18, backgroundColor: "#fff", borderRadius: 2 }} />
+                    <View
+                      style={{
+                        width: 4,
+                        height: 18,
+                        backgroundColor: "#fff",
+                        borderRadius: 2,
+                      }}
+                    />
+                    <View
+                      style={{
+                        width: 4,
+                        height: 18,
+                        backgroundColor: "#fff",
+                        borderRadius: 2,
+                      }}
+                    />
                   </View>
                 ) : (
                   <Play size={20} color="#fff" strokeWidth={2.5} fill="#fff" />
@@ -918,7 +1224,9 @@ function MediaViewer({
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}>
+                <Text
+                  style={{ color: "#fff", fontSize: 13, fontWeight: "600" }}
+                >
                   {isMuted ? "🔇 Unmute" : "🔊 Mute"}
                 </Text>
               </TouchableOpacity>
@@ -932,7 +1240,11 @@ function MediaViewer({
 
 // ─── Attachment Grid ──────────────────────────────────────────────────────────
 
-function AttachmentGrid({ attachments }: { attachments: ResponseAttachment[] }) {
+function AttachmentGrid({
+  attachments,
+}: {
+  attachments: ResponseAttachment[];
+}) {
   const [activeItem, setActiveItem] = useState<{
     uri: string;
     type: "image" | "video";
@@ -945,7 +1257,15 @@ function AttachmentGrid({ attachments }: { attachments: ResponseAttachment[] }) 
   return (
     <>
       {/* Header */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12, marginBottom: 10 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 6,
+          marginTop: 12,
+          marginBottom: 10,
+        }}
+      >
         <Paperclip size={14} color="#9ca3af" strokeWidth={2} />
         <Text style={{ fontSize: 13, color: "#9ca3af", fontWeight: "600" }}>
           Attachments ({attachments.length})
@@ -958,7 +1278,9 @@ function AttachmentGrid({ attachments }: { attachments: ResponseAttachment[] }) 
           <TouchableOpacity
             key={att.id}
             activeOpacity={0.8}
-            onPress={() => setActiveItem({ uri: att.file_url, type: att.media_type })}
+            onPress={() =>
+              setActiveItem({ uri: att.file_url, type: att.media_type })
+            }
             style={{
               width: THUMB,
               height: THUMB,
@@ -971,17 +1293,57 @@ function AttachmentGrid({ attachments }: { attachments: ResponseAttachment[] }) 
           >
             {att.media_type === "image" ? (
               <>
-                <Image source={{ uri: att.file_url }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-                <View style={{ position: "absolute", bottom: 6, right: 6, backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 8, padding: 4 }}>
+                <Image
+                  source={{ uri: att.file_url }}
+                  style={{ width: "100%", height: "100%" }}
+                  resizeMode="cover"
+                />
+                <View
+                  style={{
+                    position: "absolute",
+                    bottom: 6,
+                    right: 6,
+                    backgroundColor: "rgba(0,0,0,0.45)",
+                    borderRadius: 8,
+                    padding: 4,
+                  }}
+                >
                   <ImageIcon size={11} color="#fff" strokeWidth={2} />
                 </View>
               </>
             ) : (
-              <View style={{ flex: 1, backgroundColor: "#111827", alignItems: "center", justifyContent: "center", gap: 5 }}>
-                <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.1)", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center" }}>
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: "#111827",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 5,
+                }}
+              >
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    borderWidth: 1.5,
+                    borderColor: "rgba(255,255,255,0.25)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   <Play size={17} color="#fff" strokeWidth={2.5} fill="#fff" />
                 </View>
-                <Text style={{ fontSize: 9, color: "rgba(255,255,255,0.55)", fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" }}>
+                <Text
+                  style={{
+                    fontSize: 9,
+                    color: "rgba(255,255,255,0.55)",
+                    fontWeight: "700",
+                    letterSpacing: 1,
+                    textTransform: "uppercase",
+                  }}
+                >
                   Video
                 </Text>
               </View>
@@ -991,15 +1353,23 @@ function AttachmentGrid({ attachments }: { attachments: ResponseAttachment[] }) 
       </View>
 
       {/* Unified Media Viewer */}
-      <MediaViewer item={activeItem} visible={!!activeItem} onClose={() => setActiveItem(null)} />
+      <MediaViewer
+        item={activeItem}
+        visible={!!activeItem}
+        onClose={() => setActiveItem(null)}
+      />
     </>
   );
 }
 
 // ─── Responses / Remarks Section ─────────────────────────────────────────────
 
-
-function getRoleMeta(role?: string): { label: string; color: string; bg: string; icon: React.ReactNode } {
+function getRoleMeta(role?: string): {
+  label: string;
+  color: string;
+  bg: string;
+  icon: React.ReactNode;
+} {
   switch (role) {
     case "barangay_official":
       return {
@@ -1031,9 +1401,8 @@ function getRoleMeta(role?: string): { label: string; color: string; bg: string;
       };
   }
 }
- 
-const PREVIEW_COUNT = 2;
 
+const PREVIEW_COUNT = 2;
 
 function ResponsesSection({
   incidentLinks,
@@ -1043,7 +1412,7 @@ function ResponsesSection({
   const { t } = useTranslation();
   const [sortDesc, setSortDesc] = useState(true);
   const [showAll, setShowAll] = useState(false);
- 
+
   const allResponses = useMemo(() => {
     const flat = incidentLinks.flatMap(
       (link) => link.incident?.responses ?? []
@@ -1055,13 +1424,13 @@ function ResponsesSection({
       return sortDesc ? -diff : diff;
     });
   }, [incidentLinks, sortDesc]);
- 
+
   if (allResponses.length === 0) return null;
- 
+
   const visible = showAll
     ? allResponses
     : allResponses.slice(0, PREVIEW_COUNT);
- 
+
   return (
     <View
       style={{
@@ -1111,12 +1480,18 @@ function ResponsesSection({
               paddingVertical: 3,
             }}
           >
-            <Text style={{ fontSize: 13, fontWeight: "700", color: THEME.primary }}>
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "700",
+                color: THEME.primary,
+              }}
+            >
               {allResponses.length}
             </Text>
           </View>
         </View>
- 
+
         {/* Sort toggle */}
         <TouchableOpacity
           onPress={() => setSortDesc((p) => !p)}
@@ -1139,7 +1514,7 @@ function ResponsesSection({
           </Text>
         </TouchableOpacity>
       </View>
- 
+
       {/* Remark cards */}
       <View style={{ padding: 18, gap: 14 }}>
         {visible.map((resp, i) => {
@@ -1148,7 +1523,7 @@ function ResponsesSection({
           const hasText = !!resp.actions_taken?.trim();
           const hasAttachments = attachments.length > 0;
           const roleMeta = getRoleMeta(resp.user?.role);
- 
+
           return (
             <View
               key={resp.id}
@@ -1180,7 +1555,14 @@ function ResponsesSection({
                   }}
                 />
                 <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 4,
+                    }}
+                  >
                     <Text
                       style={{
                         fontSize: 13,
@@ -1194,7 +1576,7 @@ function ResponsesSection({
                         number: remarkNumber,
                       })}
                     </Text>
- 
+
                     {/* ── Role Badge ── */}
                     <View
                       style={{
@@ -1220,9 +1602,13 @@ function ResponsesSection({
                       </Text>
                     </View>
                   </View>
- 
+
                   <View
-                    style={{ flexDirection: "row", alignItems: "center", gap: 5 }}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 5,
+                    }}
                   >
                     <Clock size={13} color="#9ca3af" strokeWidth={2} />
                     <Text style={{ fontSize: 13, color: "#9ca3af" }}>
@@ -1231,7 +1617,7 @@ function ResponsesSection({
                     </Text>
                   </View>
                 </View>
- 
+
                 {/* Badge: attachment count */}
                 {hasAttachments && (
                   <View
@@ -1245,7 +1631,11 @@ function ResponsesSection({
                       paddingVertical: 5,
                     }}
                   >
-                    <Paperclip size={12} color={THEME.primary} strokeWidth={2.5} />
+                    <Paperclip
+                      size={12}
+                      color={THEME.primary}
+                      strokeWidth={2.5}
+                    />
                     <Text
                       style={{
                         fontSize: 12,
@@ -1258,11 +1648,17 @@ function ResponsesSection({
                   </View>
                 )}
               </View>
- 
+
               {/* Body */}
               <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
                 {hasText ? (
-                  <Text style={{ fontSize: 16, color: "#1f2937", lineHeight: 24 }}>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      color: "#1f2937",
+                      lineHeight: 24,
+                    }}
+                  >
                     {resp.actions_taken}
                   </Text>
                 ) : (
@@ -1277,13 +1673,23 @@ function ResponsesSection({
                       paddingVertical: 10,
                     }}
                   >
-                    <MessageSquare size={15} color="#d1d5db" strokeWidth={2} />
-                    <Text style={{ fontSize: 14, color: "#d1d5db", fontStyle: "italic" }}>
+                    <MessageSquare
+                      size={15}
+                      color="#d1d5db"
+                      strokeWidth={2}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        color: "#d1d5db",
+                        fontStyle: "italic",
+                      }}
+                    >
                       No remarks provided
                     </Text>
                   </View>
                 )}
- 
+
                 {hasAttachments && (
                   <AttachmentGrid attachments={attachments} />
                 )}
@@ -1292,7 +1698,7 @@ function ResponsesSection({
           );
         })}
       </View>
- 
+
       {/* View All / Show Less */}
       {allResponses.length > PREVIEW_COUNT && (
         <TouchableOpacity
@@ -1312,7 +1718,13 @@ function ResponsesSection({
           }}
           activeOpacity={0.7}
         >
-          <Text style={{ fontSize: 15, fontWeight: "700", color: THEME.primary }}>
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: "700",
+              color: THEME.primary,
+            }}
+          >
             {showAll
               ? t("complaintDetail.remarks.showLess")
               : t("complaintDetail.remarks.viewAll", {
@@ -1331,13 +1743,14 @@ function ResponsesSection({
   );
 }
 
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ComplaintDetail() {
   const router = useRouter();
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [showLetter, setShowLetter] = useState(false);
- 
+
   const { data, error, isLoading, isFetching, refetch } =
     useQuery<ComplaintWithLinks>({
       queryKey: ["complaintDetail", id],
@@ -1347,7 +1760,7 @@ export default function ComplaintDetail() {
       },
       enabled: !!id,
     });
- 
+
   if (error) {
     const appError = handleApiError(
       new Error(t("complaintDetail.error.message"))
@@ -1360,27 +1773,36 @@ export default function ComplaintDetail() {
       />
     );
   }
- 
+
   if (isLoading) return <LoadingState />;
   if (!data) return null;
- 
+
   const status = (data.status ?? "submitted") as ComplaintStatus;
- 
+
   const isResolved =
     status === "resolved_by_barangay" ||
     status === "resolved_by_lgu" ||
     status === "resolved_by_department";
- 
+
   const isRejectedByBarangay = status === "rejected";
   const isRejectedByLgu = !!data.is_rejected_by_lgu && !isResolved;
   const isRejectedByDepartment = !!data.is_rejected_by_department && !isResolved;
- 
-  const steps = getTrackerSteps(status, isRejectedByLgu, isRejectedByDepartment, t);
-  const statusDisplay = getStatusDisplay(status, isRejectedByLgu, isRejectedByDepartment, t);
- 
+
+  const steps = getTrackerSteps(
+    status,
+    isRejectedByLgu,
+    isRejectedByDepartment,
+    t
+  );
+  const statusDisplay = getStatusDisplay(
+    status,
+    isRejectedByLgu,
+    isRejectedByDepartment,
+    t
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: "#f9fafb" }}>
- 
       {/* ── Header ── */}
       <View
         style={{
@@ -1393,7 +1815,14 @@ export default function ComplaintDetail() {
         }}
       >
         {/* Back + Complaint ID */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 8 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 8,
+          }}
+        >
           <TouchableOpacity
             onPress={() => router.back()}
             style={{
@@ -1412,11 +1841,17 @@ export default function ComplaintDetail() {
             {t("complaintDetail.header.complaintId", { id: data.id })}
           </Text>
         </View>
- 
+
         {/* Title + Status badge */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <Text
-            style={{ flex: 1, fontSize: 17, fontWeight: "800", color: "#111827", lineHeight: 24 }}
+            style={{
+              flex: 1,
+              fontSize: 17,
+              fontWeight: "800",
+              color: "#111827",
+              lineHeight: 24,
+            }}
             numberOfLines={1}
             ellipsizeMode="tail"
           >
@@ -1444,7 +1879,7 @@ export default function ComplaintDetail() {
             </Text>
           </View>
         </View>
- 
+
         {/* ── Download Complaint Button ── */}
         <TouchableOpacity
           onPress={() => setShowLetter(true)}
@@ -1464,12 +1899,14 @@ export default function ComplaintDetail() {
           activeOpacity={0.7}
         >
           <Download size={16} color={THEME.primary} strokeWidth={2.5} />
-          <Text style={{ fontSize: 14, fontWeight: "700", color: THEME.primary }}>
-            Download Complaint
+          <Text
+            style={{ fontSize: 14, fontWeight: "700", color: THEME.primary }}
+          >
+            {t("complaintDetail.header.downloadComplaint")}
           </Text>
         </TouchableOpacity>
       </View>
- 
+
       {/* ── Scrollable Content ── */}
       <ScrollView
         style={{ flex: 1 }}
@@ -1488,10 +1925,19 @@ export default function ComplaintDetail() {
         {isRejectedByBarangay && <RejectionBanner by="barangay" />}
         {isRejectedByLgu && <RejectionBanner by="lgu" />}
         {isRejectedByDepartment && <RejectionBanner by="department" />}
- 
+
         {/* Progress Tracker */}
-        <ProgressTracker steps={steps} title={t("complaintDetail.tracker.title")} />
- 
+        <ProgressTracker
+          steps={steps}
+          title={t("complaintDetail.tracker.title")}
+        />
+
+        {/* ── Hearing Date Card ── */}
+        <HearingDateCard
+          hearingDate={data.hearing_date}
+          barangay={data.barangay}
+        />
+
         {/* Complaint Info */}
         <SectionCard
           title={t("complaintDetail.sections.complaintInfo")}
@@ -1504,7 +1950,13 @@ export default function ComplaintDetail() {
           />
           {data.description && (
             <InfoRow
-              icon={<MessageSquare size={18} color={THEME.primary} strokeWidth={2} />}
+              icon={
+                <MessageSquare
+                  size={18}
+                  color={THEME.primary}
+                  strokeWidth={2}
+                />
+              }
               label={t("complaintDetail.fields.description")}
               value={data.description}
             />
@@ -1517,12 +1969,14 @@ export default function ComplaintDetail() {
             />
           )}
           <InfoRow
-            icon={<Calendar size={18} color={THEME.primary} strokeWidth={2} />}
+            icon={
+              <Calendar size={18} color={THEME.primary} strokeWidth={2} />
+            }
             label={t("complaintDetail.fields.dateSubmitted")}
             value={`${formatDate(data.created_at)}  •  ${formatTime(data.created_at)}`}
           />
         </SectionCard>
- 
+
         {/* Barangay */}
         {data.barangay && (
           <SectionCard
@@ -1530,7 +1984,9 @@ export default function ComplaintDetail() {
             icon={<Shield size={18} color={THEME.primary} strokeWidth={2.5} />}
           >
             <InfoRow
-              icon={<Shield size={18} color={THEME.primary} strokeWidth={2} />}
+              icon={
+                <Shield size={18} color={THEME.primary} strokeWidth={2} />
+              }
               label={t("complaintDetail.fields.barangayName")}
               value={data.barangay.barangay_name}
             />
@@ -1551,16 +2007,24 @@ export default function ComplaintDetail() {
             />
           </SectionCard>
         )}
- 
+
         {/* Remarks */}
         {(data.incident_links ?? []).length > 0 && (
           <ResponsesSection incidentLinks={data.incident_links!} />
         )}
       </ScrollView>
- 
+
       {/* ── Floating Feedback Button (resolved only) ── */}
       {isResolved && (
-        <View style={{ position: "absolute", bottom: 32, left: 16, right: 16, zIndex: 10 }}>
+        <View
+          style={{
+            position: "absolute",
+            bottom: 32,
+            left: 16,
+            right: 16,
+            zIndex: 10,
+          }}
+        >
           <TouchableOpacity
             onPress={() =>
               router.push({
@@ -1585,21 +2049,21 @@ export default function ComplaintDetail() {
             activeOpacity={0.85}
           >
             <MessageCircle size={20} color="#fff" strokeWidth={2.5} />
-            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>
+            <Text
+              style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}
+            >
               {t("complaintDetail.feedbackButton")}
             </Text>
           </TouchableOpacity>
         </View>
       )}
- 
+
       {/* ── Letter Modal ── */}
       <ComplaintLetterModal
         visible={showLetter}
         onClose={() => setShowLetter(false)}
         complaint={data}
       />
- 
     </View>
   );
 }
- 

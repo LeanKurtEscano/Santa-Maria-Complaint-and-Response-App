@@ -42,8 +42,11 @@ import { useTranslation } from 'react-i18next';
 import { detectIntents, TextRun, RICH_REGEX, ActionIntent } from '@/constants/chatbot/rule-based-nlp';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
 
+// FIX: Remove STATUS_BAR_HEIGHT — we now handle Android status bar via
+// StatusBar.currentHeight only where strictly needed (modal background tint),
+// NOT as a KAV offset. The safe-area insets already account for status bar
+// height on both platforms when using useSafeAreaInsets().
 const MAX_CHARS = 250;
 const ACTION_COOLDOWN_MS = 800;
 
@@ -326,7 +329,6 @@ function MessageBubble({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
-  // FIX: If already streamed (restored from cache or finished), show full text immediately.
   const [displayedText, setDisplayedText] = useState(
     msg.streamed || !msg.streaming ? msg.text : ''
   );
@@ -334,7 +336,6 @@ function MessageBubble({
   const [cursorVisible, setCursorVisible] = useState(false);
   const [intents, setIntents] = useState<ActionIntent[]>([]);
 
-  // FIX: Detect intents immediately for already-streamed messages
   useEffect(() => {
     if (!isUser && (msg.streamed || !msg.streaming)) {
       setIntents(detectIntents(msg.text));
@@ -343,7 +344,6 @@ function MessageBubble({
 
   // Typewriter effect
   useEffect(() => {
-    // FIX: Skip typewriter if already streamed or not streaming
     if (msg.streamed || !msg.streaming) {
       setDisplayedText(msg.text);
       if (!isUser) setIntents(detectIntents(msg.text));
@@ -368,9 +368,9 @@ function MessageBubble({
     return () => {
       if (streamRef.current) clearTimeout(streamRef.current);
     };
-  }, [msg.text, msg.streaming, msg.streamed]); // FIX: added msg.streamed to deps
+  }, [msg.text, msg.streaming, msg.streamed]);
 
-  // Cursor blink — FIX: also guard on msg.streamed
+  // Cursor blink
   useEffect(() => {
     if (!msg.streaming || msg.streamed) {
       setCursorVisible(false);
@@ -378,7 +378,7 @@ function MessageBubble({
     }
     const blink = setInterval(() => setCursorVisible((v) => !v), 500);
     return () => clearInterval(blink);
-  }, [msg.streaming, msg.streamed]); // FIX: added msg.streamed to deps
+  }, [msg.streaming, msg.streamed]);
 
   // Entrance animation
   useEffect(() => {
@@ -400,7 +400,6 @@ function MessageBubble({
       );
     }
 
-    // FIX: cursor only shows when actively streaming AND not yet streamed
     const cursor = msg.streaming && !msg.streamed && cursorVisible ? '▍' : '';
     const runs = parseTextRuns(displayedText);
 
@@ -618,7 +617,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
       text: t('chatbot.greeting'),
       timestamp: new Date(),
       streaming: false,
-      streamed: true, // FIX: initial greeting is already "done"
+      streamed: true,
     },
   ];
 
@@ -628,7 +627,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
-  // ── Cooldown state ──
   const [isCoolingDown, setIsCoolingDown] = useState(false);
   const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelScaleAnim = useRef(new Animated.Value(1)).current;
@@ -645,7 +643,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const cancelledIdsRef = useRef<Set<string>>(new Set());
   const displayedTextRef = useRef<string>('');
 
-  // ── Session cache — persists across modal opens within 30 minutes ──
   const sessionCacheRef = useRef<{
     sessionId: string;
     messages: Message[];
@@ -657,10 +654,11 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const isAtLimit = charCount >= MAX_CHARS;
 
   const scrollToBottom = useCallback((animated = true) => {
+    // FIX: On Android, a single scrollToEnd call is often ignored because
+    // the layout hasn't settled yet. We fire at 60ms and again at 300ms.
+    // 300ms is generous enough to catch both fast and slow Android devices.
     setTimeout(() => listRef.current?.scrollToEnd({ animated }), 60);
-    if (Platform.OS === 'android') {
-      setTimeout(() => listRef.current?.scrollToEnd({ animated }), 250);
-    }
+    setTimeout(() => listRef.current?.scrollToEnd({ animated }), 300);
   }, []);
 
   const scrollToBottomIfNear = useCallback((animated = true) => {
@@ -711,9 +709,10 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
 
       isNearBottomRef.current = true;
       Animated.spring(slideAnim, { toValue: 0, tension: 50, friction: 10, useNativeDriver: true }).start();
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
+      // FIX: Delay the initial scroll on Android — the FlatList hasn't
+      // finished measuring its content at 100ms on slower devices.
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), Platform.OS === 'android' ? 300 : 100);
     } else {
-      // FIX: freeze streaming + mark all as streamed before caching
       sessionCacheRef.current = {
         sessionId: sessionId ?? uuidv4(),
         messages: messages.map((m) => ({ ...m, streaming: false, streamed: true })),
@@ -770,7 +769,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     if (currentBotIdRef.current) {
       const idToFreeze = currentBotIdRef.current;
       const partial = displayedTextRef.current;
-      // FIX: mark as streamed: true so it won't retype on next open
       setMessages((prev) =>
         prev.map((m) =>
           m.id === idToFreeze ? { ...m, streaming: false, streamed: true, text: partial } : m
@@ -807,7 +805,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
         text: trimmed,
         timestamp: new Date(),
         streaming: false,
-        streamed: true, // FIX: user messages are always "done"
+        streamed: true,
       };
       setMessages((prev) => [...prev, userMsg]);
 
@@ -859,7 +857,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
         text: reply,
         timestamp: new Date(),
         streaming: true,
-        streamed: false, // FIX: explicitly false — this one should animate
+        streamed: false,
       };
       setMessages((prev) => [...prev, botMsg]);
 
@@ -869,7 +867,6 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
       const estimatedDuration = reply.length * 13;
       streamFinishRef.current = setTimeout(() => {
         if (generationRef.current !== myGeneration) return;
-        // FIX: mark streamed: true when animation completes
         setMessages((prev) =>
           prev.map((m) => (m.id === botId ? { ...m, streaming: false, streamed: true } : m))
         );
@@ -884,13 +881,39 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
 
   const isBusy = isTyping || isStreaming;
   const sendDisabled = isOffline || !input.trim() || isCoolingDown;
-  const kavOffset = Platform.OS === 'android' ? STATUS_BAR_HEIGHT : insets.top;
+
+  // FIX: On Android, KeyboardAvoidingView needs behavior='height' to actually
+  // push the input above the keyboard. On iOS, 'padding' is correct.
+  // keyboardVerticalOffset on Android must be 0 — the safe area inset for the
+  // status bar is already baked into the layout via paddingTop on the header;
+  // adding StatusBar.currentHeight here double-counts it and causes the input
+  // bar to over-shoot upward on Android.
+  const kavBehavior = Platform.OS === 'ios' ? 'padding' : 'height';
+  const kavOffset = Platform.OS === 'ios' ? insets.top : 0;
 
   return (
-    <Modal visible={visible} transparent={false} animationType="none" onRequestClose={onClose}>
+    // FIX: Use transparent={true} + a fully opaque background View instead of
+    // transparent={false}. On Android, transparent={false} causes the OS to
+    // render a brief black flash before the JS slide animation starts, because
+    // the native modal animates independently of the JS thread. With
+    // transparent={true} the modal surface is always present; only our
+    // Animated.View slides in, giving the same smooth result as iOS.
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <StatusBar
+        // FIX: Keep the status bar style consistent while the modal is open.
+        // On Android, modals don't automatically inherit the host screen's
+        // StatusBar config, so text can flip to unreadable white-on-white or
+        // black-on-black depending on the device's default.
+        barStyle="dark-content"
+        backgroundColor="#FFFFFF"
+      />
       <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
         <Animated.View style={{ flex: 1, transform: [{ translateY: slideAnim }] }}>
-          <KeyboardAvoidingView style={{ flex: 1 }} keyboardVerticalOffset={kavOffset} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={kavBehavior}
+            keyboardVerticalOffset={kavOffset}
+          >
 
             {/* ── Header ── */}
             <View
@@ -968,7 +991,14 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
               style={{ flex: 1, backgroundColor: '#F8FAFC' }}
               contentContainerStyle={{ paddingTop: 8, paddingBottom: 12 }}
               showsVerticalScrollIndicator={false}
-              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+              // FIX: Remove maintainVisibleContentPosition on Android — it
+              // conflicts with programmatic scrollToEnd calls on Android and
+              // can cause the list to jump or refuse to scroll to the bottom.
+              // iOS handles this prop correctly; Android does not need it here
+              // because we always want the latest message at the bottom.
+              maintainVisibleContentPosition={
+                Platform.OS === 'ios' ? { minIndexForVisible: 0 } : undefined
+              }
               onContentSizeChange={() => {
                 scrollToBottomIfNear(true);
               }}
@@ -983,6 +1013,16 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                   contentOffset.y + layoutMeasurement.height >= contentSize.height - 200;
               }}
               scrollEventThrottle={100}
+              // FIX: Disable automatic keyboard dismissal on Android — the
+              // default 'on-drag' behaviour causes the keyboard to hide when
+              // the user scrolls, which then triggers a KAV layout relayout
+              // that jumps the input bar. 'interactive' is iOS-only; use
+              // 'none' on Android so only an explicit tap-away closes it.
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
+              // FIX: Tell the list to keep its content above the soft keyboard
+              // on Android. Without this the bottom messages are hidden behind
+              // the keyboard even when KAV is working correctly.
+              keyboardShouldPersistTaps="handled"
               ListHeaderComponent={
                 <>
                   <DateSeparator />
@@ -1069,6 +1109,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingHorizontal: 16 }}
+                  keyboardShouldPersistTaps="handled"
                   renderItem={({ item }) => (
                     <SuggestionChip
                       text={t(`chatbot.suggestions.${item}`)}
@@ -1085,7 +1126,12 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                   backgroundColor: '#FFFFFF',
                   borderTopWidth: 1, borderTopColor: '#F1F5F9',
                   paddingHorizontal: 12, paddingTop: 10,
-                  paddingBottom: Math.max(insets.bottom, 12),
+                  // FIX: On Android insets.bottom is 0 inside a transparent
+                  // modal with gesture-navigation bars. Use the safe-area value
+                  // when it's available (e.g. on devices with a nav bar rendered
+                  // inside the app window), but fall back to a hard 16px so the
+                  // input bar never sits flush against the bottom edge.
+                  paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 16 : 12),
                 }}
               >
                 <View style={{ alignItems: 'flex-end', paddingHorizontal: 4, marginBottom: 4 }}>
@@ -1146,6 +1192,12 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                         color: isOffline ? '#94A3B8' : '#1E293B',
                         paddingTop: 10, paddingBottom: 10,
                         maxHeight: 100, lineHeight: 20,
+                        // FIX: Android adds extra vertical padding inside
+                        // TextInput by default via its material theme.
+                        // Setting textAlignVertical to 'top' and zeroing the
+                        // default padding keeps multiline inputs aligned the
+                        // same as on iOS.
+                        textAlignVertical: 'top',
                       }}
                       returnKeyType="default"
                     />

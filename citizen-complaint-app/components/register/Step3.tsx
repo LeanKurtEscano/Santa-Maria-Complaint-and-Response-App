@@ -45,6 +45,54 @@ interface Step3Props {
   saveFormData: () => Promise<void>;
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Returns true if the string looks like a base64 data URI.
+ * We use this to skip re-conversion at submit time and to display a
+ * friendly filename in the UI instead of a garbled base64 string.
+ */
+const isBase64Uri = (value: string) => value.startsWith('data:');
+
+/**
+ * Converts an image URI to a base64 data URI immediately after pick so that
+ * the value stored in the form is stable across Android app backgrounding.
+ */
+const toBase64DataUri = async (uri: string): Promise<string> => {
+  // If it's already base64, return as-is
+  if (isBase64Uri(uri)) return uri;
+
+  const response = await fetch(uri);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
+/**
+ * Shows a short, human-readable label for the image field value.
+ * base64 URIs are replaced with a friendly name; file URIs show their filename.
+ */
+const getDisplayLabel = (
+  value: string,
+  fieldName: 'idFrontImage' | 'idBackImage' | 'selfieImage',
+): string => {
+  if (isBase64Uri(value)) {
+    const labels: Record<string, string> = {
+      idFrontImage: 'ID Front captured',
+      idBackImage: 'ID Back captured',
+      selfieImage: 'Selfie captured',
+    };
+    return labels[fieldName] ?? 'Image captured';
+  }
+  return value.split('/').pop() ?? 'Image selected';
+};
+
+// ── Component ────────────────────────────────────────────────────────────────
+
 const Step3IdVerification = ({
   form,
   onBack,
@@ -59,57 +107,79 @@ const Step3IdVerification = ({
   const { t } = useTranslation();
   const { control, formState: { errors }, watch, setValue, setError, clearErrors } = form;
 
-  // ✅ Local state instead of watch — guaranteed re-render
   const [selectedIdType, setSelectedIdType] = useState(watch('idType') || '');
-
-  const idPlaceholder = selectedIdType
-    ? getIdNumberPlaceholder(selectedIdType)
-    : 'Select an ID type first';
-  const idHint = getIdNumberHint(selectedIdType);
-
   const [showIdTypeModal, setShowIdTypeModal] = useState(false);
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
-  const [currentImageField, setCurrentImageField] = useState<'idFrontImage' | 'idBackImage' | 'selfieImage' | null>(null);
+  const [currentImageField, setCurrentImageField] = useState<
+    'idFrontImage' | 'idBackImage' | 'selfieImage' | null
+  >(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
 
-  const getFileName = (uri: string | undefined) => {
-    if (!uri) return '';
-    return uri.split('/').pop() ?? '';
-  };
+  const idPlaceholder = selectedIdType ? getIdNumberPlaceholder(selectedIdType) : 'Select an ID type first';
+  const idHint = getIdNumberHint(selectedIdType);
+
+  // ── Image handling ──────────────────────────────────────────────────────────
 
   const handleImagePick = (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
     setCurrentImageField(field);
     setShowImagePickerModal(true);
   };
 
+  const processAndStoreImage = async (uri: string, field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
+    setImageLoading(true);
+    try {
+      // FIX: Convert to base64 immediately so the value is stable on Android
+      // even if the app is backgrounded before the user submits.
+      const base64Uri = await toBase64DataUri(uri);
+      setValue(field, base64Uri as any);
+      clearErrors(field);
+      await saveFormData();
+    } catch {
+      setError(field, { type: 'manual', message: 'Failed to process image. Please try again.' });
+    } finally {
+      setImageLoading(false);
+    }
+  };
+
   const pickFromCamera = async () => {
     if (!currentImageField) return;
+
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permissionResult.granted) { alert('Camera permission is required!'); return; }
-    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.8 });
-    if (!result.canceled) {
-      setValue(currentImageField, result.assets[0].uri);
-      clearErrors(currentImageField);
-      await saveFormData();
+    if (!permissionResult.granted) {
+      alert('Camera permission is required!');
+      return;
     }
+
+    const result = await ImagePicker.launchCameraAsync({
+      // FIX: 'mediaTypes' array instead of deprecated MediaTypeOptions enum
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      // NOTE: aspect is intentionally left out — unreliable on Android
+      quality: 0.8,
+    });
+
     setShowImagePickerModal(false);
+    if (!result.canceled) {
+      await processAndStoreImage(result.assets[0].uri, currentImageField);
+    }
     setCurrentImageField(null);
   };
 
   const pickFromLibrary = async () => {
     if (!currentImageField) return;
+
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      // FIX: 'mediaTypes' array instead of deprecated MediaTypeOptions enum
+      mediaTypes: ['images'],
       allowsEditing: true,
-      aspect: [4, 3],
       quality: 0.8,
     });
-    if (!result.canceled) {
-      setValue(currentImageField, result.assets[0].uri);
-      clearErrors(currentImageField);
-      await saveFormData();
-    }
+
     setShowImagePickerModal(false);
+    if (!result.canceled) {
+      await processAndStoreImage(result.assets[0].uri, currentImageField);
+    }
     setCurrentImageField(null);
   };
 
@@ -118,6 +188,8 @@ const Step3IdVerification = ({
     clearErrors(field);
     await saveFormData();
   };
+
+  // ── Sub-components ──────────────────────────────────────────────────────────
 
   const ImageUploadField = ({
     fieldName,
@@ -141,19 +213,34 @@ const Step3IdVerification = ({
         render={({ field: { value } }) => (
           <>
             {value && value !== '' ? (
-              <View className={`border-2 rounded-xl p-4 bg-white ${errors[fieldName] ? 'border-error-500' : 'border-neutral-200'}`}>
+              <View
+                className={`border-2 rounded-xl p-4 bg-white ${
+                  errors[fieldName] ? 'border-error-500' : 'border-neutral-200'
+                }`}
+              >
                 <View className="flex-row items-center justify-between">
                   <View className="flex-row items-center flex-1">
                     <ImageIcon size={20} color="#10B981" />
+                    {/* FIX: getDisplayLabel handles base64 URIs gracefully */}
                     <Text className="ml-2 text-sm text-neutral-700 flex-1" numberOfLines={1}>
-                      {getFileName(value)}
+                      {getDisplayLabel(value, fieldName)}
                     </Text>
                   </View>
                   <View className="flex-row" style={{ gap: 8 }}>
-                    <TouchableOpacity onPress={() => handleImagePick(fieldName)} className="bg-primary-100 rounded-lg p-2" activeOpacity={0.7}>
+                    <TouchableOpacity
+                      onPress={() => handleImagePick(fieldName)}
+                      className="bg-primary-100 rounded-lg p-2"
+                      activeOpacity={0.7}
+                      disabled={imageLoading}
+                    >
                       <Camera size={16} color={THEME.primary} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => removeImage(fieldName)} className="bg-error-100 rounded-lg p-2" activeOpacity={0.7}>
+                    <TouchableOpacity
+                      onPress={() => removeImage(fieldName)}
+                      className="bg-error-100 rounded-lg p-2"
+                      activeOpacity={0.7}
+                      disabled={imageLoading}
+                    >
                       <X size={16} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
@@ -162,12 +249,25 @@ const Step3IdVerification = ({
             ) : (
               <TouchableOpacity
                 onPress={() => handleImagePick(fieldName)}
-                className={`border-2 border-dashed rounded-xl p-6 items-center ${errors[fieldName] ? 'border-error-500 bg-error-50' : 'border-neutral-300 bg-neutral-50'}`}
+                className={`border-2 border-dashed rounded-xl p-6 items-center ${
+                  errors[fieldName]
+                    ? 'border-error-500 bg-error-50'
+                    : 'border-neutral-300 bg-neutral-50'
+                }`}
                 activeOpacity={0.7}
+                disabled={imageLoading}
               >
-                <Camera size={32} color="#9CA3AF" />
-                <Text style={{ color: THEME.primary }} className="font-medium mt-2">{t('tapToUpload')}</Text>
-                <Text className="text-neutral-500 text-xs mt-1">{subLabel}</Text>
+                {imageLoading && currentImageField === fieldName ? (
+                  <ActivityIndicator color={THEME.primary} />
+                ) : (
+                  <>
+                    <Camera size={32} color="#9CA3AF" />
+                    <Text style={{ color: THEME.primary }} className="font-medium mt-2">
+                      {t('tapToUpload')}
+                    </Text>
+                    <Text className="text-neutral-500 text-xs mt-1">{subLabel}</Text>
+                  </>
+                )}
               </TouchableOpacity>
             )}
           </>
@@ -176,6 +276,8 @@ const Step3IdVerification = ({
       <ErrorMessage message={errors[fieldName]?.message} />
     </View>
   );
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <View>
@@ -192,7 +294,9 @@ const Step3IdVerification = ({
           render={({ field: { value } }) => (
             <TouchableOpacity
               onPress={() => setShowIdTypeModal(true)}
-              className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${errors.idType ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}
+              className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${
+                errors.idType ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+              }`}
               activeOpacity={0.7}
             >
               <CreditCard size={20} color="#6B7280" />
@@ -207,11 +311,20 @@ const Step3IdVerification = ({
       </View>
 
       {/* ID Type Modal */}
-      <Modal visible={showIdTypeModal} transparent animationType="slide" onRequestClose={() => setShowIdTypeModal(false)}>
+      <Modal
+        visible={showIdTypeModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowIdTypeModal(false)}
+      >
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-3xl p-6 max-h-[70%]">
             <Text className="text-xl font-bold text-neutral-900 mb-4">{t('selectIdType')}</Text>
-            <TouchableOpacity onPress={() => setShowIdTypeModal(false)} className="absolute top-6 right-6" activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={() => setShowIdTypeModal(false)}
+              className="absolute top-6 right-6"
+              activeOpacity={0.7}
+            >
               <X size={24} color="#6B7280" />
             </TouchableOpacity>
             <ScrollView>
@@ -223,15 +336,15 @@ const Step3IdVerification = ({
                       setValue('idNumber', '');
                       clearErrors('idNumber');
                     }
-                    // ✅ Update local state for immediate re-render
                     setSelectedIdType(type);
-                    // ✅ Also sync to form
                     setValue('idType', type, { shouldDirty: true, shouldValidate: true });
                     clearErrors('idType');
                     setShowIdTypeModal(false);
                     saveFormData();
                   }}
-                  className={`py-4 border-b border-neutral-200 flex-row justify-between items-center ${selectedIdType === type ? 'bg-primary-50' : ''}`}
+                  className={`py-4 border-b border-neutral-200 flex-row justify-between items-center ${
+                    selectedIdType === type ? 'bg-primary-50' : ''
+                  }`}
                   activeOpacity={0.7}
                 >
                   <Text className="text-base text-neutral-900">{t(type)}</Text>
@@ -258,7 +371,11 @@ const Step3IdVerification = ({
           }}
           render={({ field: { onChange, onBlur, value } }) => (
             <>
-              <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.idNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+              <View
+                className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
+                  errors.idNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
+              >
                 <FileText size={20} color="#6B7280" />
                 <TextInput
                   className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
@@ -313,26 +430,40 @@ const Step3IdVerification = ({
         visible={showImagePickerModal}
         transparent
         animationType="fade"
-        onRequestClose={() => { setShowImagePickerModal(false); setCurrentImageField(null); }}
+        onRequestClose={() => {
+          setShowImagePickerModal(false);
+          setCurrentImageField(null);
+        }}
       >
         <View className="flex-1 justify-center items-center bg-black/50 px-6">
           <View className="bg-white rounded-2xl p-6 w-full">
             <Text className="text-xl font-bold text-neutral-900 mb-4">Choose Image Source</Text>
             <TouchableOpacity
-              onPress={() => { setShowImagePickerModal(false); setCurrentImageField(null); }}
+              onPress={() => {
+                setShowImagePickerModal(false);
+                setCurrentImageField(null);
+              }}
               className="absolute top-6 right-6"
               activeOpacity={0.7}
             >
               <X size={24} color="#6B7280" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={pickFromCamera} className="flex-row items-center bg-primary-50 rounded-xl p-4 mb-3" activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={pickFromCamera}
+              className="flex-row items-center bg-primary-50 rounded-xl p-4 mb-3"
+              activeOpacity={0.7}
+            >
               <Camera size={24} color={THEME.primary} />
               <View className="ml-3 flex-1">
                 <Text className="text-base font-semibold text-neutral-900">Take Photo</Text>
                 <Text className="text-sm text-neutral-600">Use your camera to capture</Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity onPress={pickFromLibrary} className="flex-row items-center bg-neutral-50 rounded-xl p-4" activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={pickFromLibrary}
+              className="flex-row items-center bg-neutral-50 rounded-xl p-4"
+              activeOpacity={0.7}
+            >
               <ImageIcon size={24} color="#6B7280" />
               <View className="ml-3 flex-1">
                 <Text className="text-base font-semibold text-neutral-900">Choose from Gallery</Text>
@@ -352,13 +483,17 @@ const Step3IdVerification = ({
           render={({ field: { onChange, value } }) => (
             <>
               <TouchableOpacity
-                onPress={() => { if (value) { onChange(false); } else { setShowTermsModal(true); } }}
+                onPress={() => {
+                  if (value) { onChange(false); } else { setShowTermsModal(true); }
+                }}
                 className="flex-row items-start mb-2"
                 activeOpacity={0.7}
               >
                 <View
                   style={value ? { backgroundColor: THEME.primary, borderColor: THEME.primary } : {}}
-                  className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${!value ? (errors.agreedToTerms ? 'border-error-500' : 'border-neutral-300') : ''}`}
+                  className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${
+                    !value ? (errors.agreedToTerms ? 'border-error-500' : 'border-neutral-300') : ''
+                  }`}
                 >
                   {value && <Check size={14} color="#FFFFFF" />}
                 </View>
@@ -384,7 +519,10 @@ const Step3IdVerification = ({
         <View className="mb-6 mt-2">
           <Recaptcha
             verified={recaptchaVerified}
-            onVerify={() => { setRecaptchaVerified(true); setRecaptchaError(undefined); }}
+            onVerify={() => {
+              setRecaptchaVerified(true);
+              setRecaptchaError(undefined);
+            }}
             error={recaptchaError}
           />
         </View>
@@ -399,12 +537,17 @@ const Step3IdVerification = ({
         )}
 
         <View className="flex-row gap-3">
-          <TouchableOpacity onPress={onBack} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
+          <TouchableOpacity
+            onPress={onBack}
+            className="flex-1 bg-neutral-100 rounded-xl py-4 items-center"
+            activeOpacity={0.7}
+            disabled={isLoading || imageLoading}
+          >
             <Text className="text-neutral-700 font-semibold text-base">{t('back')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={onSubmit}
-            disabled={isLoading}
+            disabled={isLoading || imageLoading}
             style={{ backgroundColor: THEME.primary }}
             className="flex-1 rounded-xl py-4 items-center shadow-sm"
             activeOpacity={0.85}

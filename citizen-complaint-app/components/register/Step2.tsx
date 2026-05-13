@@ -38,13 +38,20 @@ const Step2ContactInfo = ({
   saveFormData,
 }: Step2Props) => {
   const { t } = useTranslation();
-  const { control, formState: { errors }, watch, setValue, setError, clearErrors } = form;
+  const {
+    control,
+    formState: { errors },
+    watch,
+    setValue,
+    setError,
+    clearErrors,
+    getValues,
+    trigger,
+  } = form;
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showBarangayModal, setShowBarangayModal] = useState(false);
-
-  const password = watch('password');
 
   const handlePhoneNumberChange = (text: string, onChange: (val: string) => void) => {
     let digits = text.replace(/\D/g, '');
@@ -82,7 +89,11 @@ const Step2ContactInfo = ({
             },
           }}
           render={({ field: { onChange, onBlur, value } }) => (
-            <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.email ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+            <View
+              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
+                errors.email ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+              }`}
+            >
               <Mail size={20} color={errors.email ? '#EF4444' : '#6B7280'} />
               <TextInput
                 className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
@@ -92,7 +103,11 @@ const Step2ContactInfo = ({
                   if (err) setError('email', { type: 'manual', message: err });
                   else clearErrors('email');
                 }}
-                onChangeText={(text) => { onChange(text); clearErrors('email'); setNetworkError(null); }}
+                onChangeText={(text) => {
+                  onChange(text);
+                  clearErrors('email');
+                  setNetworkError(null);
+                }}
                 value={value}
                 placeholder="juan.delacruz@gmail.com"
                 placeholderTextColor="#9CA3AF"
@@ -120,7 +135,11 @@ const Step2ContactInfo = ({
             },
           }}
           render={({ field: { onChange, onBlur, value } }) => (
-            <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+            <View
+              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
+                errors.phoneNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+              }`}
+            >
               <Phone size={20} color="#6B7280" />
               <TextInput
                 className="flex-1 ml-2 text-base text-neutral-900 py-2.5"
@@ -141,7 +160,9 @@ const Step2ContactInfo = ({
             </View>
           )}
         />
-        <Text className="text-xs text-neutral-500 mt-1">Enter your 11-digit number (e.g. 09123456789)</Text>
+        <Text className="text-xs text-neutral-500 mt-1">
+          Enter your 11-digit number (e.g. 09123456789)
+        </Text>
         <ErrorMessage message={errors.phoneNumber?.message} />
       </View>
 
@@ -151,10 +172,17 @@ const Step2ContactInfo = ({
         <Controller
           control={control}
           name="password"
-          rules={{ required: t('required'), validate: (value) => validatePassword(value, t) || true }}
+          rules={{
+            required: t('required'),
+            validate: (value) => validatePassword(value, t) || true,
+          }}
           render={({ field: { onChange, onBlur, value } }) => (
             <>
-              <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.password ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+              <View
+                className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
+                  errors.password ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
+              >
                 <Lock size={20} color="#6B7280" />
                 <TextInput
                   className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
@@ -165,17 +193,35 @@ const Step2ContactInfo = ({
                     if (err) setError('password', { type: 'manual', message: err });
                     else clearErrors('password');
                   }}
-                  onChangeText={(text) => { onChange(text.replace(/\s/g, '')); clearErrors('password'); }}
+                  onChangeText={(text) => {
+                    onChange(text.replace(/\s/g, ''));
+                    clearErrors('password');
+                    // FIX: Re-validate confirmPassword whenever password changes
+                    // so the mismatch error clears as soon as they match again
+                    if (getValues('confirmPassword')) {
+                      trigger('confirmPassword');
+                    }
+                  }}
                   value={value}
                   placeholder="••••••••"
                   placeholderTextColor="#9CA3AF"
                   secureTextEntry={!showPassword}
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="p-1" activeOpacity={0.7}>
-                  {showPassword ? <EyeOff size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  className="p-1"
+                  activeOpacity={0.7}
+                >
+                  {showPassword ? (
+                    <EyeOff size={20} color="#6B7280" />
+                  ) : (
+                    <Eye size={20} color="#6B7280" />
+                  )}
                 </TouchableOpacity>
               </View>
-              <Text className="text-xs text-neutral-500 mt-1">{t('registerValidation.passwordHint')}</Text>
+              <Text className="text-xs text-neutral-500 mt-1">
+                {t('registerValidation.passwordHint')}
+              </Text>
             </>
           )}
         />
@@ -188,9 +234,21 @@ const Step2ContactInfo = ({
         <Controller
           control={control}
           name="confirmPassword"
-          rules={{ required: t('required'), validate: (value) => value === password || t('passwordMismatch') }}
+          rules={{
+            required: t('required'),
+            // FIX: use getValues() instead of the stale 'password' watch variable
+            // so validation always reads the current password at the time it runs
+            validate: (value) => {
+              const currentPassword = getValues('password');
+              return value === currentPassword || t('passwordMismatch');
+            },
+          }}
           render={({ field: { onChange, onBlur, value } }) => (
-            <View className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${errors.confirmPassword ? 'border-error-500 bg-error-50' : 'border-neutral-200'}`}>
+            <View
+              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
+                errors.confirmPassword ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+              }`}
+            >
               <Lock size={20} color="#6B7280" />
               <TextInput
                 className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
@@ -201,8 +259,16 @@ const Step2ContactInfo = ({
                 placeholderTextColor="#9CA3AF"
                 secureTextEntry={!showConfirmPassword}
               />
-              <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="p-1" activeOpacity={0.7}>
-                {showConfirmPassword ? <EyeOff size={20} color="#6B7280" /> : <Eye size={20} color="#6B7280" />}
+              <TouchableOpacity
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="p-1"
+                activeOpacity={0.7}
+              >
+                {showConfirmPassword ? (
+                  <EyeOff size={20} color="#6B7280" />
+                ) : (
+                  <Eye size={20} color="#6B7280" />
+                )}
               </TouchableOpacity>
             </View>
           )}
@@ -211,11 +277,20 @@ const Step2ContactInfo = ({
       </View>
 
       {/* Barangay Modal */}
-      <Modal visible={showBarangayModal} transparent animationType="slide" onRequestClose={() => setShowBarangayModal(false)}>
+      <Modal
+        visible={showBarangayModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowBarangayModal(false)}
+      >
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white rounded-t-3xl p-6 max-h-[70%]">
             <Text className="text-xl font-bold text-neutral-900 mb-4">{t('selectBarangay')}</Text>
-            <TouchableOpacity onPress={() => setShowBarangayModal(false)} className="absolute top-6 right-6" activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={() => setShowBarangayModal(false)}
+              className="absolute top-6 right-6"
+              activeOpacity={0.7}
+            >
               <X size={24} color="#6B7280" />
             </TouchableOpacity>
             <ScrollView>
@@ -228,7 +303,9 @@ const Step2ContactInfo = ({
                     setShowBarangayModal(false);
                     saveFormData();
                   }}
-                  className={`py-4 border-b border-neutral-200 flex-row justify-between items-center ${watch('barangay') === brgy ? 'bg-primary-50' : ''}`}
+                  className={`py-4 border-b border-neutral-200 flex-row justify-between items-center ${
+                    watch('barangay') === brgy ? 'bg-primary-50' : ''
+                  }`}
                   activeOpacity={0.7}
                 >
                   <Text className="text-base text-neutral-900">{brgy}</Text>
@@ -241,7 +318,11 @@ const Step2ContactInfo = ({
       </Modal>
 
       <View className="flex-row gap-3">
-        <TouchableOpacity onPress={onBack} className="flex-1 bg-neutral-100 rounded-xl py-4 items-center" activeOpacity={0.7}>
+        <TouchableOpacity
+          onPress={onBack}
+          className="flex-1 bg-neutral-100 rounded-xl py-4 items-center"
+          activeOpacity={0.7}
+        >
           <Text className="text-neutral-700 font-semibold text-base">{t('back')}</Text>
         </TouchableOpacity>
         <TouchableOpacity

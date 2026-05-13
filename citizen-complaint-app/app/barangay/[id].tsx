@@ -31,6 +31,7 @@ import { userApiClient } from '@/lib/client/user';
 import { useComplaintCategories } from '@/hooks/general/useCategories';
 // ─── Step type ────────────────────────────────────────────────────────────────
 import { emergencyClassifierClient } from '@/lib/client/emergency';
+import { useQueryClient } from '@tanstack/react-query';
 type Step = 'instructions' | 'form' | 'location';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ export default function ComplaintFormScreen() {
   const [customTitle, setCustomTitle]         = useState('');
   const [showTitlePicker, setShowTitlePicker] = useState(false);
   const [titleError, setTitleError]           = useState('');
-
+  const queryClient = useQueryClient();
   // ── Message ─────────────────────────────────────────────────────────────────
   const [message, setMessage]           = useState('');
   const [messageError, setMessageError] = useState('');
@@ -314,6 +315,9 @@ const handleSubmit = async () => {
 
   } finally {
     setIsSubmitting(false);
+  queryClient.invalidateQueries({
+      queryKey: ["complaintDetail"],
+    }); // ← ensure complaints list is fresh after submission
 
     // ── Only reset form + navigate if submission actually succeeded ──────────
     if (submissionSuccess) {
