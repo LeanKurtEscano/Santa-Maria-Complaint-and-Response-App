@@ -13,7 +13,8 @@ import { useNotificationStore } from '@/store/useNotificationStore';
 import { complaintApiClient } from '@/lib/client/complaint';
 import { MyStats } from '@/types/general/home';
 import { THEME } from '@/constants/theme';
-
+import { useTranslation } from 'react-i18next';
+import { useRouter } from 'expo-router'; 
 function NotifBadge({ count }: { count: number }) {
   if (count === 0) return null;
   return (
@@ -260,6 +261,120 @@ export function HeroHeader({
         {isLoading && <StatsLoading />}
         {isError   && <StatsError onRetry={refetch} />}
         {data      && <StatsContent data={data} />}
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+
+export function GuestHeroHeader({
+  scrollY, cityTitle, municipality, location,
+  currentLanguage, onChangeLanguage, onBell,
+}: {
+  scrollY: Animated.Value;
+  cityTitle: string; municipality: string; location: string;
+  currentLanguage: string;
+  onChangeLanguage: () => void;
+  onBell: () => void;
+}) {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { unreadCount } = useNotificationStore();
+
+  const DIST = 80;
+  const paddingBottom = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 28], extrapolate: 'clamp' });
+  const titleFontSize = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [30, 22], extrapolate: 'clamp' });
+  const subOpacity    = scrollY.interpolate({ inputRange: [0, 60],   outputRange: [1, 0],   extrapolate: 'clamp' });
+  const paddingTop    = scrollY.interpolate({
+    inputRange: [0, DIST],
+    outputRange: [20 + insets.top, 10 + insets.top],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <Animated.View
+      className="px-5 overflow-hidden"
+      style={{ paddingTop, paddingBottom, backgroundColor: THEME.primary }}
+    >
+      <ParallaxBlob scrollY={scrollY} size={200} top={-50} right={-50} speed={0.25} opacity={0.05} />
+      <ParallaxBlob scrollY={scrollY} size={160} top={60}  left={-30}  speed={0.4}  opacity={0.04} />
+      <ParallaxBlob scrollY={scrollY} size={80}  top={60}  right={70}  speed={0.15} opacity={0.04} />
+
+      {/* Top row */}
+      <View className="flex-row items-start justify-between mb-7">
+        <View className="flex-1">
+          <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1.5 mb-1">
+            <Sparkles size={10} color={THEME.primaryLight} />
+            <Text className="text-white text-[11px] font-bold tracking-widest uppercase">{municipality}</Text>
+          </Animated.View>
+          <Animated.Text className="text-white font-black leading-8" style={{ fontSize: titleFontSize }}>
+            {cityTitle}
+          </Animated.Text>
+          <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1 mt-1">
+            <MapPin size={11} color={THEME.primaryLight} />
+            <Text className="text-white text-[12px] font-medium">{location}</Text>
+          </Animated.View>
+        </View>
+
+        <View className="flex-row items-center gap-2 mt-1">
+          <TouchableOpacity
+            onPress={onChangeLanguage}
+            activeOpacity={0.8}
+            className="rounded-2xl px-3 py-2.5 flex-row items-center gap-1.5"
+            style={{ backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+          >
+            <Languages size={14} color="white" />
+            <Text className="text-white text-[12px] font-bold">{currentLanguage === 'en' ? 'EN' : 'TL'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onBell}
+            activeOpacity={0.8}
+            className="rounded-2xl p-3"
+            style={{
+              position: 'relative',
+              backgroundColor: 'rgba(255,255,255,0.13)',
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+            }}
+          >
+            <Bell size={22} color="white" />
+            <NotifBadge count={unreadCount} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Guest welcome banner */}
+      <Animated.View style={{ opacity: subOpacity }}>
+        <View
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.12)',
+            borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+            borderRadius: 16, padding: 16,
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: 'white', fontSize: 14, fontWeight: '800', marginBottom: 2 }}>
+              {t('home.guest.title')}
+            </Text>
+            <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '500' }}>
+              {t('home.guest.subtitle')}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => router.push('/(auth)/Login')}
+            activeOpacity={0.85}
+            style={{
+              backgroundColor: 'white',
+              borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9,
+            }}
+          >
+            <Text style={{ color: THEME.primary, fontSize: 13, fontWeight: '800' }}>
+              {t('home.guest.cta')}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </Animated.View>
     </Animated.View>
   );

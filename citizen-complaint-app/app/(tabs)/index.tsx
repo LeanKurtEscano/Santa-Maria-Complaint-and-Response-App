@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { useSettingsLogic } from '@/hooks/general/useSetting';
 import { announcementApiClient } from '@/lib/client/announcement';
 import { Announcement } from '@/types/general/home';
-import { StickyMiniHeader, HeroHeader, BottomCTA } from '@/components/home/HeroHeader';
+import { StickyMiniHeader, HeroHeader, BottomCTA, GuestHeroHeader } from '@/components/home/HeroHeader';
 import { QuickAction } from '@/components/home/QuickAction';
 import { GreetingBanner } from '@/components/home/GreetingBanner';
 import { UpcomingEventsStrip } from '@/components/home/UpcomingEvents';
@@ -28,6 +28,7 @@ import ErrorScreen from '@/screen/general/ErrorScreen';
 import { handleApiError } from '@/utils/general/errorHandler';
 import { ActivityIndicator } from 'react-native';
 import { OrdinanceCard } from '@/components/home/OrdinanceCard';
+import { useCurrentUser } from '@/store/useCurrentUserStore';
 
 const HEADER_SCROLL_DISTANCE = 80;
 
@@ -37,6 +38,7 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const [chatOpen, setChatOpen] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const { isAuthenticated, userData, loading: authLoading } = useCurrentUser();
 
   // ── Queries ──────────────────────────────────────────────────────────────
   const {
@@ -59,7 +61,8 @@ export default function HomeScreen() {
     queryKey: ['my-stats'],
     queryFn: async () => (await complaintApiClient.get('/my-stats')).data,
     staleTime: 1000 * 60 * 5,
-    retry: 2,
+    retry: false,
+    enabled: !authLoading && isAuthenticated && !!userData,
   });
 
   const {
@@ -75,23 +78,22 @@ export default function HomeScreen() {
   });
 
   // ── Derived states ────────────────────────────────────────────────────────
-  const isAnyLoading = isLoading || isLoadingStats || isLoadingEvents;
-  const isAnyError   = isError   || isErrorStats   || isErrorEvents;
+  const isAnyLoading = isLoading || isLoadingEvents || authLoading || (isAuthenticated && isLoadingStats);
+  const isAnyError   = isError   || isErrorEvents   || (isAuthenticated && isErrorStats);
 
   const refetchAll = () => {
     refetch();
-    refetchStats();
     refetchEvents();
+    if (isAuthenticated) refetchStats();
   };
 
- 
   if (isAnyLoading) {
-  return (
-    <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
-      <ActivityIndicator size="large" color="#10B981" />
-    </SafeAreaView>
-  );
-}
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 items-center justify-center">
+        <ActivityIndicator size="large" color="#10B981" />
+      </SafeAreaView>
+    );
+  }
 
   if (isAnyError) {
     const appError = handleApiError(new Error(t('home.errors.loadFailed')));
@@ -135,25 +137,37 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
-            onRefresh={refetchAll}          // 👈 refresh all at once
+            onRefresh={refetchAll}
             tintColor="#10B981"
             colors={['#10B981']}
           />
         }
       >
-        <HeroHeader
-          data={stats}
-          isLoading={isLoadingStats}
-          isError={isErrorStats}
-          refetch={refetchStats}
-          scrollY={scrollY}
-          cityTitle={t('header.city')}
-          municipality={t('header.municipality')}
-          location={t('header.location')}
-          currentLanguage={currentLanguage}
-          onChangeLanguage={() => changeLanguage(currentLanguage === 'en' ? 'tl' : 'en')}
-          onBell={() => router.push('/(tabs)/Notifications')}
-        />
+        {isAuthenticated ? (
+          <HeroHeader
+            data={stats}
+            isLoading={isLoadingStats}
+            isError={isErrorStats}
+            refetch={refetchStats}
+            scrollY={scrollY}
+            cityTitle={t('header.city')}
+            municipality={t('header.municipality')}
+            location={t('header.location')}
+            currentLanguage={currentLanguage}
+            onChangeLanguage={() => changeLanguage(currentLanguage === 'en' ? 'tl' : 'en')}
+            onBell={() => router.push('/(tabs)/Notifications')}
+          />
+        ) : (
+          <GuestHeroHeader
+            scrollY={scrollY}
+            cityTitle={t('header.city')}
+            municipality={t('header.municipality')}
+            location={t('header.location')}
+            currentLanguage={currentLanguage}
+            onChangeLanguage={() => changeLanguage(currentLanguage === 'en' ? 'tl' : 'en')}
+            onBell={() => router.push('/(tabs)/Notifications')}
+          />
+        )}
 
         {/* ── Quick access card ── */}
         <Animated.View
@@ -175,7 +189,12 @@ export default function HomeScreen() {
               onPress={() => router.push('/complaints/UserComplaints')}
               delay={60}
             />
-            <QuickAction Icon={CalendarDays} label={t('quick.events')} onPress={() => router.push('/event/events')} delay={120} />
+            <QuickAction
+              Icon={CalendarDays}
+              label={t('quick.events')}
+              onPress={() => router.push('/event/events')}
+              delay={120}
+            />
             <QuickAction
               Icon={Phone}
               label={t('emergency.title')}
@@ -211,8 +230,8 @@ export default function HomeScreen() {
             onRetry={refetch}
           />
         </View>
-        <OrdinanceCard/>
 
+        <OrdinanceCard />
         <FeedbackCard />
 
       </Animated.ScrollView>

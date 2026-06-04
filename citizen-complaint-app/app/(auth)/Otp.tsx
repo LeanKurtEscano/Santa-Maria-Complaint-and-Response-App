@@ -12,13 +12,24 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Mail, Phone, AlertCircle, CheckCircle, WifiOff, Clock, ShieldAlert } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Mail,
+  Phone,
+  AlertCircle,
+  CheckCircle,
+  WifiOff,
+  Clock,
+  ShieldAlert,
+} from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
+
 import { authApiClient } from '@/lib/client/user';
 import { THEME } from '@/constants/theme';
 import { useLocalSearchParams } from 'expo-router';
 import { userApiClient } from '@/lib/client/user';
-
+const IP_URL = process.env.EXPO_PUBLIC_IP_URL;
 interface OTPVerificationScreenProps {
   navigation?: any;
   route?: {
@@ -34,19 +45,52 @@ interface OTPVerificationScreenProps {
 
 type ErrorType = 'invalid_otp' | 'expired_otp' | 'server' | 'validation' | 'generic' | null;
 
-// ── FIX #1: Ensure file URIs have the file:// prefix on Android ──────────────
-const ensureFileUri = (uri: string): string => {
-  if (!uri) return uri;
-  if (Platform.OS === 'android' && !uri.startsWith('file://') && !uri.startsWith('content://')) {
-    return `file://${uri}`;
+// ── Image helpers ─────────────────────────────────────────────────────────────
+
+/**
+ * Writes a base64 data URI to a temporary file and returns the file:// path.
+ *
+ * WHY: React Native's FormData file append requires a file:// (or content://)
+ * URI — it cannot directly accept a base64 data URI string. We write the image
+ * to the app's cache directory, which is always writable, then append that path.
+ *
+ * The temp files are cleaned up after the request completes.
+ */
+const base64ToTempFile = async (base64Uri: string, filename: string): Promise<string | null> => {
+  if (!base64Uri) return null;
+  try {
+    // Strip the "data:image/jpeg;base64," prefix — FileSystem only wants the raw base64
+    const base64Data = base64Uri.includes(',') ? base64Uri.split(',')[1] : base64Uri;
+    const tempPath = `${FileSystem.cacheDirectory}${filename}`;
+    await FileSystem.writeAsStringAsync(tempPath, base64Data, {
+      encoding: 'base64' as any,
+    });
+    return tempPath;
+  } catch (err) {
+    console.error(`Failed to write temp file ${filename}:`, err);
+    return null;
   }
-  return uri;
 };
+
+/**
+ * Deletes a list of temp file paths. Called after the API request regardless
+ * of success/failure to avoid accumulating stale files in the cache directory.
+ */
+const cleanupTempFiles = async (paths: (string | null)[]) => {
+  await Promise.all(
+    paths
+      .filter(Boolean)
+      .map((p) => FileSystem.deleteAsync(p as string, { idempotent: true }).catch(() => {})),
+  );
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function OTPVerificationScreen({ navigation, route }: OTPVerificationScreenProps) {
   const router = useRouter();
   const { t } = useTranslation();
-  const { email: registerEmail, phone: registerPhone, apiRoute, otpResendRoute } = useLocalSearchParams();
+  const { email: registerEmail, phone: registerPhone, apiRoute, otpResendRoute } =
+    useLocalSearchParams();
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -60,13 +104,13 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
   const [phone, setPhone] = useState('');
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
-  // ── Mode detection ────────────────────────────────────────────────────────
+  // ── Mode detection ──────────────────────────────────────────────────────
   const isResetPassword =
     apiRoute === 'verify-reset-password-otp' || apiRoute === '/verify-reset-password-otp';
   const isPhoneMode =
     apiRoute === '/verify-phone-number-otp' || apiRoute === 'verify-phone-number-otp';
 
-  // ── Load contact info ─────────────────────────────────────────────────────
+  // ── Load contact info ───────────────────────────────────────────────────
   useEffect(() => {
     const loadContactInfo = async () => {
       if (isResetPassword) {
@@ -89,7 +133,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     return (registerEmail as string) || '';
   };
 
-  // ── Timer ─────────────────────────────────────────────────────────────────
+  // ── Timer ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (resendTimer > 0) {
       const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
@@ -120,21 +164,21 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     }
   };
 
-  // ── Resend OTP ────────────────────────────────────────────────────────────
+  // ── Resend OTP ──────────────────────────────────────────────────────────
   const handleResendOtp = async () => {
     if (!canResend) return;
     clearErrors();
     try {
       if (isResetPassword) {
-        await userApiClient.post(otpResendRoute as string || '/resend-reset-otp', {
+        await userApiClient.post((otpResendRoute as string) || '/resend-reset-otp', {
           email: await getEmail(),
         });
       } else if (isPhoneMode) {
-        await authApiClient.post(otpResendRoute as string || '/resend-phone-otp', {
+        await authApiClient.post((otpResendRoute as string) || '/resend-phone-otp', {
           phone_number: phone,
         });
       } else {
-        await authApiClient.post(otpResendRoute as string || '/resend-otp', {
+        await authApiClient.post((otpResendRoute as string) || '/resend-otp', {
           email: await getEmail(),
         });
       }
@@ -153,7 +197,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
         setNetworkError(t('otpResendTimeout'));
       } else {
         const msg = extractErrorMessage(
-          err?.response?.data?.detail || err?.response?.data?.message
+          err?.response?.data?.detail || err?.response?.data?.message,
         );
         setErrorMessage(msg || t('otpResendFailed'));
         setErrorType('generic');
@@ -192,10 +236,11 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     return String(errorData);
   };
 
-  // ── FIX #2: Safe AsyncStorage parser ─────────────────────────────────────
+  // ── Safe AsyncStorage parser ────────────────────────────────────────────
   const safeParseRegistrationData = async (): Promise<any | null> => {
     try {
       const raw = await AsyncStorage.getItem('registrationData');
+         console.log('RAW registrationData:', raw);
       if (!raw) return null;
       return JSON.parse(raw);
     } catch {
@@ -203,11 +248,74 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     }
   };
 
-  // ── FIX #3: Build FormData without manually setting Content-Type ──────────
-  // On Android, manually setting 'Content-Type: multipart/form-data' omits the
-  // boundary string, which causes the server to fail parsing the body.
-  // Let Axios/fetch set the header automatically so the boundary is included.
-  const buildRegistrationFormData = (registrationData: any, otpString: string, includeEmail: boolean) => {
+  /**
+   * Sends a multipart FormData request using native fetch instead of Axios.
+   *
+   * WHY NOT AXIOS: On Android, Axios fails to serialize React Native FormData
+   * containing file:// URIs for multipart uploads — it throws a silent "Network Error"
+   * with no status code. Native fetch uses RN's XMLHttpRequest which handles
+   * file:// URIs correctly and is the recommended approach for file uploads in RN.
+   */
+  const postFormDataWithFetch = async (
+    path: string,
+    formData: FormData,
+  ): Promise<{ status: number; data: any }> => {
+   // Set your API base URL here
+    const url = `${IP_URL}/api/v1/auth${path}`;
+    console.log('Sending multipart to:', url);
+
+    // Do NOT set Content-Type — fetch sets it with the correct boundary automatically
+    const response = await fetch(url, { method: 'POST', body: formData });
+
+    let data: any = null;
+    const ct = response.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      data = await response.json();
+    } else {
+      data = await response.text();
+    }
+    console.log('Multipart response:', response.status, JSON.stringify(data));
+
+    if (!response.ok) {
+      const error: any = new Error(`Request failed with status ${response.status}`);
+      error.response = { status: response.status, data };
+      throw error;
+    }
+    return { status: response.status, data };
+  };
+
+  /**
+   * Builds a multipart FormData payload for the registration verification API.
+   *
+   * HOW IMAGES WORK:
+   * 1. Images are stored in AsyncStorage as base64 data URIs (set in Step3).
+   * 2. React Native's FormData cannot accept base64 data URIs directly as files.
+   * 3. We write each image to a temp file in the cache directory using expo-file-system.
+   * 4. We append the temp file:// paths to FormData — RN's native layer reads them.
+   * 5. After the request, we delete the temp files.
+   *
+   * We also do NOT manually set Content-Type. Axios/fetch sets it automatically
+   * with the correct multipart boundary string. Setting it manually strips the
+   * boundary and causes a server-side parse failure.
+   */
+  const buildRegistrationFormData = async (
+    registrationData: any,
+    otpString: string,
+    includeEmail: boolean,
+  ): Promise<{ formData: FormData; tempFiles: (string | null)[] }> => {
+    // Write base64 images to temp files in parallel
+    const [frontPath, backPath, selfiePath] = await Promise.all([
+      registrationData.idFrontImage
+        ? base64ToTempFile(registrationData.idFrontImage, 'front_id.jpg')
+        : Promise.resolve(null),
+      registrationData.idBackImage
+        ? base64ToTempFile(registrationData.idBackImage, 'back_id.jpg')
+        : Promise.resolve(null),
+      registrationData.selfieImage
+        ? base64ToTempFile(registrationData.selfieImage, 'selfie_with_id.jpg')
+        : Promise.resolve(null),
+    ]);
+
     const formData = new FormData();
 
     const dataObject: any = {
@@ -237,33 +345,33 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
     formData.append('data', JSON.stringify(dataObject));
 
-    // FIX #1 applied here — ensure file:// prefix on Android
-    if (registrationData.idFrontImage) {
+    // Append images using the stable temp file:// paths
+    if (frontPath) {
       formData.append('front_id', {
-        uri: ensureFileUri(registrationData.idFrontImage),
+        uri: frontPath,
         type: 'image/jpeg',
         name: 'front_id.jpg',
       } as any);
     }
-    if (registrationData.idBackImage) {
+    if (backPath) {
       formData.append('back_id', {
-        uri: ensureFileUri(registrationData.idBackImage),
+        uri: backPath,
         type: 'image/jpeg',
         name: 'back_id.jpg',
       } as any);
     }
-    if (registrationData.selfieImage) {
+    if (selfiePath) {
       formData.append('selfie_with_id', {
-        uri: ensureFileUri(registrationData.selfieImage),
+        uri: selfiePath,
         type: 'image/jpeg',
         name: 'selfie_with_id.jpg',
       } as any);
     }
 
-    return formData;
+    return { formData, tempFiles: [frontPath, backPath, selfiePath] };
   };
 
-  // ── Verify OTP ────────────────────────────────────────────────────────────
+  // ── Verify OTP ──────────────────────────────────────────────────────────
   const handleVerifyOtp = async () => {
     const otpString = otp.join('');
     if (otpString.length !== 6) {
@@ -276,7 +384,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     clearErrors();
 
     try {
-      // ── Reset password flow ──────────────────────────────────────────────
+      // ── Reset password flow ──────────────────────────────────────────
       if (isResetPassword) {
         const response = await userApiClient.post(`${apiRoute}`, {
           email: await getEmail(),
@@ -293,9 +401,8 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
           params: { email: await getEmail() },
         });
 
-      // ── Phone OTP flow ───────────────────────────────────────────────────
+      // ── Phone OTP flow ───────────────────────────────────────────────
       } else if (isPhoneMode) {
-        // FIX #2: safe parse with error guard
         const registrationData = await safeParseRegistrationData();
         if (!registrationData) {
           setErrorMessage(t('otpRegistrationDataNotFound'));
@@ -304,19 +411,26 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
           return;
         }
 
-        const formData = buildRegistrationFormData(registrationData, otpString, false);
+        const { formData, tempFiles } = await buildRegistrationFormData(
+          registrationData,
+          otpString,
+          false,
+        );
 
-        // FIX #3: no manual Content-Type header — Axios sets it with boundary
-        const response = await authApiClient.post('/verify-phone-number-otp', formData);
-
-        if (response.status === 201) {
-          await AsyncStorage.removeItem('registrationData');
-          router.push('/(auth)/NotVerified');
+        try {
+          // Use native fetch instead of Axios for multipart — Axios fails on Android with file:// URIs
+          const response = await postFormDataWithFetch('/verify-phone-number-otp', formData);
+          if (response.status === 200 || response.status === 201) {
+            await AsyncStorage.removeItem('registrationData');
+            router.push('/(auth)/NotVerified');
+          }
+        } finally {
+          // Always clean up temp files, success or failure
+          await cleanupTempFiles(tempFiles);
         }
 
-      // ── Email OTP flow ───────────────────────────────────────────────────
+      // ── Email OTP flow ───────────────────────────────────────────────
       } else {
-        // FIX #2: safe parse with error guard
         const registrationData = await safeParseRegistrationData();
         if (!registrationData) {
           setErrorMessage(t('otpRegistrationDataNotFound'));
@@ -325,14 +439,22 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
           return;
         }
 
-        const formData = buildRegistrationFormData(registrationData, otpString, true);
+        const { formData, tempFiles } = await buildRegistrationFormData(
+          registrationData,
+          otpString,
+          true,
+        );
 
-        // FIX #3: no manual Content-Type header — Axios sets it with boundary
-        const response = await authApiClient.post('/verify-otp', formData);
-
-        if (response.status === 201) {
-          await AsyncStorage.removeItem('registrationData');
-          router.push('/(auth)/NotVerified');
+        try {
+          // Use native fetch instead of Axios for multipart — Axios fails on Android with file:// URIs
+          const response = await postFormDataWithFetch('/verify-otp', formData);
+          if (response.status === 200 || response.status === 201) {
+            await AsyncStorage.removeItem('registrationData');
+            router.push('/(auth)/NotVerified');
+          }
+        } finally {
+          // Always clean up temp files, success or failure
+          await cleanupTempFiles(tempFiles);
         }
       }
     } catch (err: any) {
@@ -351,7 +473,11 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
         } else if (detail.includes('ID images')) {
           setErrorMessage(t('otpIdImagesRequired'));
           setErrorType('validation');
-        } else if (detail.includes('birthdate') || detail.includes('datetime') || detail.includes('date')) {
+        } else if (
+          detail.includes('birthdate') ||
+          detail.includes('datetime') ||
+          detail.includes('date')
+        ) {
           setErrorMessage(t('otpInvalidDate'));
           setErrorType('validation');
         } else {
@@ -375,7 +501,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
         setNetworkError(t('otpRequestTimeout'));
       } else {
         const msg = extractErrorMessage(
-          err?.response?.data?.detail || err?.response?.data?.message
+          err?.response?.data?.detail || err?.response?.data?.message,
         );
         setErrorMessage(msg || t('otpVerificationFailed'));
         setErrorType('generic');
@@ -390,7 +516,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     else router.back();
   };
 
-  // ── Masking helpers ───────────────────────────────────────────────────────
+  // ── Masking helpers ─────────────────────────────────────────────────────
   const maskEmail = (email: string) => {
     if (!email) return '';
     const [username, domain] = email.split('@');
@@ -407,9 +533,20 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
   const getInputStyle = (digit: string, isFocused: boolean) => {
     const hasOtpError = errorType === 'invalid_otp' || errorType === 'expired_otp';
-    if (hasOtpError) return { borderColor: '#DC2626', backgroundColor: '#FEF2F2', color: '#B91C1C' };
-    if (isFocused) return { borderColor: THEME.primary, backgroundColor: THEME.primary + '10', color: THEME.primary };
-    if (digit) return { borderColor: THEME.primary, backgroundColor: THEME.primary + '10', color: THEME.primary };
+    if (hasOtpError)
+      return { borderColor: '#DC2626', backgroundColor: '#FEF2F2', color: '#B91C1C' };
+    if (isFocused)
+      return {
+        borderColor: THEME.primary,
+        backgroundColor: THEME.primary + '10',
+        color: THEME.primary,
+      };
+    if (digit)
+      return {
+        borderColor: THEME.primary,
+        backgroundColor: THEME.primary + '10',
+        color: THEME.primary,
+      };
     return { borderColor: '#D1D5DB', backgroundColor: '#FFFFFF', color: '#111827' };
   };
 
@@ -470,9 +607,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
               activeOpacity={0.7}
             >
               <ArrowLeft size={24} color="#1F2937" />
-              <Text className="text-neutral-800 text-base font-medium ml-2">
-                {t('back')}
-              </Text>
+              <Text className="text-neutral-800 text-base font-medium ml-2">{t('back')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -483,21 +618,23 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
                 className="rounded-full p-4 mb-4"
                 style={{ backgroundColor: THEME.primary }}
               >
-                {isPhoneMode
-                  ? <Phone size={32} color="#FFFFFF" />
-                  : <Mail size={32} color="#FFFFFF" />
-                }
+                {isPhoneMode ? (
+                  <Phone size={32} color="#FFFFFF" />
+                ) : (
+                  <Mail size={32} color="#FFFFFF" />
+                )}
               </View>
 
               <Text className="text-neutral-900 text-2xl font-bold text-center mb-2">
-                {isPhoneMode ? t('verifyYourPhone') || 'Verify Your Phone' : t('verifyYourEmail')}
+                {isPhoneMode
+                  ? t('verifyYourPhone') || 'Verify Your Phone'
+                  : t('verifyYourEmail')}
               </Text>
 
               <Text className="text-neutral-600 text-base text-center leading-6">
                 {isPhoneMode
                   ? t('otpSentMessagePhone') || 'We sent a 6-digit code to'
-                  : t('otpSentMessage')
-                }
+                  : t('otpSentMessage')}
               </Text>
 
               <Text
@@ -512,7 +649,9 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
             {networkError ? (
               <View className="bg-error-50 border border-error-400 rounded-xl p-4 mb-4 flex-row items-start">
                 <WifiOff size={18} color="#DC2626" />
-                <Text className="text-sm text-error-800 flex-1 ml-2.5 leading-5">{networkError}</Text>
+                <Text className="text-sm text-error-800 flex-1 ml-2.5 leading-5">
+                  {networkError}
+                </Text>
               </View>
             ) : null}
 
@@ -549,7 +688,10 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
                     keyboardType="number-pad"
                     maxLength={1}
                     className="w-12 h-14 border-2 rounded-xl text-center text-xl font-bold"
-                    style={[{ textAlignVertical: 'center' }, getInputStyle(digit, focusedIndex === index)]}
+                    style={[
+                      { textAlignVertical: 'center' },
+                      getInputStyle(digit, focusedIndex === index),
+                    ]}
                   />
                 ))}
               </View>
@@ -560,7 +702,11 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
                   className="flex-row items-start rounded-xl p-3.5 mb-4 border"
                   style={activeError.containerStyle}
                 >
-                  <activeError.Icon size={16} color={activeError.iconColor} style={{ marginTop: 1 }} />
+                  <activeError.Icon
+                    size={16}
+                    color={activeError.iconColor}
+                    style={{ marginTop: 1 }}
+                  />
                   <Text className="text-sm ml-2 flex-1 leading-5" style={activeError.textStyle}>
                     {errorMessage}
                   </Text>
@@ -569,9 +715,7 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
 
               {/* Resend */}
               <View className="items-center">
-                <Text className="text-neutral-600 text-sm mb-2">
-                  {t("didn'tReceiveCode")}
-                </Text>
+                <Text className="text-neutral-600 text-sm mb-2">{t("didn'tReceiveCode")}</Text>
                 {canResend ? (
                   <TouchableOpacity onPress={handleResendOtp} activeOpacity={0.7}>
                     <Text className="text-sm font-semibold" style={{ color: THEME.primary }}>
@@ -580,20 +724,30 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
                   </TouchableOpacity>
                 ) : (
                   <Text className="text-neutral-500 text-sm">
-                    {t('resendIn')} {Math.floor(resendTimer / 60)}:{String(resendTimer % 60).padStart(2, '0')}
+                    {t('resendIn')} {Math.floor(resendTimer / 60)}:
+                    {String(resendTimer % 60).padStart(2, '0')}
                   </Text>
                 )}
               </View>
             </View>
 
             {/* Info notice */}
-            <View className="rounded-xl p-4 mb-6" style={{ backgroundColor: THEME.primary + '20' }}>
+            <View
+              className="rounded-xl p-4 mb-6"
+              style={{ backgroundColor: THEME.primary + '20' }}
+            >
               <View className="flex-row items-start">
-                <View className="rounded-full p-1 mr-3 mt-0.5" style={{ backgroundColor: THEME.primary }}>
+                <View
+                  className="rounded-full p-1 mr-3 mt-0.5"
+                  style={{ backgroundColor: THEME.primary }}
+                >
                   <CheckCircle size={16} color="#FFFFFF" />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-sm font-semibold mb-1" style={{ color: THEME.primary }}>
+                  <Text
+                    className="text-sm font-semibold mb-1"
+                    style={{ color: THEME.primary }}
+                  >
                     {t('importantNotice')}
                   </Text>
                   <Text className="text-sm leading-5" style={{ color: THEME.primary }}>

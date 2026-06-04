@@ -63,7 +63,7 @@ const Step1PersonalInfo = ({
 
   const getMaxDate = () => {
     const date = new Date();
-    date.setFullYear(date.getFullYear() - 18);
+    date.setFullYear(date.getFullYear() - 12);
     return date;
   };
 

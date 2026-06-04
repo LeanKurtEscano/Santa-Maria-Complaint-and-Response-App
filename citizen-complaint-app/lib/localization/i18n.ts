@@ -951,16 +951,26 @@ const resources = {
         "afternoon": "Good Afternoon",
         "evening": "Good Evening"
       },
+      
 
       "home": {
         "resident": "Resident",
         "stay_updated": "Stay updated with your community today.",
         "weather_fair": "Fair",
+         "guest": {
+    "title": "Welcome to Mary App",
+    "subtitle": "Login to access the full services",
+    "cta": "Login"
+  },
 
         "errors" : {
           "screenTitle": "Unable to Load Home Screen",
         }
       },
+
+
+   
+
 
 
         "emergency": {
@@ -1002,6 +1012,14 @@ const resources = {
       }
     }
   }, 
+
+  "authGuard": {
+  "title": "Login Required",
+  "subtitle": "You need an account to access this service. Login or create one to continue.",
+  "login": "Log In",
+  "noAccount": "Don't have an account?",
+  "signup": "Create an Account"
+},
 
 
   "registerValidation": {
@@ -2002,6 +2020,11 @@ const resources = {
         "resident": "Residente",
         "stay_updated": "Manatiling updated sa iyong komunidad ngayong araw.",
         "weather_fair": "Maaliwalas",
+        "guest": {
+    "title": "Maligayang pagdating sa Mary App",
+    "subtitle": "Mag-login para ma-access ang lahat ng serbisyo",
+    "cta": "Mag-login"
+  },
 
            "errors" : {
           "screenTitle": "Hindi Ma-load ang Home Screen",
@@ -2289,7 +2312,15 @@ const resources = {
       "attached": "{{count}} larawan naka-attach",
       "attached_plural": "{{count}} mga larawan naka-attach"
     }
-  }
+  },
+
+  "authGuard": {
+  "title": "Kailangan ng Login",
+  "subtitle": "Kailangan mo ng account para ma-access ang serbisyong ito. Mag-login o gumawa ng account para magpatuloy.",
+  "login": "Mag-login",
+  "noAccount": "Wala pang account?",
+  "signup": "Gumawa ng Account"
+}
 
     },
   },

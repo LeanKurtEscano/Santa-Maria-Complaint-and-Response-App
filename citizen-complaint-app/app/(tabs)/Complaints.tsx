@@ -13,11 +13,13 @@ import { getBarangayCoords, DEFAULT_COORDS } from '@/constants/general/barangay'
 import { THEME } from '@/constants/theme';
 import GeneralToast from '@/components/Toast/GeneralToast';
 import useToastStore from '@/store/useGlobalModal';
-
+import { useCurrentUser } from "@/store/useCurrentUserStore";
+import AuthGuard from '@/screen/general/AuthGuard';
 export default function ComplaintsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+  const { isAuthenticated } = useCurrentUser();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -26,6 +28,9 @@ export default function ComplaintsScreen() {
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const { setToastVisible, toastVisible, toastMessage, toastType, showToast } = useToastStore();
 
+  if (!isAuthenticated) {
+    return <AuthGuard />;
+  }
   // Bouncing arrow animation — loops while button is visible
   useEffect(() => {
     if (!showScrollTop) {
@@ -63,11 +68,11 @@ export default function ComplaintsScreen() {
     const query = searchQuery.trim().toLowerCase();
     const filtered = query
       ? data.filter(
-          (barangay) =>
-            barangay.barangay_name.toLowerCase().includes(query) ||
-            barangay.barangay_address?.toLowerCase().includes(query) ||
-            barangay.barangay_contact_number?.toLowerCase().includes(query)
-        )
+        (barangay) =>
+          barangay.barangay_name.toLowerCase().includes(query) ||
+          barangay.barangay_address?.toLowerCase().includes(query) ||
+          barangay.barangay_contact_number?.toLowerCase().includes(query)
+      )
       : data;
     return [...filtered].sort((a, b) => a.barangay_name.localeCompare(b.barangay_name));
   }, [data, searchQuery]);

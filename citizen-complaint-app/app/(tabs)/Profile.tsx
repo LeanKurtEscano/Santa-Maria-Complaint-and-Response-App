@@ -34,6 +34,7 @@ import { useRouter } from 'expo-router';
 import GeneralToast from '@/components/Toast/GeneralToast';
 import { formatName } from '@/utils/general/name';
 import { THEME } from '@/constants/theme';
+import AuthGuard from '@/screen/general/AuthGuard';
 
 // ---------------------------------------------------------------------------
 // LogoutConfirmModal
@@ -231,13 +232,15 @@ export default function ProfileScreen() {
     toastMessage,
     setToastVisible,
     toastVisible,
+    isAuthenticated,
   } = useProfileLogic();
 
   // Wrap the original handleLogout so we can show a loading state and close the modal
   const handleLogoutConfirmed = async () => {
     try {
       setLogoutLoading(true);
-      await handleLogout(); // now just clears token + user, no Alert inside
+      await handleLogout(); 
+
     } finally {
       setLogoutLoading(false);
       setShowLogoutModal(false);
@@ -253,6 +256,10 @@ export default function ProfileScreen() {
         </View>
       </SafeAreaView>
     );
+  }
+
+  if(!isAuthenticated) {
+    return <AuthGuard />;
   }
 
   if (!userData) {

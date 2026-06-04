@@ -7,6 +7,7 @@ import {
   Modal,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Controller, UseFormReturn } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -45,42 +46,48 @@ interface Step3Props {
   saveFormData: () => Promise<void>;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Returns true if the string looks like a base64 data URI.
- * We use this to skip re-conversion at submit time and to display a
- * friendly filename in the UI instead of a garbled base64 string.
+ * Converts any image URI to a stable base64 data URI immediately after pick.
+ *
+ * WHY: On newer Android, image picker returns content:// or short-lived file://
+ * URIs that expire once the picker closes or the app is backgrounded. Converting
+ * to base64 right away makes the value stable for the lifetime of the session.
+ *
+ * NOTE: We use XMLHttpRequest instead of fetch() because fetch() of a
+ * content:// URI is unreliable on Android's JS engine.
  */
-const isBase64Uri = (value: string) => value.startsWith('data:');
-
-/**
- * Converts an image URI to a base64 data URI immediately after pick so that
- * the value stored in the form is stable across Android app backgrounding.
- */
-const toBase64DataUri = async (uri: string): Promise<string> => {
-  // If it's already base64, return as-is
-  if (isBase64Uri(uri)) return uri;
-
-  const response = await fetch(uri);
-  const blob = await response.blob();
+const toBase64DataUri = (uri: string): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
+    if (!uri) return reject(new Error('No URI provided'));
+    // Already base64 — nothing to do.
+    if (uri.startsWith('data:')) return resolve(uri);
+
+    const xhr = new XMLHttpRequest();
+    xhr.onload = () => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('FileReader failed'));
+      reader.readAsDataURL(xhr.response);
+    };
+    xhr.onerror = () => reject(new Error('XHR failed'));
+    xhr.open('GET', uri);
+    xhr.responseType = 'blob';
+    xhr.send();
   });
 };
 
 /**
- * Shows a short, human-readable label for the image field value.
- * base64 URIs are replaced with a friendly name; file URIs show their filename.
+ * Shows a human-readable label for the image field value.
+ * base64 URIs are replaced with a friendly name.
  */
 const getDisplayLabel = (
   value: string,
   fieldName: 'idFrontImage' | 'idBackImage' | 'selfieImage',
 ): string => {
-  if (isBase64Uri(value)) {
+  if (!value) return '';
+  if (value.startsWith('data:')) {
     const labels: Record<string, string> = {
       idFrontImage: 'ID Front captured',
       idBackImage: 'ID Back captured',
@@ -119,18 +126,21 @@ const Step3IdVerification = ({
   const idPlaceholder = selectedIdType ? getIdNumberPlaceholder(selectedIdType) : 'Select an ID type first';
   const idHint = getIdNumberHint(selectedIdType);
 
-  // ── Image handling ──────────────────────────────────────────────────────────
+  // ── Image handling ────────────────────────────────────────────────────────
 
   const handleImagePick = (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
     setCurrentImageField(field);
     setShowImagePickerModal(true);
   };
 
-  const processAndStoreImage = async (uri: string, field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
+  const processAndStoreImage = async (
+    uri: string,
+    field: 'idFrontImage' | 'idBackImage' | 'selfieImage',
+  ) => {
     setImageLoading(true);
     try {
-      // FIX: Convert to base64 immediately so the value is stable on Android
-      // even if the app is backgrounded before the user submits.
+      // Convert to base64 immediately so the value is stable on Android even
+      // after the picker closes, the app is backgrounded, or at submit time.
       const base64Uri = await toBase64DataUri(uri);
       setValue(field, base64Uri as any);
       clearErrors(field);
@@ -152,11 +162,11 @@ const Step3IdVerification = ({
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      // FIX: 'mediaTypes' array instead of deprecated MediaTypeOptions enum
       mediaTypes: ['images'],
-      allowsEditing: true,
-      // NOTE: aspect is intentionally left out — unreliable on Android
-      quality: 0.8,
+      // allowsEditing on Android produces a short-lived temp URI that can expire
+      // before submission. Disable it on Android to avoid that race condition.
+      allowsEditing: Platform.OS === 'ios',
+      quality: 0.7,
     });
 
     setShowImagePickerModal(false);
@@ -170,10 +180,10 @@ const Step3IdVerification = ({
     if (!currentImageField) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      // FIX: 'mediaTypes' array instead of deprecated MediaTypeOptions enum
       mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.8,
+      // Same reason as above — disable editing on Android.
+      allowsEditing: Platform.OS === 'ios',
+      quality: 0.7,
     });
 
     setShowImagePickerModal(false);
@@ -189,7 +199,7 @@ const Step3IdVerification = ({
     await saveFormData();
   };
 
-  // ── Sub-components ──────────────────────────────────────────────────────────
+  // ── Sub-components ────────────────────────────────────────────────────────
 
   const ImageUploadField = ({
     fieldName,
@@ -221,7 +231,6 @@ const Step3IdVerification = ({
                 <View className="flex-row items-center justify-between">
                   <View className="flex-row items-center flex-1">
                     <ImageIcon size={20} color="#10B981" />
-                    {/* FIX: getDisplayLabel handles base64 URIs gracefully */}
                     <Text className="ml-2 text-sm text-neutral-700 flex-1" numberOfLines={1}>
                       {getDisplayLabel(value, fieldName)}
                     </Text>
@@ -277,7 +286,7 @@ const Step3IdVerification = ({
     </View>
   );
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <View>

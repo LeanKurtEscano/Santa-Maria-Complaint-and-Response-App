@@ -61,6 +61,8 @@ function RootLayoutNav() {
 useEffect(() => {
   const subscription = AppState.addEventListener("change", (state) => {
     if (state === "active") {
+      const { userData, isAuthenticated } = useCurrentUser.getState();
+      if (!isAuthenticated || !userData) return; // 👈 guard
       console.log("🔄 App active → syncing push token");
       useCurrentUser.getState().syncPushToken();
     }
@@ -100,11 +102,15 @@ useEffect(() => {
     inAuthGroup,
   });
 
-  // ❌ Not authenticated
-  if (!userData && !inAuthGroup) {
+  // ❌ Not authenticated 
+
+  {/*  if (!userData && !inAuthGroup) {
     router.replace("/(auth)/Login");
     return;
-  }
+  } */}
+ 
+
+
 
     if (userData && userData.is_suspended) {
     if (segments[1] !== "AccountSuspended") {

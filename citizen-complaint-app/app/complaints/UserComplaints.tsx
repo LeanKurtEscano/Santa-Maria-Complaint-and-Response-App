@@ -43,6 +43,8 @@ import {
   View,
 } from "react-native";
 
+import useCurrentUser from "@/store/useCurrentUserStore";
+import AuthGuard from "@/screen/general/AuthGuard";
 const PAGE_SIZE = 10;
 
 // ─── Complaint Card ───────────────────────────────────────────────────────────
@@ -442,18 +444,20 @@ function FilterModal({
 export default function UserComplaints() {
   const router = useRouter();
   const { t } = useTranslation();
+  const {userData, isAuthenticated} = useCurrentUser();
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [filterVisible, setFilterVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-
+  
   const { data, isPending, error, refetch } = useQuery<Complaint[]>({
     queryKey: ["my-complaints"],
     queryFn: async () => {
       const response = await complaintApiClient.get("/my-complaints");
       return response.data;
     },
+    enabled: isAuthenticated, // Only fetch if authenticated
   });
 
   const handleRefresh = async () => {
@@ -504,6 +508,10 @@ export default function UserComplaints() {
   const goToPrev = () => setCurrentPage((p) => Math.max(1, p - 1));
   const goToNext = () => setCurrentPage((p) => Math.min(totalPages, p + 1));
   const goToPage = (page: number) => setCurrentPage(page);
+
+  if(!isAuthenticated) {
+    return <AuthGuard />;
+  }
 
   if (error) {
     const appError = handleApiError(new Error(t("complaints.error.message")));

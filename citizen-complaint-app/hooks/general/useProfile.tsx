@@ -5,7 +5,6 @@ import { useCurrentUser } from '@/store/useCurrentUserStore';
 import { useLocationPermission } from '@/hooks/general/useLocationPermission';
 import { userApiClient } from '@/lib/client/user';
 import { handleApiError } from '@/utils/general/errorHandler';
-import * as secureStorage from 'expo-secure-store';
 import { useTranslation } from 'react-i18next';
 import useToast from './useToast';
 
@@ -13,7 +12,13 @@ export const useProfileLogic = () => {
   const { t } = useTranslation();
   const { toastType, toastMessage, showToast, setToastVisible, toastVisible } = useToast();
 
-  const { userData, loading, fetchCurrentUser, clearUser } = useCurrentUser();
+
+
+  const userData = useCurrentUser((s) => s.userData);
+const loading = useCurrentUser((s) => s.loading);
+const isAuthenticated = useCurrentUser((s) => s.isAuthenticated);
+const fetchCurrentUser = useCurrentUser((s) => s.fetchCurrentUser);
+const clearUser = useCurrentUser((s) => s.clearUser);
   const { locationLoading, requestLocationPermission } = useLocationPermission();
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
@@ -92,6 +97,7 @@ export const useProfileLogic = () => {
     showMapPicker,
     locationLoading,
     updateLocationMutation,
+    isAuthenticated,
 
     // Actions
     setShowLocationModal,

@@ -25,6 +25,8 @@ import { useTranslation } from "react-i18next";
 import { formatTime } from "@/utils/date/date";
 import { refreshAccessToken } from "@/utils/general/token";
 import { THEME } from "@/constants/theme";
+import AuthGuard from "@/screen/general/AuthGuard";
+import { useCurrentUser } from "@/store/useCurrentUserStore";
 
 // ─── Notification Card ────────────────────────────────────────────────────────
 
@@ -209,6 +211,7 @@ const Notifications = () => {
   const LOG_TAG = "[Notifications]";
   const { setNotifications, markAsRead, markAllAsRead, unreadCount } =
     useNotificationStore();
+  const {isAuthenticated} = useCurrentUser();
 
   const [markingAll, setMarkingAll] = useState(false);
   const [sseStatus, setSseStatus] = useState<SSEStatus>("connecting");
@@ -217,6 +220,11 @@ const Notifications = () => {
   const prevIdsRef = useRef<Set<number>>(new Set());
   const eventSourceRef = useRef<any>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+
+   if(!isAuthenticated) {
+      return <AuthGuard />;
+    }
 
   // ── Fetch ────────────────────────────────────────────────────────────────
 

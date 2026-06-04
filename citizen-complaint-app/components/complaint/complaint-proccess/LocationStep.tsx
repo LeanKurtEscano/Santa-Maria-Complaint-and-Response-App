@@ -280,8 +280,8 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   };
 
   // ── Confirm disabled when: map error | still syncing | user outside boundary ──
-  //const isConfirmDisabled = mapError || syncingLocation || userOutsideBoundary;
-  const isConfirmDisabled = mapError || syncingLocation 
+  const isConfirmDisabled = mapError || syncingLocation || userOutsideBoundary;
+ // const isConfirmDisabled = mapError || syncingLocation 
   const isGpsDisabled = gettingGps || cooldownRemaining > 0;
   const pinColor = THEME.primary;
 
@@ -490,7 +490,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         </View>
 
         {/* Outside boundary warning — shown above confirm button */}
-        {false && userOutsideBoundary && !syncingLocation && (
+        { userOutsideBoundary && !syncingLocation && (
           <View style={styles.outsideBoundaryBanner}>
             <ShieldAlert size={15} color="#991B1B" style={{ flexShrink: 0 }} />
             <Text style={styles.outsideBoundaryText}>
