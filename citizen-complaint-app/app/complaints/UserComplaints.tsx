@@ -43,7 +43,7 @@ import {
   View,
 } from "react-native";
 
-import useCurrentUser from "@/store/useCurrentUserStore";
+import { useCurrentUser } from "@/store/useCurrentUserStore";
 import AuthGuard from "@/screen/general/AuthGuard";
 const PAGE_SIZE = 10;
 

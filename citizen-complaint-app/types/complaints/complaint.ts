@@ -43,4 +43,5 @@ export interface Complaint {
   department?: DepartmentInfo | null;
   priority_level?: PriorityLevel | null;
   sector?: Sector | null;
+  has_feedback: boolean;
 }

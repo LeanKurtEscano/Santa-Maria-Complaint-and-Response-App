@@ -21,7 +21,7 @@ import {
 } from "lucide-react-native";
 import { THEME } from "@/constants/theme";
 import { feedbackApiClient } from "@/lib/client/feedback";
-
+import { useQueryClient } from "@tanstack/react-query";
 // ─── Star Rating ──────────────────────────────────────────────────────────────
 
 function StarRating({
@@ -219,6 +219,7 @@ export default function PostIncidentFeedbackScreen() {
     incidentId: string;
     complaintTitle: string;
   }>();
+  const queryClient = useQueryClient();
  console.log((incidentId))
   const [rating, setRating] = useState(0);
   const [message, setMessage] = useState("");
@@ -235,6 +236,10 @@ export default function PostIncidentFeedbackScreen() {
     onSuccess: () => {
       setSubmittedRating(rating);
       setSubmitted(true);
+
+queryClient.invalidateQueries({
+  queryKey: ["complaintDetail", incidentId],
+});
     },
     onError: () => {
       Alert.alert(

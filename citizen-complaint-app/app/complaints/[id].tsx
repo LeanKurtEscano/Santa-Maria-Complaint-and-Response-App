@@ -15,14 +15,12 @@ import { Download } from "lucide-react-native";
 import {
   AlertTriangle,
   ArrowDownUp,
-  Building2,
   Calendar,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   Clock,
   FileText,
-  Hash,
   ImageIcon,
   Landmark,
   Layers,
@@ -30,7 +28,6 @@ import {
   MapPin,
   MessageCircle,
   MessageSquare,
-  Navigation,
   Paperclip,
   Phone,
   Play,
@@ -42,7 +39,6 @@ import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  Linking,
   Modal,
   ScrollView,
   Text,
@@ -91,6 +87,7 @@ interface IncidentLink {
 interface ComplaintWithLinks extends Complaint {
   incident_links?: IncidentLink[];
   hearing_date?: string | null;
+ 
 }
 
 // ─── Complaint Status Types ───────────────────────────────────────────────────
@@ -102,9 +99,6 @@ type ComplaintStatus =
   | "forwarded_to_lgu"
   | "reviewed_by_lgu"
   | "resolved_by_lgu"
-  | "forwarded_to_department"
-  | "reviewed_by_department"
-  | "resolved_by_department"
   | "rejected_by_barangay"
   | "rejected";
 
@@ -121,13 +115,10 @@ interface TrackerStep {
 function getTrackerSteps(
   status: ComplaintStatus,
   isRejectedByLgu: boolean,
-  isRejectedByDepartment: boolean,
   t: (key: string) => string
 ): TrackerStep[] {
   const isResolved =
-    status === "resolved_by_barangay" ||
-    status === "resolved_by_lgu" ||
-    status === "resolved_by_department";
+    status === "resolved_by_barangay" || status === "resolved_by_lgu";
 
   const isRejectedByBarangay =
     status === "rejected" || status === "rejected_by_barangay";
@@ -141,9 +132,6 @@ function getTrackerSteps(
     forwarded_to_lgu: 2,
     reviewed_by_lgu: 3,
     resolved_by_lgu: 4,
-    forwarded_to_department: 4,
-    reviewed_by_department: 5,
-    resolved_by_department: 6,
   };
 
   const currentOrder = statusOrder[status];
@@ -175,13 +163,6 @@ function getTrackerSteps(
   )
     lguState = "active";
 
-  let deptState: StepState = "pending";
-  if (isRejectedByDepartment && !isResolved) deptState = "rejected";
-  else if (currentOrder >= 6) deptState = "completed";
-  else if (currentOrder === 4 && status === "forwarded_to_department")
-    deptState = "active";
-  else if (currentOrder === 5) deptState = "active";
-
   let resolvedState: StepState = "pending";
   if (isResolved) resolvedState = "completed";
 
@@ -190,8 +171,6 @@ function getTrackerSteps(
       ? t("complaintDetail.tracker.resolvedByBarangay")
       : status === "resolved_by_lgu"
       ? t("complaintDetail.tracker.resolvedByLgu")
-      : status === "resolved_by_department"
-      ? t("complaintDetail.tracker.resolvedByDept")
       : t("complaintDetail.tracker.resolvedSub");
 
   return [
@@ -240,24 +219,6 @@ function getTrackerSteps(
         ),
     },
     {
-      id: "department",
-      label:
-        isRejectedByDepartment && !isResolved
-          ? t("complaintDetail.tracker.rejectedDept")
-          : t("complaintDetail.tracker.department"),
-      sublabel:
-        isRejectedByDepartment && !isResolved
-          ? t("complaintDetail.tracker.rejectedSub")
-          : t("complaintDetail.tracker.departmentSub"),
-      state: deptState,
-      icon:
-        isRejectedByDepartment && !isResolved ? (
-          <XCircle size={ICON} color={red} strokeWidth={2.5} />
-        ) : (
-          <Building2 size={ICON} color={col(deptState)} strokeWidth={2.5} />
-        ),
-    },
-    {
       id: "resolved",
       label: t("complaintDetail.tracker.resolved"),
       sublabel: resolvedSublabel,
@@ -276,7 +237,6 @@ function getTrackerSteps(
 function getStatusDisplay(
   status: ComplaintStatus,
   isRejectedByLgu: boolean,
-  isRejectedByDepartment: boolean,
   t: (key: string) => string
 ): { label: string; color: string; bg: string } {
   if (status === "rejected")
@@ -288,12 +248,6 @@ function getStatusDisplay(
   if (isRejectedByLgu)
     return {
       label: t("complaintDetail.status.rejectedLgu"),
-      color: "#ef4444",
-      bg: "#fef2f2",
-    };
-  if (isRejectedByDepartment)
-    return {
-      label: t("complaintDetail.status.rejectedDept"),
       color: "#ef4444",
       bg: "#fef2f2",
     };
@@ -322,16 +276,6 @@ function getStatusDisplay(
       color: "#f59e0b",
       bg: "#fffbeb",
     },
-    forwarded_to_department: {
-      label: t("complaintDetail.status.forwardedDept"),
-      color: "#8b5cf6",
-      bg: "#f5f3ff",
-    },
-    reviewed_by_department: {
-      label: t("complaintDetail.status.deptReview"),
-      color: "#f59e0b",
-      bg: "#fffbeb",
-    },
     resolved_by_barangay: {
       label: t("complaintDetail.status.resolvedBarangay"),
       color: "#10b981",
@@ -339,11 +283,6 @@ function getStatusDisplay(
     },
     resolved_by_lgu: {
       label: t("complaintDetail.status.resolvedLgu"),
-      color: "#10b981",
-      bg: "#ecfdf5",
-    },
-    resolved_by_department: {
-      label: t("complaintDetail.status.resolvedDept"),
       color: "#10b981",
       bg: "#ecfdf5",
     },
@@ -696,14 +635,12 @@ function ProgressTracker({
 
 // ─── Rejection Banner ─────────────────────────────────────────────────────────
 
-function RejectionBanner({ by }: { by: "barangay" | "lgu" | "department" }) {
+function RejectionBanner({ by }: { by: "barangay" | "lgu" }) {
   const { t } = useTranslation();
   const label =
     by === "barangay"
       ? t("complaintDetail.rejection.byBarangay")
-      : by === "lgu"
-      ? t("complaintDetail.rejection.byLgu")
-      : t("complaintDetail.rejection.byDept");
+      : t("complaintDetail.rejection.byLgu");
 
   return (
     <View
@@ -1385,13 +1322,6 @@ function getRoleMeta(role?: string): {
         bg: "#f5f3ff",
         icon: <Landmark size={11} color="#7c3aed" strokeWidth={2.5} />,
       };
-    case "department_staff":
-      return {
-        label: "Department",
-        color: "#0369a1",
-        bg: "#e0f2fe",
-        icon: <Building2 size={11} color="#0369a1" strokeWidth={2.5} />,
-      };
     default:
       return {
         label: "Official",
@@ -1743,6 +1673,60 @@ function ResponsesSection({
   );
 }
 
+// ─── Feedback Already Submitted Banner ───────────────────────────────────────
+
+function FeedbackSubmittedBanner() {
+  const { t } = useTranslation();
+  return (
+    <View
+      style={{
+        position: "absolute",
+        bottom: 32,
+        left: 16,
+        right: 16,
+        zIndex: 10,
+        backgroundColor: "#ecfdf5",
+        borderRadius: 18,
+        borderWidth: 1.5,
+        borderColor: "#a7f3d0",
+        paddingVertical: 16,
+        paddingHorizontal: 18,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        shadowColor: "#10b981",
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 4,
+      }}
+    >
+      <View
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 12,
+          backgroundColor: "#d1fae5",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <CheckCircle2 size={22} color="#10b981" strokeWidth={2.5} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 15, fontWeight: "700", color: "#065f46" }}>
+          {t("complaintDetail.feedbackSubmitted.title")}
+        </Text>
+        <Text
+          style={{ fontSize: 13, color: "#059669", marginTop: 2, lineHeight: 18 }}
+        >
+          {t("complaintDetail.feedbackSubmitted.subtitle")}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ComplaintDetail() {
@@ -1751,15 +1735,21 @@ export default function ComplaintDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [showLetter, setShowLetter] = useState(false);
 
-  const { data, error, isLoading, isFetching, refetch } =
-    useQuery<ComplaintWithLinks>({
-      queryKey: ["complaintDetail", id],
-      queryFn: async () => {
-        const response = await complaintApiClient.get(`/${id}`);
-        return response.data;
-      },
-      enabled: !!id,
-    });
+ const { data, error, isLoading, isFetching, refetch } =
+  useQuery<ComplaintWithLinks>({
+    queryKey: ["complaintDetail", id],
+    queryFn: async () => {
+      const response = await complaintApiClient.get(`/${id}`);
+
+      return {
+        ...response.data,
+        has_feedback: response.data.has_feedback ?? false,
+      };
+    },
+    enabled: !!id,
+  });
+
+console.log("Complaint Detail Data:", data);
 
   if (error) {
     const appError = handleApiError(
@@ -1780,26 +1770,15 @@ export default function ComplaintDetail() {
   const status = (data.status ?? "submitted") as ComplaintStatus;
 
   const isResolved =
-    status === "resolved_by_barangay" ||
-    status === "resolved_by_lgu" ||
-    status === "resolved_by_department";
+    status === "resolved_by_barangay" || status === "resolved_by_lgu";
 
   const isRejectedByBarangay = status === "rejected";
   const isRejectedByLgu = !!data.is_rejected_by_lgu && !isResolved;
-  const isRejectedByDepartment = !!data.is_rejected_by_department && !isResolved;
 
-  const steps = getTrackerSteps(
-    status,
-    isRejectedByLgu,
-    isRejectedByDepartment,
-    t
-  );
-  const statusDisplay = getStatusDisplay(
-    status,
-    isRejectedByLgu,
-    isRejectedByDepartment,
-    t
-  );
+  const hasFeedback = !!data.has_feedback;
+
+  const steps = getTrackerSteps(status, isRejectedByLgu, t);
+  const statusDisplay = getStatusDisplay(status, isRejectedByLgu, t);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9fafb" }}>
@@ -1924,7 +1903,6 @@ export default function ComplaintDetail() {
         {/* Rejection Banners */}
         {isRejectedByBarangay && <RejectionBanner by="barangay" />}
         {isRejectedByLgu && <RejectionBanner by="lgu" />}
-        {isRejectedByDepartment && <RejectionBanner by="department" />}
 
         {/* Progress Tracker */}
         <ProgressTracker
@@ -2014,8 +1992,10 @@ export default function ComplaintDetail() {
         )}
       </ScrollView>
 
-      {/* ── Floating Feedback Button (resolved only) ── */}
-      {isResolved && (
+      {/* ── Floating Feedback Button / Already Submitted Banner (resolved only) ── */}
+      {isResolved && hasFeedback && <FeedbackSubmittedBanner />}
+
+      {isResolved && !hasFeedback && (
         <View
           style={{
             position: "absolute",

@@ -787,6 +787,10 @@ const resources = {
       title: "Something went wrong",
       message: "Failed to load complaint details.",
     },
+     "feedbackSubmitted": {
+    "title": "Salamat sa Feedback",
+    "subtitle": "Nakapagbigay ka na ng feedback para sa reklamong ito. Maraming salamat sa pagbabahagi ng iyong karanasan."
+  },
  
     header: {
         "downloadComplaint": "Download Complaint Form",
@@ -1696,7 +1700,11 @@ const resources = {
    complaintDetail: {
     loading: "Nino-load ang detalye ng reklamo…",
      "feedbackButton": "Mag-submit ng Feedback",
- 
+     
+       "feedbackSubmitted": {
+    "title": "Feedback Already Submitted",
+    "subtitle": "You have already submitted feedback for this complaint. Thank you for sharing your experience."
+  },
     error: {
       title: "May nangyaring mali",
       message: "Hindi ma-load ang detalye ng reklamo.",

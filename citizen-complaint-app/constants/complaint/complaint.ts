@@ -108,7 +108,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   illegal_dumping:      "Illegal Dumping",
   road_damage:          "Road Damage",
   street_light_outage:  "Street Light Outage",
-  flooding:             "Flooding",
+  flooding_drainage:             "Flooding or Drainage Issues",
   illegal_construction: "Illegal Construction",
   stray_animals:        "Stray Animals",
   public_intoxication:  "Public Intoxication",
