@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, TextInput, Keyboard, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { barangayApiClient } from '@/lib/client/barangay';
 import { handleApiError } from '@/utils/general/errorHandler';
 import { ErrorScreen } from '@/screen/general/ErrorScreen';
@@ -15,6 +15,21 @@ import GeneralToast from '@/components/Toast/GeneralToast';
 import useToastStore from '@/store/useGlobalModal';
 import { useCurrentUser } from "@/store/useCurrentUserStore";
 import AuthGuard from '@/screen/general/AuthGuard';
+
+interface BarangayPage {
+  data: Barangay[];
+  pagination: {
+    has_next: boolean;
+    has_previous: boolean;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+  };
+}
+
+const PAGE_SIZE = 20;
+
 export default function ComplaintsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -31,6 +46,7 @@ export default function ComplaintsScreen() {
   if (!isAuthenticated) {
     return <AuthGuard />;
   }
+
   // Bouncing arrow animation — loops while button is visible
   useEffect(() => {
     if (!showScrollTop) {
@@ -55,27 +71,49 @@ export default function ComplaintsScreen() {
     return () => loop.stop();
   }, [showScrollTop]);
 
-  const { data, isPending, error, refetch } = useQuery({
+  const {
+    data,
+    isPending,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['barangays'],
-    queryFn: async () => {
-      const response = await barangayApiClient.get('/all');
-      return response.data as Barangay[];
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = await barangayApiClient.get('/all', {
+        params: { page: pageParam, page_size: PAGE_SIZE },
+      });
+      return response.data as BarangayPage;
     },
+    getNextPageParam: (lastPage) => {
+      return lastPage.pagination.has_next
+        ? lastPage.pagination.page + 1
+        : undefined;
+    },
+    initialPageParam: 1,
   });
 
-  const filteredData = useMemo(() => {
+  // Flatten all fetched pages into a single array
+  const allBarangays = useMemo(() => {
     if (!data) return [];
+    return data.pages.flatMap((page) => page.data);
+  }, [data]);
+
+  // Client-side filter over whatever pages have been loaded so far
+  const filteredData = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const filtered = query
-      ? data.filter(
+      ? allBarangays.filter(
         (barangay) =>
           barangay.barangay_name.toLowerCase().includes(query) ||
           barangay.barangay_address?.toLowerCase().includes(query) ||
           barangay.barangay_contact_number?.toLowerCase().includes(query)
       )
-      : data;
-    return [...filtered].sort((a, b) => a.barangay_name.localeCompare(b.barangay_name));
-  }, [data, searchQuery]);
+      : allBarangays;
+    return filtered.slice().sort((a, b) => a.barangay_name.localeCompare(b.barangay_name));
+  }, [allBarangays, searchQuery]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -96,6 +134,14 @@ export default function ComplaintsScreen() {
   const scrollToTop = useCallback(() => {
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, []);
+
+  const handleLoadMore = useCallback(() => {
+    // Pause pagination while actively searching — avoid loading more while filtering what's already in
+    if (searchQuery.trim().length > 0) return;
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [searchQuery, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const handleBarangayPress = (barangay: Barangay) => {
     const fallback = getBarangayCoords(barangay.barangay_name) ?? DEFAULT_COORDS;
@@ -149,9 +195,18 @@ export default function ComplaintsScreen() {
     </TouchableOpacity>
   );
 
+  const renderFooter = () => {
+    if (!isFetchingNextPage) return null;
+    return (
+      <View className="py-4 items-center justify-center">
+        <ActivityIndicator size="small" color={THEME.primary} />
+      </View>
+    );
+  };
+
   const isSearchActive = searchQuery.trim().length > 0;
   const resultCount = filteredData.length;
-  const totalCount = data?.length ?? 0;
+  const totalCount = data?.pages[0]?.pagination.total_items ?? allBarangays.length;
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50" edges={['top']}>
@@ -231,10 +286,12 @@ export default function ComplaintsScreen() {
             </Text>
             {isSearchActive ? (
               <Text style={{ fontSize: 12, color: THEME.primary, fontWeight: '500' }}>
-                {resultCount} of {totalCount} results
+                {resultCount} of {allBarangays.length} loaded
               </Text>
             ) : (
-              <Text className="text-xs text-gray-400 font-medium">{totalCount} barangays</Text>
+              <Text className="text-xs text-gray-400 font-medium">
+                {allBarangays.length} of {totalCount} barangays
+              </Text>
             )}
           </View>
 
@@ -249,6 +306,9 @@ export default function ComplaintsScreen() {
             keyboardDismissMode="on-drag"
             onScroll={handleScroll}
             scrollEventThrottle={16}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={renderFooter}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
