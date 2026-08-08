@@ -749,6 +749,12 @@ const resources = {
     }
   },
 
+  "chatbotNotLogin": {  
+
+    "title": "Login to Chat with MaryBot",
+    "subtitle": "To access MaryBot's assistance, please log in to your account. If you don't have an account yet, you can register for free.",
+  },
+
 
  "postIncidentFeedback": {
 "title": "Rate Your Experience",
@@ -1212,6 +1218,12 @@ const resources = {
 "secureTransparentFast": "Ligtas · Transparent · Mabilis",
 "badgeVerified": "Napatunayan",
 "badgeInstant": "Agarang",
+
+  "chatbotNotLogin": {  
+
+    "title": "Mag-login muna para makausap si Mary Bot",
+    "subtitle": "You need to log in to access MaryBot's assistance. If you don't have an account yet, you can register for free.",
+  },
 
 "fileComplaint": "Mag-file ng Reklamo",
 "fileComplaintDesc": "Ligtas at kumpidensyal",

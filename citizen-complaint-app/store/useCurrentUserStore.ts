@@ -7,6 +7,7 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 
 let isSyncing = false;
+let isFetchingUser = false;
 
 const isTokenExpired = (token: string): boolean => {
   try {
@@ -95,9 +96,13 @@ export const useCurrentUser = create<UserState>((set, get) => ({
     }
   },
 
-  // ✅ FETCH USER + AUTO SYNC TOKEN (FIXED FLOW)
+  // ✅ FETCH USER + AUTO SYNC TOKEN (guarded against duplicate concurrent calls)
   fetchCurrentUser: async (background = false) => {
+    if (isFetchingUser) return; // a fetch is already in progress, skip this call
+
     try {
+      isFetchingUser = true;
+
       if (!background) set({ loading: true });
 
       const token = await SecureStore.getItemAsync("complaint_token");
@@ -112,7 +117,6 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       if (response.data) {
         get().mapUserFromBackend(response.data);
 
-       
         setTimeout(() => {
           get().syncPushToken();
         }, 300);
@@ -122,10 +126,11 @@ export const useCurrentUser = create<UserState>((set, get) => ({
     } catch (error) {
       set({ loading: false });
       throw error;
+    } finally {
+      isFetchingUser = false;
     }
   },
 
-  
   syncPushToken: async () => {
     try {
       if (isSyncing) return;
@@ -171,7 +176,6 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       console.log("⚠️ Push sync failed silently");
     }
   },
-
 
   mapUserFromBackend: (data) => {
     const mappedUser: User = {

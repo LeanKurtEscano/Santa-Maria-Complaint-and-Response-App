@@ -23,11 +23,14 @@ import {
   ClipboardList,
   FileText,
   HelpCircle,
+  Lock,
+  LogIn,
   Phone,
   Send,
   Sparkles,
   Square,
   User,
+  UserPlus,
   Wifi,
   WifiOff,
   Zap,
@@ -40,7 +43,7 @@ import { Role, Message } from '@/types/general/chat';
 import { THEME } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
 import { detectIntents, TextRun, RICH_REGEX, ActionIntent } from '@/constants/chatbot/rule-based-nlp';
-
+import { useCurrentUser } from '@/store/useCurrentUserStore';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // FIX: Remove STATUS_BAR_HEIGHT — we now handle Android status bar via
@@ -594,6 +597,115 @@ function BotInfo() {
   );
 }
 
+// ─── Login Required View ──────────────────────────────────────────────────────
+
+function LoginRequiredView({
+  onLogin,
+  onRegister,
+}: {
+  onLogin: () => void;
+  onRegister: () => void;
+}) {
+
+  const { t } = useTranslation();
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 32,
+        backgroundColor: '#F8FAFC',
+      }}
+    >
+      <View
+        style={{
+          width: 72,
+          height: 72,
+          borderRadius: 36,
+          backgroundColor: THEME.primaryMuted,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 20,
+        }}
+      >
+        <Lock size={30} color={THEME.primary} />
+      </View>
+
+      <Text
+        style={{
+          fontSize: 17,
+          fontWeight: '700',
+          color: '#0F172A',
+          textAlign: 'center',
+          marginBottom: 8,
+        }}
+      >
+        {t('chatbotNotLogin.title')}
+      </Text>
+      <Text
+        style={{
+          fontSize: 13,
+          color: '#64748B',
+          textAlign: 'center',
+          marginBottom: 28,
+          lineHeight: 19,
+        }}
+      >
+        {t('chatbotNotLogin.subtitle')}
+      </Text>
+
+      <TouchableOpacity
+        onPress={onLogin}
+        activeOpacity={0.85}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          width: '100%',
+          backgroundColor: THEME.primary,
+          borderRadius: 14,
+          paddingVertical: 14,
+          marginBottom: 12,
+          shadowColor: THEME.primaryDark,
+          shadowOpacity: 0.3,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 3 },
+          elevation: 4,
+        }}
+      >
+        <LogIn size={17} color="#FFFFFF" />
+        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
+          {t('authGuard.login')}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={onRegister}
+        activeOpacity={0.85}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          width: '100%',
+          backgroundColor: '#FFFFFF',
+          borderRadius: 14,
+          paddingVertical: 14,
+          borderWidth: 1.5,
+          borderColor: THEME.primary + '55',
+        }}
+      >
+        <UserPlus size={17} color={THEME.primary} />
+        <Text style={{ color: THEME.primary, fontWeight: '700', fontSize: 14 }}>
+          {t('authGuard.signup')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 
 interface ChatbotModalProps {
@@ -606,6 +718,9 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const router = useRouter();
   const connectionQuality = useConnectionQuality();
   const { t } = useTranslation();
+
+  const { userData, isAuthenticated } = useCurrentUser();
+  const isLoggedIn = isAuthenticated && !!userData;
 
   const isOffline = connectionQuality === 'offline';
   const isSlow = connectionQuality === 'slow';
@@ -882,6 +997,16 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const isBusy = isTyping || isStreaming;
   const sendDisabled = isOffline || !input.trim() || isCoolingDown;
 
+  const handleGoLogin = useCallback(() => {
+    onClose();
+    setTimeout(() => router.push('/(auth)/Login' as any), 320);
+  }, [onClose, router]);
+
+  const handleGoRegister = useCallback(() => {
+    onClose();
+    setTimeout(() => router.push('/(auth)/Register' as any), 320);
+  }, [onClose, router]);
+
   // FIX: On Android, KeyboardAvoidingView needs behavior='height' to actually
   // push the input above the keyboard. On iOS, 'padding' is correct.
   // keyboardVerticalOffset on Android must be 0 — the safe area inset for the
@@ -971,284 +1096,292 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                       color: isOffline ? '#DC2626' : isSlow ? '#D97706' : isBusy ? THEME.primary : '#64748B',
                     }}
                   >
-                    {isOffline
-                      ? 'Walang koneksyon'
-                      : isSlow
-                        ? 'Mabagal ang koneksyon'
-                        : isBusy
-                          ? t('chatbot.typing')
-                          : 'FAQ · Santa Maria, Laguna'}
+                    {!isLoggedIn
+                      ? 'Kailangan mag-login'
+                      : isOffline
+                        ? 'Walang koneksyon'
+                        : isSlow
+                          ? 'Mabagal ang koneksyon'
+                          : isBusy
+                            ? t('chatbot.typing')
+                            : 'FAQ · Santa Maria, Laguna'}
                   </Text>
                 </View>
               </View>
             </View>
 
-            {/* ── Message List ── */}
-            <FlatList
-              ref={listRef}
-              data={messages}
-              keyExtractor={(m) => m.id}
-              style={{ flex: 1, backgroundColor: '#F8FAFC' }}
-              contentContainerStyle={{ paddingTop: 8, paddingBottom: 12 }}
-              showsVerticalScrollIndicator={false}
-              // FIX: Remove maintainVisibleContentPosition on Android — it
-              // conflicts with programmatic scrollToEnd calls on Android and
-              // can cause the list to jump or refuse to scroll to the bottom.
-              // iOS handles this prop correctly; Android does not need it here
-              // because we always want the latest message at the bottom.
-              maintainVisibleContentPosition={
-                Platform.OS === 'ios' ? { minIndexForVisible: 0 } : undefined
-              }
-              onContentSizeChange={() => {
-                scrollToBottomIfNear(true);
-              }}
-              onLayout={() => {
-                if (isNearBottomRef.current) {
-                  listRef.current?.scrollToEnd({ animated: false });
-                }
-              }}
-              onScroll={(e) => {
-                const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
-                isNearBottomRef.current =
-                  contentOffset.y + layoutMeasurement.height >= contentSize.height - 200;
-              }}
-              scrollEventThrottle={100}
-              // FIX: Disable automatic keyboard dismissal on Android — the
-              // default 'on-drag' behaviour causes the keyboard to hide when
-              // the user scrolls, which then triggers a KAV layout relayout
-              // that jumps the input bar. 'interactive' is iOS-only; use
-              // 'none' on Android so only an explicit tap-away closes it.
-              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
-              // FIX: Tell the list to keep its content above the soft keyboard
-              // on Android. Without this the bottom messages are hidden behind
-              // the keyboard even when KAV is working correctly.
-              keyboardShouldPersistTaps="handled"
-              ListHeaderComponent={
-                <>
-                  <DateSeparator />
-                  <BotInfo />
-                </>
-              }
-              renderItem={({ item, index }) => {
-                const next = messages[index + 1];
-                const isLast = !next || next.role !== item.role;
-                const showAvatar = item.role === 'bot' && isLast;
-                return (
-                  <MessageBubble
-                    msg={item}
-                    showAvatar={showAvatar}
-                    isLast={isLast}
-                    onAction={handleAction}
-                    onTextUpdate={(id, text) => {
-                      if (id === currentBotIdRef.current) {
-                        displayedTextRef.current = text;
-                        scrollToBottomIfNear();
-                      }
-                    }}
-                  />
-                );
-              }}
-              ListFooterComponent={
-                isTyping ? (
-                  <Animated.View
-                    style={{
-                      flexDirection: 'row', alignItems: 'flex-end',
-                      paddingHorizontal: 16, marginTop: 4, marginBottom: 4,
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 32, height: 32, borderRadius: 16,
-                        backgroundColor: THEME.primary,
-                        alignItems: 'center', justifyContent: 'center',
-                        marginRight: 8, marginBottom: 2,
-                      }}
-                    >
-                      <Bot size={14} color="white" />
-                    </View>
-                    <View
-                      style={{
-                        backgroundColor: '#FFFFFF', borderRadius: 20, borderBottomLeftRadius: 5,
-                        paddingHorizontal: 16, paddingVertical: 12,
-                        borderWidth: 1, borderColor: '#F1F5F9',
-                        shadowColor: '#94a3b8', shadowOpacity: 0.1, shadowRadius: 4, elevation: 1,
-                      }}
-                    >
-                      <TypingDots />
-                    </View>
-                  </Animated.View>
-                ) : null
-              }
-            />
-
-            {/* ── Bottom Area ── */}
-            <View>
-              <ConnectionBanner quality={connectionQuality} />
-
-              {/* Suggestion chips */}
-              <View
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  borderTopWidth: connectionQuality !== 'online' ? 0 : 1,
-                  borderTopColor: '#F1F5F9',
-                  paddingTop: 12, paddingBottom: 10,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 10, color: '#94A3B8', fontWeight: '700',
-                    letterSpacing: 1.2, textTransform: 'uppercase',
-                    paddingHorizontal: 16, marginBottom: 8,
-                  }}
-                >
-                  {t('chatbot.frequentQuestions')}
-                </Text>
+            {!isLoggedIn ? (
+              <LoginRequiredView onLogin={handleGoLogin} onRegister={handleGoRegister} />
+            ) : (
+              <>
+                {/* ── Message List ── */}
                 <FlatList
-                  data={SUGGESTIONS}
-                  keyExtractor={(s) => s}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: 16 }}
+                  ref={listRef}
+                  data={messages}
+                  keyExtractor={(m) => m.id}
+                  style={{ flex: 1, backgroundColor: '#F8FAFC' }}
+                  contentContainerStyle={{ paddingTop: 8, paddingBottom: 12 }}
+                  showsVerticalScrollIndicator={false}
+                  // FIX: Remove maintainVisibleContentPosition on Android — it
+                  // conflicts with programmatic scrollToEnd calls on Android and
+                  // can cause the list to jump or refuse to scroll to the bottom.
+                  // iOS handles this prop correctly; Android does not need it here
+                  // because we always want the latest message at the bottom.
+                  maintainVisibleContentPosition={
+                    Platform.OS === 'ios' ? { minIndexForVisible: 0 } : undefined
+                  }
+                  onContentSizeChange={() => {
+                    scrollToBottomIfNear(true);
+                  }}
+                  onLayout={() => {
+                    if (isNearBottomRef.current) {
+                      listRef.current?.scrollToEnd({ animated: false });
+                    }
+                  }}
+                  onScroll={(e) => {
+                    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+                    isNearBottomRef.current =
+                      contentOffset.y + layoutMeasurement.height >= contentSize.height - 200;
+                  }}
+                  scrollEventThrottle={100}
+                  // FIX: Disable automatic keyboard dismissal on Android — the
+                  // default 'on-drag' behaviour causes the keyboard to hide when
+                  // the user scrolls, which then triggers a KAV layout relayout
+                  // that jumps the input bar. 'interactive' is iOS-only; use
+                  // 'none' on Android so only an explicit tap-away closes it.
+                  keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
+                  // FIX: Tell the list to keep its content above the soft keyboard
+                  // on Android. Without this the bottom messages are hidden behind
+                  // the keyboard even when KAV is working correctly.
                   keyboardShouldPersistTaps="handled"
-                  renderItem={({ item }) => (
-                    <SuggestionChip
-                      text={t(`chatbot.suggestions.${item}`)}
-                      onPress={() => sendMessage(t(`chatbot.suggestions.${item}`), true)}
-                      disabled={isBusy || isOffline || isCoolingDown}
-                    />
-                  )}
+                  ListHeaderComponent={
+                    <>
+                      <DateSeparator />
+                      <BotInfo />
+                    </>
+                  }
+                  renderItem={({ item, index }) => {
+                    const next = messages[index + 1];
+                    const isLast = !next || next.role !== item.role;
+                    const showAvatar = item.role === 'bot' && isLast;
+                    return (
+                      <MessageBubble
+                        msg={item}
+                        showAvatar={showAvatar}
+                        isLast={isLast}
+                        onAction={handleAction}
+                        onTextUpdate={(id, text) => {
+                          if (id === currentBotIdRef.current) {
+                            displayedTextRef.current = text;
+                            scrollToBottomIfNear();
+                          }
+                        }}
+                      />
+                    );
+                  }}
+                  ListFooterComponent={
+                    isTyping ? (
+                      <Animated.View
+                        style={{
+                          flexDirection: 'row', alignItems: 'flex-end',
+                          paddingHorizontal: 16, marginTop: 4, marginBottom: 4,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 32, height: 32, borderRadius: 16,
+                            backgroundColor: THEME.primary,
+                            alignItems: 'center', justifyContent: 'center',
+                            marginRight: 8, marginBottom: 2,
+                          }}
+                        >
+                          <Bot size={14} color="white" />
+                        </View>
+                        <View
+                          style={{
+                            backgroundColor: '#FFFFFF', borderRadius: 20, borderBottomLeftRadius: 5,
+                            paddingHorizontal: 16, paddingVertical: 12,
+                            borderWidth: 1, borderColor: '#F1F5F9',
+                            shadowColor: '#94a3b8', shadowOpacity: 0.1, shadowRadius: 4, elevation: 1,
+                          }}
+                        >
+                          <TypingDots />
+                        </View>
+                      </Animated.View>
+                    ) : null
+                  }
                 />
-              </View>
 
-              {/* Input bar */}
-              <View
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  borderTopWidth: 1, borderTopColor: '#F1F5F9',
-                  paddingHorizontal: 12, paddingTop: 10,
-                  // FIX: On Android insets.bottom is 0 inside a transparent
-                  // modal with gesture-navigation bars. Use the safe-area value
-                  // when it's available (e.g. on devices with a nav bar rendered
-                  // inside the app window), but fall back to a hard 16px so the
-                  // input bar never sits flush against the bottom edge.
-                  paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 16 : 12),
-                }}
-              >
-                <View style={{ alignItems: 'flex-end', paddingHorizontal: 4, marginBottom: 4 }}>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: '600',
-                      color: isAtLimit
-                        ? '#DC2626'
-                        : charCount >= MAX_CHARS - 10
-                          ? '#F97316'
-                          : '#94A3B8',
-                    }}
-                  >
-                    {charCount}/{MAX_CHARS}
-                  </Text>
-                </View>
+                {/* ── Bottom Area ── */}
+                <View>
+                  <ConnectionBanner quality={connectionQuality} />
 
-                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+                  {/* Suggestion chips */}
                   <View
                     style={{
-                      flex: 1, backgroundColor: '#F1F5F9', borderRadius: 24,
-                      paddingHorizontal: 16, paddingVertical: 2,
-                      flexDirection: 'row', alignItems: 'flex-end',
-                      minHeight: 44, borderWidth: 1.5,
-                      borderColor: isAtLimit
-                        ? '#DC2626'
-                        : isOffline
-                          ? '#FECACA'
-                          : isSlow
-                            ? '#FDE68A'
-                            : isBusy
-                              ? THEME.primary + '55'
-                              : '#E2E8F0',
+                      backgroundColor: '#FFFFFF',
+                      borderTopWidth: connectionQuality !== 'online' ? 0 : 1,
+                      borderTopColor: '#F1F5F9',
+                      paddingTop: 12, paddingBottom: 10,
                     }}
                   >
-                    <TextInput
-                      ref={inputRef}
-                      value={input}
-                      onChangeText={(text) => {
-                        if (text.length <= MAX_CHARS) setInput(text);
-                      }}
-                      placeholder={
-                        isOffline
-                          ? t('chatbot.placeholder.offline')
-                          : isSlow
-                            ? t('chatbot.placeholder.slow')
-                            : isBusy
-                              ? t('chatbot.placeholder.busy')
-                              : t('chatbot.askInput')
-                      }
-                      placeholderTextColor={isOffline ? '#EF4444' : '#94A3B8'}
-                      multiline
-                      maxLength={MAX_CHARS}
-                      editable={!isOffline}
+                    <Text
                       style={{
-                        flex: 1, fontSize: 15,
-                        color: isOffline ? '#94A3B8' : '#1E293B',
-                        paddingTop: 10, paddingBottom: 10,
-                        maxHeight: 100, lineHeight: 20,
-                        // FIX: Android adds extra vertical padding inside
-                        // TextInput by default via its material theme.
-                        // Setting textAlignVertical to 'top' and zeroing the
-                        // default padding keeps multiline inputs aligned the
-                        // same as on iOS.
-                        textAlignVertical: 'top',
+                        fontSize: 10, color: '#94A3B8', fontWeight: '700',
+                        letterSpacing: 1.2, textTransform: 'uppercase',
+                        paddingHorizontal: 16, marginBottom: 8,
                       }}
-                      returnKeyType="default"
+                    >
+                      {t('chatbot.frequentQuestions')}
+                    </Text>
+                    <FlatList
+                      data={SUGGESTIONS}
+                      keyExtractor={(s) => s}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingHorizontal: 16 }}
+                      keyboardShouldPersistTaps="handled"
+                      renderItem={({ item }) => (
+                        <SuggestionChip
+                          text={t(`chatbot.suggestions.${item}`)}
+                          onPress={() => sendMessage(t(`chatbot.suggestions.${item}`), true)}
+                          disabled={isBusy || isOffline || isCoolingDown}
+                        />
+                      )}
                     />
                   </View>
 
-                  {isBusy ? (
-                    <Animated.View style={{ transform: [{ scale: cancelScaleAnim }] }}>
-                      <TouchableOpacity
-                        onPress={handleCancel}
-                        disabled={isCoolingDown}
-                        activeOpacity={0.8}
+                  {/* Input bar */}
+                  <View
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      borderTopWidth: 1, borderTopColor: '#F1F5F9',
+                      paddingHorizontal: 12, paddingTop: 10,
+                      // FIX: On Android insets.bottom is 0 inside a transparent
+                      // modal with gesture-navigation bars. Use the safe-area value
+                      // when it's available (e.g. on devices with a nav bar rendered
+                      // inside the app window), but fall back to a hard 16px so the
+                      // input bar never sits flush against the bottom edge.
+                      paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 16 : 12),
+                    }}
+                  >
+                    <View style={{ alignItems: 'flex-end', paddingHorizontal: 4, marginBottom: 4 }}>
+                      <Text
                         style={{
-                          width: 44, height: 44, borderRadius: 22,
-                          alignItems: 'center', justifyContent: 'center',
-                          backgroundColor: isCoolingDown ? '#F1F5F9' : '#FEE2E2',
-                          borderWidth: 1.5,
-                          borderColor: isCoolingDown ? '#E2E8F0' : '#FECACA',
-                          opacity: isCoolingDown ? 0.5 : 1,
+                          fontSize: 11,
+                          fontWeight: '600',
+                          color: isAtLimit
+                            ? '#DC2626'
+                            : charCount >= MAX_CHARS - 10
+                              ? '#F97316'
+                              : '#94A3B8',
                         }}
                       >
-                        <Square
-                          size={16}
-                          color={isCoolingDown ? '#94A3B8' : '#EF4444'}
-                          fill={isCoolingDown ? '#94A3B8' : '#EF4444'}
+                        {charCount}/{MAX_CHARS}
+                      </Text>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+                      <View
+                        style={{
+                          flex: 1, backgroundColor: '#F1F5F9', borderRadius: 24,
+                          paddingHorizontal: 16, paddingVertical: 2,
+                          flexDirection: 'row', alignItems: 'flex-end',
+                          minHeight: 44, borderWidth: 1.5,
+                          borderColor: isAtLimit
+                            ? '#DC2626'
+                            : isOffline
+                              ? '#FECACA'
+                              : isSlow
+                                ? '#FDE68A'
+                                : isBusy
+                                  ? THEME.primary + '55'
+                                  : '#E2E8F0',
+                        }}
+                      >
+                        <TextInput
+                          ref={inputRef}
+                          value={input}
+                          onChangeText={(text) => {
+                            if (text.length <= MAX_CHARS) setInput(text);
+                          }}
+                          placeholder={
+                            isOffline
+                              ? t('chatbot.placeholder.offline')
+                              : isSlow
+                                ? t('chatbot.placeholder.slow')
+                                : isBusy
+                                  ? t('chatbot.placeholder.busy')
+                                  : t('chatbot.askInput')
+                          }
+                          placeholderTextColor={isOffline ? '#EF4444' : '#94A3B8'}
+                          multiline
+                          maxLength={MAX_CHARS}
+                          editable={!isOffline}
+                          style={{
+                            flex: 1, fontSize: 15,
+                            color: isOffline ? '#94A3B8' : '#1E293B',
+                            paddingTop: 10, paddingBottom: 10,
+                            maxHeight: 100, lineHeight: 20,
+                            // FIX: Android adds extra vertical padding inside
+                            // TextInput by default via its material theme.
+                            // Setting textAlignVertical to 'top' and zeroing the
+                            // default padding keeps multiline inputs aligned the
+                            // same as on iOS.
+                            textAlignVertical: 'top',
+                          }}
+                          returnKeyType="default"
                         />
-                      </TouchableOpacity>
-                    </Animated.View>
-                  ) : (
-                    <Animated.View style={{ transform: [{ scale: cancelScaleAnim }] }}>
-                      <TouchableOpacity
-                        onPress={() => sendMessage(input)}
-                        disabled={sendDisabled}
-                        activeOpacity={0.8}
-                        style={{
-                          width: 44, height: 44, borderRadius: 22,
-                          alignItems: 'center', justifyContent: 'center',
-                          backgroundColor: sendDisabled ? '#E2E8F0' : THEME.primary,
-                          shadowColor: sendDisabled ? 'transparent' : THEME.primaryDark,
-                          shadowOpacity: 0.35, shadowRadius: 8,
-                          shadowOffset: { width: 0, height: 3 },
-                          elevation: sendDisabled ? 0 : 4,
-                          opacity: isCoolingDown ? 0.5 : 1,
-                        }}
-                      >
-                        <Send size={18} color={sendDisabled ? '#94A3B8' : '#FFFFFF'} style={{ marginLeft: 2 }} />
-                      </TouchableOpacity>
-                    </Animated.View>
-                  )}
+                      </View>
+
+                      {isBusy ? (
+                        <Animated.View style={{ transform: [{ scale: cancelScaleAnim }] }}>
+                          <TouchableOpacity
+                            onPress={handleCancel}
+                            disabled={isCoolingDown}
+                            activeOpacity={0.8}
+                            style={{
+                              width: 44, height: 44, borderRadius: 22,
+                              alignItems: 'center', justifyContent: 'center',
+                              backgroundColor: isCoolingDown ? '#F1F5F9' : '#FEE2E2',
+                              borderWidth: 1.5,
+                              borderColor: isCoolingDown ? '#E2E8F0' : '#FECACA',
+                              opacity: isCoolingDown ? 0.5 : 1,
+                            }}
+                          >
+                            <Square
+                              size={16}
+                              color={isCoolingDown ? '#94A3B8' : '#EF4444'}
+                              fill={isCoolingDown ? '#94A3B8' : '#EF4444'}
+                            />
+                          </TouchableOpacity>
+                        </Animated.View>
+                      ) : (
+                        <Animated.View style={{ transform: [{ scale: cancelScaleAnim }] }}>
+                          <TouchableOpacity
+                            onPress={() => sendMessage(input)}
+                            disabled={sendDisabled}
+                            activeOpacity={0.8}
+                            style={{
+                              width: 44, height: 44, borderRadius: 22,
+                              alignItems: 'center', justifyContent: 'center',
+                              backgroundColor: sendDisabled ? '#E2E8F0' : THEME.primary,
+                              shadowColor: sendDisabled ? 'transparent' : THEME.primaryDark,
+                              shadowOpacity: 0.35, shadowRadius: 8,
+                              shadowOffset: { width: 0, height: 3 },
+                              elevation: sendDisabled ? 0 : 4,
+                              opacity: isCoolingDown ? 0.5 : 1,
+                            }}
+                          >
+                            <Send size={18} color={sendDisabled ? '#94A3B8' : '#FFFFFF'} style={{ marginLeft: 2 }} />
+                          </TouchableOpacity>
+                        </Animated.View>
+                      )}
+                    </View>
+                  </View>
                 </View>
-              </View>
-            </View>
+              </>
+            )}
 
           </KeyboardAvoidingView>
         </Animated.View>

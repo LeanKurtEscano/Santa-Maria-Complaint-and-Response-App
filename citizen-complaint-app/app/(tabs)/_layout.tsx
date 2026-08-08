@@ -12,7 +12,7 @@ export default function TabsLayout() {
   const [isConnected, setIsConnected] = useState<boolean | null>(true);
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
-  const { fetchCurrentUser } = useCurrentUser();
+  const { fetchCurrentUser, isAuthenticated, userData } = useCurrentUser();
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -34,6 +34,7 @@ export default function TabsLayout() {
       <Tabs
         screenListeners={{
           tabPress: async () => {
+            if (!isAuthenticated || !userData) return;
             await fetchCurrentUser(true);
           },
         }}

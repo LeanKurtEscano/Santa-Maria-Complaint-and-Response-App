@@ -10,6 +10,7 @@ import ErrorScreen from "@/screen/general/ErrorScreen";
 import { handleApiError } from "@/utils/general/errorHandler";
 import * as Notifications from "expo-notifications"; // 👈 add import
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ClerkProvider } from "@clerk/expo";
 
 
 Notifications.setNotificationHandler({
@@ -171,8 +172,10 @@ useEffect(() => {
 
 export default function RootLayout() {
   return (
+     <ClerkProvider publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}> 
     <QueryClientProvider client={queryClient}>
       <RootLayoutNav />
     </QueryClientProvider>
+    </ClerkProvider>
   );
 }

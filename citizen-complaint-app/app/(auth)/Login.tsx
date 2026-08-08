@@ -20,6 +20,12 @@ import { useCurrentUser } from '@/store/useCurrentUserStore';
 import * as SecureStore from 'expo-secure-store';
 import { THEME } from '@/constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+// 👇 Clerk (used only to run the Google OAuth flow and grab a token — not your session system)
+import { useSSO, useAuth } from '@clerk/expo';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+
+WebBrowser.maybeCompleteAuthSession();
 
 interface LoginFormData {
     email: string;
@@ -38,6 +44,11 @@ export default function LoginScreen({ navigation }: any) {
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [showPassword, setShowPassword] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
+
+    // 👇 Clerk hooks for the Google flow only
+    const { startSSOFlow } = useSSO();
+    const { getToken, signOut } = useAuth();
 
     const loginMutation = useSubmitForm<LoginFormData>({
         url: '/login',
@@ -62,8 +73,8 @@ export default function LoginScreen({ navigation }: any) {
 
             await useCurrentUser.getState().syncPushToken();
 
-    // small delay ensures backend receives token
-             await new Promise(res => setTimeout(res, 300));
+            // small delay ensures backend receives token
+            await new Promise(res => setTimeout(res, 300));
             router.replace('/(tabs)');
         },
     });
@@ -89,6 +100,68 @@ export default function LoginScreen({ navigation }: any) {
                 }
             },
         });
+    };
+
+    // 👇 Google login: use Clerk purely to get a Google-verified token,
+    // exchange it for YOUR OWN access/refresh tokens, then discard the Clerk session.
+    const handleGoogleLogin = async () => {
+        setErrors({});
+        setGoogleLoading(true);
+        let createdSessionId: string | undefined;
+        try {
+            // Defensive: clear any stale Clerk session left over from a previous
+            // attempt (e.g. app was killed mid-flow, or an older build of this
+            // screen). Safe no-op if nothing is signed in.
+            try {
+                await signOut();
+            } catch {
+                // ignore — nothing to sign out of
+            }
+
+            const ssoResult = await startSSOFlow({
+                strategy: 'oauth_google',
+                redirectUrl: AuthSession.makeRedirectUri(),
+            });
+            createdSessionId = ssoResult.createdSessionId;
+            const { setActive } = ssoResult;
+
+            if (!createdSessionId || !setActive) {
+                setGoogleLoading(false);
+                return; // user cancelled
+            }
+
+            await setActive({ session: createdSessionId });
+            const clerkToken = await getToken();
+
+            const { data } = await authApiClient.post('/login/google', {
+                clerk_token: clerkToken,
+            });
+
+            console.log('Google login successful:', data.access_token, data.refresh_token);
+
+            await SecureStore.setItemAsync('complaint_token', data.access_token);
+            await SecureStore.setItemAsync('complaint_refresh_token', data.refresh_token);
+
+            await fetchCurrentUser();
+            await useCurrentUser.getState().syncPushToken();
+            await new Promise(res => setTimeout(res, 300));
+            router.replace('/(tabs)');
+        } catch (error: any) {
+            console.log('Google login error:', error);
+            setErrors({ general: t('loginFailed') });
+        } finally {
+            // Always drop the Clerk session, success or failure — Clerk is only
+            // ever a middleman here, and leaving a session active is what causes
+            // "You're already signed in" on the next attempt.
+            if (createdSessionId) {
+                try {
+                    await signOut();
+                } catch (signOutError) {
+                    console.log('Clerk signOut cleanup failed:', signOutError);
+                }
+            }
+            setGoogleLoading(false);
+        }
     };
 
     // Fixed icon strip width so both buttons' text starts at the same x position
@@ -305,6 +378,52 @@ export default function LoginScreen({ navigation }: any) {
                             </Text>
                             <View className="flex-1 h-px bg-neutral-200" />
                         </View>
+
+                        {/* Google Sign-In */}
+                        <TouchableOpacity
+                            onPress={handleGoogleLogin}
+                            disabled={googleLoading}
+                            activeOpacity={0.85}
+                            className="flex-row items-center rounded-2xl overflow-hidden mb-6"
+                            style={{
+                                backgroundColor: '#fff',
+                                borderWidth: 1.5,
+                                borderColor: '#E5E7EB',
+                                minHeight: 52,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: ICON_STRIP_WIDTH,
+                                    alignSelf: 'stretch',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                {googleLoading ? (
+                                    <ActivityIndicator size="small" color="#374151" />
+                                ) : (
+                                    <Image
+                                        source={require("../../assets/images/google-icon.png")}
+                                        style={{ width: 20, height: 20 }}
+                                        resizeMode="contain"
+                                    />
+                                )}
+                            </View>
+                            <Text
+                                style={{
+                                    flex: 1,
+                                    textAlign: 'center',
+                                    fontSize: 14,
+                                    fontWeight: '700',
+                                    color: '#374151',
+                                    paddingVertical: 14,
+                                }}
+                            >
+                                {t('continueWithGoogle') || 'Continue with Google'}
+                            </Text>
+                            <View style={{ width: ICON_STRIP_WIDTH }} />
+                        </TouchableOpacity>
 
                         {/* Register Buttons */}
                         <View className="gap-3">
