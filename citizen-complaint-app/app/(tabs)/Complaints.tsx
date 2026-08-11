@@ -15,6 +15,7 @@ import GeneralToast from '@/components/Toast/GeneralToast';
 import useToastStore from '@/store/useGlobalModal';
 import { useCurrentUser } from "@/store/useCurrentUserStore";
 import AuthGuard from '@/screen/general/AuthGuard';
+import VerifyGuard from '@/screen/general/VerifyGuard';
 
 interface BarangayPage {
   data: Barangay[];
@@ -34,7 +35,7 @@ export default function ComplaintsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
-  const { isAuthenticated } = useCurrentUser();
+  const { isAuthenticated,userData } = useCurrentUser();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -45,6 +46,15 @@ export default function ComplaintsScreen() {
 
   if (!isAuthenticated) {
     return <AuthGuard />;
+  }
+
+   if (!userData?.is_verified) {
+    const hasSubmittedIdDocs = !!(
+      userData?.front_id &&
+      userData?.back_id &&
+      userData?.selfie_with_id
+    );
+    return <VerifyGuard pending={hasSubmittedIdDocs} />;
   }
 
   // Bouncing arrow animation — loops while button is visible

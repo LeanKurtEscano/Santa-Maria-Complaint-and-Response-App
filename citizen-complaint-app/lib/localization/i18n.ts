@@ -393,6 +393,41 @@ const resources = {
         loadingProfile: "Loading profile...",
         failedToLoad: "Failed to Load Profile",
         unableToRetrieve: "Unable to retrieve your profile information.",
+     "verification": {
+  "required": "Verification Required",
+  "requiredMessage": "You need to verify your identity before you can file a complaint.",
+  "button": "Verify Now",
+  "pendingTitle": "Thank you for submitting your ID",
+  "pendingMessage": "Your ID is under review. Please wait for your account to be verified before you can file a complaint."
+},
+"googleIdVerification": {
+  "title": "Verify Your Identity",
+  "subtitle": "You signed in with Google. Complete ID verification below to unlock all features, including filing complaints.",
+  "signedInAs": "Signed in as",
+  "selectIdTypeFirst": "Select an ID type first",
+  "chooseImageSource": "Choose Image Source",
+  "takePhoto": "Take Photo",
+  "takePhotoSubtitle": "Use your camera to capture",
+  "chooseFromGallery": "Choose from Gallery",
+  "chooseFromGallerySubtitle": "Select from your photos",
+  "success": "Your ID verification was submitted successfully.",
+  "subLabels": {
+    "front": "Front side of your ID",
+    "back": "Back side of your ID",
+    "selfie": "Selfie holding your ID"
+  },
+  "captured": {
+    "front": "ID Front captured",
+    "back": "ID Back captured",
+    "selfie": "Selfie captured",
+    "generic": "Image captured"
+  },
+  "errors": {
+    "imageProcessFailed": "Failed to process image. Please try again.",
+    "cameraPermission": "Camera permission is required!",
+    "submitFailed": "Failed to submit verification. Please try again."
+  }
+},
         location: {
           myLocation: "Your Location",
           required: "Location Required",
@@ -1087,6 +1122,14 @@ const resources = {
   "passwordMaxLength": "Password must not exceed 128 characters."
 },
 
+"verifyGuard": {
+  "title": "Verify Your Account",
+  "subtitle": "You need to complete identity verification before you can file a complaint. This helps us keep the community safe and your reports credible.",
+  "button": "Verify Now",
+  "pendingTitle": "Thank You for Submitting",
+  "pendingSubtitle": "Your ID is under review. Please wait for your account to be verified before you can file a complaint."
+},
+
 
 "notifications": {
   "emptyTitle": "All caught up!",
@@ -1173,7 +1216,15 @@ const resources = {
       "attached": "{{count}} photo attached",
       "attached_plural": "{{count}} photos attached"
     }
-  }
+  },
+
+  "verification": {
+  "required": "Verification Required",
+  "requiredMessage": "You need to verify your identity before you can file a complaint.",
+  "button": "Verify Now"
+},
+
+"continueWithGoogle": "Continue with Google",
     
 
 
@@ -1198,8 +1249,14 @@ const resources = {
 "incorrectPassword": "Mali ang password. Pakisubukan muli.",
 "networkError": "Hindi makakonekta. Pakisuriin ang iyong koneksyon.",
 "loginFailed": "Nabigong mag-login. Pakisubukan muli.",
-
-
+"verifyGuard": {
+  "title": "I-verify ang Iyong Account",
+  "subtitle": "Kailangan mong kumpletuhin ang pag-verify ng iyong pagkakakilanlan bago ka makapagsampa ng reklamo. Nakakatulong ito upang mapanatiling ligtas ang komunidad at kredibol ang iyong mga ulat.",
+  "button": "I-verify Ngayon",
+  "pendingTitle": "Salamat sa Pagsumite",
+  "pendingSubtitle": "Sinusuri pa ang iyong ID. Mangyaring maghintay hanggang ma-verify ang iyong account bago ka makapagsampa ng reklamo."
+},
+"continueWithGoogle": "Magpatuloy gamit ang Google",
 "otpEnterAllDigits": "Mangyaring ilagay ang lahat ng 6 na digit.",
 "otpRegistrationDataNotFound": "Hindi nahanap ang datos ng pagpaparehistro. Mangyaring mag-rehistro muli.",
 "otpExpired": "Nag-expire na ang iyong OTP. Mangyaring humingi ng bagong code.",
@@ -1224,6 +1281,12 @@ const resources = {
     "title": "Mag-login muna para makausap si Mary Bot",
     "subtitle": "You need to log in to access MaryBot's assistance. If you don't have an account yet, you can register for free.",
   },
+
+  "verification": {
+  "required": "Kailangan ng Pag-verify",
+  "requiredMessage": "Kailangan mong i-verify ang iyong pagkakakilanlan bago ka makapagsampa ng reklamo.",
+  "button": "I-verify Ngayon"
+},
 
 "fileComplaint": "Mag-file ng Reklamo",
 "fileComplaintDesc": "Ligtas at kumpidensyal",
@@ -1256,7 +1319,34 @@ const resources = {
   "forgotPasswordValidationError": "Hindi valid ang email format.",
   "forgotPasswordServerError": "May problema sa server. Subukan ulit mamaya.",
   "forgotPasswordFailed": "Hindi naipadala ang code. Subukan ulit.",
-
+"googleIdVerification": {
+  "title": "I-verify ang Iyong Pagkakakilanlan",
+  "subtitle": "Nag-sign in ka gamit ang Google. Kumpletuhin ang pag-verify ng ID sa ibaba para magamit ang lahat ng feature, kasama ang pagsampa ng reklamo.",
+  "signedInAs": "Naka-sign in bilang",
+  "selectIdTypeFirst": "Pumili muna ng uri ng ID",
+  "chooseImageSource": "Pumili ng Pinagmulan ng Larawan",
+  "takePhoto": "Kumuha ng Larawan",
+  "takePhotoSubtitle": "Gamitin ang camera para kumuha",
+  "chooseFromGallery": "Pumili mula sa Gallery",
+  "chooseFromGallerySubtitle": "Pumili mula sa iyong mga larawan",
+  "success": "Matagumpay na naisumite ang iyong pag-verify ng ID.",
+  "subLabels": {
+    "front": "Harapang bahagi ng iyong ID",
+    "back": "Likurang bahagi ng iyong ID",
+    "selfie": "Selfie na hawak ang iyong ID"
+  },
+  "captured": {
+    "front": "Nakuha na ang harap ng ID",
+    "back": "Nakuha na ang likod ng ID",
+    "selfie": "Nakuha na ang selfie",
+    "generic": "Nakuha na ang larawan"
+  },
+  "errors": {
+    "imageProcessFailed": "Hindi naproseso ang larawan. Pakisubukan muli.",
+    "cameraPermission": "Kailangan ang pahintulot sa camera!",
+    "submitFailed": "Hindi naisumite ang pag-verify. Pakisubukan muli."
+  }
+},
 
   "resetPasswordTitle": "Gumawa ng Bagong Password",
   "resetPasswordSubtitle": "Dapat iba ang bagong password mo sa dati mong password.",
@@ -1478,6 +1568,13 @@ const resources = {
         loadingProfile: "Naglo-load ng profile...",
         failedToLoad: "Hindi Na-load ang Profile",
         unableToRetrieve: "Hindi makuha ang iyong impormasyon sa profile.",
+      "verification": {
+  "required": "Kailangan ng Pag-verify",
+  "requiredMessage": "Kailangan mong i-verify ang iyong pagkakakilanlan bago ka makapagsampa ng reklamo.",
+  "button": "I-verify Ngayon",
+  "pendingTitle": "Salamat sa pagsumite ng iyong ID",
+  "pendingMessage": "Sinusuri pa ang iyong ID. Mangyaring maghintay hanggang ma-verify ang iyong account bago ka makapagsampa ng reklamo."
+},
         location: {
           myLocation: "Ang iyong Lokasyon",
           required: "Kailangan ang Lokasyon",
@@ -2115,6 +2212,8 @@ const resources = {
       }
     }
   }, 
+
+
 
   "ordinance": {
   "badge": "Opisyal na Rekord",

@@ -28,6 +28,7 @@ import {
   Map,
   LogOut,
   Settings,
+  ChevronLeft
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -240,7 +241,6 @@ export default function ProfileScreen() {
     try {
       setLogoutLoading(true);
       await handleLogout(); 
-
     } finally {
       setLogoutLoading(false);
       setShowLogoutModal(false);
@@ -290,6 +290,8 @@ export default function ProfileScreen() {
       >
         {/* Header */}
         <View style={{ backgroundColor: THEME.primary }} className="px-6 pt-6 pb-12">
+
+
           <View className="flex-row items-center justify-between">
             <Text className="text-white text-2xl font-bold">{t('profile.title')}</Text>
             <TouchableOpacity
@@ -410,6 +412,64 @@ export default function ProfileScreen() {
               </View>
             )}
           </View>
+
+          {/* Verification Status — Not Verified */}
+        {/* Verification Status — Not Verified */}
+          {!userData.is_verified && (() => {
+            const hasSubmittedIdDocs = !!(
+              userData.front_id &&
+              userData.back_id &&
+              userData.selfie_with_id
+            );
+
+            if (hasSubmittedIdDocs) {
+              // Already submitted — awaiting manual review, don't let them resubmit
+              return (
+                <View className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                  <View className="flex-row items-start">
+                    <AlertCircle size={20} color="#F59E0B" />
+                    <View className="flex-1 ml-3">
+                      <Text className="text-amber-900 font-semibold text-sm">
+                        {t('profile.verification.pendingTitle')}
+                      </Text>
+                      <Text className="text-amber-700 text-xs mt-1">
+                        {t('profile.verification.pendingMessage')}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            }
+
+            // Not submitted yet — prompt to verify
+            return (
+              <View className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+                <View className="flex-row items-start">
+                  <AlertCircle size={20} color="#DC2626" />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-red-900 font-semibold text-sm">
+                      {t('profile.verification.required')}
+                    </Text>
+                    <Text className="text-red-700 text-xs mt-1">
+                      {t('profile.verification.requiredMessage')}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => router.push('/profile/GoogleAccountVerification')}
+                  style={{ backgroundColor: '#DC2626' }}
+                  className="rounded-lg py-2.5 items-center flex-row justify-center mt-3"
+                  activeOpacity={0.8}
+                >
+                  <CheckCircle size={16} color="#fff" />
+                  <Text className="text-white font-semibold text-sm ml-2">
+                    {t('profile.verification.button')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
         </View>
 
         {/* Location Map Card */}

@@ -11,6 +11,9 @@ export const createApiClient = (axiosInstance: AxiosInstance) => {
         put: <T = any>(url: string, data?: any, config = {}) =>
             axiosInstance.put<T>(url, data, config),
 
+        patch: <T = any>(url: string, data?: any, config = {}) =>
+            axiosInstance.patch<T>(url, data, config),
+
         delete: <T = any>(url: string, config = {}) =>
             axiosInstance.delete<T>(url, config),
     };

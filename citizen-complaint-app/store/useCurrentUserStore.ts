@@ -202,7 +202,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       front_id: data.front_id,
       back_id: data.back_id,
       selfie_with_id: data.selfie_with_id,
-
+      clerk_user_id: data.clerk_user_id,
       is_verified:
         data.is_verified === true ||
         data.is_verified === 1 ||

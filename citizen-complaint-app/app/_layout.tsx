@@ -11,7 +11,7 @@ import { handleApiError } from "@/utils/general/errorHandler";
 import * as Notifications from "expo-notifications"; // 👈 add import
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ClerkProvider } from "@clerk/expo";
-
+import * as SecureStore from 'expo-secure-store';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -29,19 +29,20 @@ function RootLayoutNav() {
   const router = useRouter();
   const [initError, setInitError] = useState<any>(null);
   const [retrying, setRetrying] = useState(false);
-  
+
   useEffect(() => {
     initializeApp();
-    
+
     {/*   async function clearOnboarding() {
       await AsyncStorage.removeItem('hasSeenOnboarding');
     }
     clearOnboarding(); */}
-   
-  
+    {/*   async function clearTokens() {
+      await SecureStore.deleteItemAsync('complaint_token');
+      await SecureStore.deleteItemAsync('complaint_refresh_token');
+    }
+    clearTokens(); */}
   }, []);
-
-
 
   // ✅ 🔥 FIX 1: LISTEN FOR NOTIFICATIONS
   useEffect(() => {
@@ -59,20 +60,20 @@ function RootLayoutNav() {
     };
   }, []);
 
-useEffect(() => {
-  const subscription = AppState.addEventListener("change", (state) => {
-    if (state === "active") {
-      const { userData, isAuthenticated } = useCurrentUser.getState();
-      if (!isAuthenticated || !userData) return; // 👈 guard
-      console.log("🔄 App active → syncing push token");
-      useCurrentUser.getState().syncPushToken();
-    }
-  });
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        const { userData, isAuthenticated } = useCurrentUser.getState();
+        if (!isAuthenticated || !userData) return; // 👈 guard
+        console.log("🔄 App active → syncing push token");
+        useCurrentUser.getState().syncPushToken();
+      }
+    });
 
-  return () => {
-    subscription.remove();
-  };
-}, []);
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const initializeApp = async () => {
     try {
@@ -80,7 +81,7 @@ useEffect(() => {
       setRetrying(false);
       await checkAuthStatus();
     } catch (error) {
-    
+
       setInitError(error);
     }
   };
@@ -92,51 +93,52 @@ useEffect(() => {
   };
 
   useEffect(() => {
-  if (loading || retrying) return;
+    if (loading || retrying) return;
 
-  const inAuthGroup = segments[0] === "(auth)";
+    const inAuthGroup = segments[0] === "(auth)";
 
-  console.log("🔍 Auth Check:", {
-    isAuthenticated: !!userData,
-    isVerified: userData?.is_verified,
-    currentSegment: segments[0],
-    inAuthGroup,
-  });
-
-  // ❌ Not authenticated 
-
-  {/*  if (!userData && !inAuthGroup) {
-    router.replace("/(auth)/Login");
-    return;
-  } */}
- 
-
-
+    console.log("🔍 Auth Check:", {
+      isAuthenticated: !!userData,
+      isVerified: userData?.is_verified,
+      currentSegment: segments[0],
+      inAuthGroup,
+      userData: userData,
+    });
 
     if (userData && userData.is_suspended) {
-    if (segments[1] !== "AccountSuspended") {
-      router.replace("/(auth)/AccountSuspended");
+      if (segments[1] !== "AccountSuspended") {
+        router.replace("/(auth)/AccountSuspended");
+      }
+      return;
     }
-    return;
-  }
 
+    // ✅ Authenticated but NOT verified
+    if (userData && !userData.is_verified) {
+      // Any account with a linked clerk_user_id (i.e. has used Google login,
+      // whether that was their original signup method or linked later) is
+      // allowed inside the app while unverified. Verification-gated actions
+      // like filing complaints are enforced separately inside the app
+      // (VerifyGuard / pending-review banners), so this redirect only needs
+      // to handle users who have never touched Google login at all.
+      const isGoogleLinked = !!userData.clerk_user_id;
 
-  // ✅ Authenticated but NOT verified
-  if (userData && !userData.is_verified) {
-    if (segments[1] !== "NotVerified") {
-      router.replace("/(auth)/NotVerified");
+      if (!isGoogleLinked) {
+        if (segments[1] !== "NotVerified") {
+          router.replace("/(auth)/NotVerified");
+        }
+        return;
+      }
+      // else: Google-linked account, unverified — let them into the app
     }
-    return;
-  }
 
-  // ✅ Authenticated and verified
-  if (userData && userData.is_verified && inAuthGroup) {
-    router.replace("/(tabs)");
-    return;
-  }
+    // ✅ Authenticated and verified
+    if (userData && userData.is_verified && inAuthGroup) {
+      router.replace("/(tabs)");
+      return;
+    }
 
-}, [userData, loading, segments, retrying]);
-   
+  }, [userData, loading, segments, retrying]);
+
   if (initError && !loading) {
     const appError = handleApiError(initError);
 
@@ -160,8 +162,6 @@ useEffect(() => {
     );
   }
 
-  
-
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -172,10 +172,10 @@ useEffect(() => {
 
 export default function RootLayout() {
   return (
-     <ClerkProvider publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}> 
-    <QueryClientProvider client={queryClient}>
-      <RootLayoutNav />
-    </QueryClientProvider>
+    <ClerkProvider publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}>
+      <QueryClientProvider client={queryClient}>
+        <RootLayoutNav />
+      </QueryClientProvider>
     </ClerkProvider>
   );
 }

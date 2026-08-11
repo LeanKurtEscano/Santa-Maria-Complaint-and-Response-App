@@ -28,5 +28,6 @@ export interface User {
   selfie_with_id: string | null;
   push_notifications_enabled?: boolean;
   can_submit_complaints?: boolean;
-  is_suspended?: boolean; // Optional field for notification settings
+  is_suspended?: boolean;
+  clerk_user_id?: string | null; // Optional field for notification settings
 }
