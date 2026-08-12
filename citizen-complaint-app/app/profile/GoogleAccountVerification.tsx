@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 import {
   CreditCard,
   Camera,
@@ -42,76 +41,39 @@ import { authApiClient, userApiClient } from '@/lib/client/user';
 
 type ImageField = 'idFrontImage' | 'idBackImage' | 'selfieImage';
 
-type ImageAsset = {
-  /** Stable local file:// uri, safe to hand to FormData on both platforms */
-  uri: string;
-  mimeType: string;
-  ext: string;
-};
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const MIME_TO_EXT: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/jpg': 'jpg',
-  'image/png': 'png',
-  'image/heic': 'heic',
-  'image/heif': 'heif',
-  'image/webp': 'webp',
-};
-
-const EXT_TO_MIME: Record<string, string> = {
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  heic: 'image/heic',
-  heif: 'image/heif',
-  webp: 'image/webp',
-};
-
 /**
- * Figures out mimeType + extension for a picked asset.
- * Prefers the mimeType the OS/picker already reported (most reliable,
- * especially on Android where the uri itself may carry no real extension).
- * Falls back to sniffing the uri/fileName only if mimeType is missing.
+ * Converts any image URI to a stable base64 data URI immediately after pick.
+ *
+ * WHY: On newer Android, image picker returns content:// or short-lived file://
+ * URIs that expire once the picker closes or the app is backgrounded, and RN's
+ * networking layer does not reliably stream content:// uris into a multipart
+ * body — the field arrives empty/undefined server-side even though picking
+ * "succeeded" locally. Converting to base64 right away sidesteps that entirely
+ * (same approach used in the register flow, which works on both platforms).
+ *
+ * NOTE: We use XMLHttpRequest instead of fetch() because fetch() of a
+ * content:// URI is unreliable on Android's JS engine.
  */
-const resolveImageMeta = (
-  uri: string,
-  mimeType?: string | null,
-  fileName?: string | null
-): { mimeType: string; ext: string } => {
-  if (mimeType && MIME_TO_EXT[mimeType]) {
-    return { mimeType, ext: MIME_TO_EXT[mimeType] };
-  }
+const toBase64DataUri = (uri: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (!uri) return reject(new Error('No URI provided'));
+    // Already base64 — nothing to do.
+    if (uri.startsWith('data:')) return resolve(uri);
 
-  const source = fileName || uri;
-  const extMatch = /\.([a-zA-Z0-9]+)(\?.*)?$/.exec(source);
-  const ext = (extMatch?.[1] || 'jpg').toLowerCase();
-  return { ext, mimeType: EXT_TO_MIME[ext] || 'image/jpeg' };
-};
-
-/**
- * Android (and occasionally iOS) can hand back a content:// / ph:// uri that
- * RN's networking layer does not reliably stream into a multipart body —
- * the field arrives empty/undefined server-side even though picking
- * "succeeded" locally. Copying the asset into the app's own cache dir gives
- * us a plain file:// path that works the same way on both platforms.
- */
-const localizeAsset = async (
-  asset: ImagePicker.ImagePickerAsset,
-  destName: string
-): Promise<ImageAsset> => {
-  const { mimeType, ext } = resolveImageMeta(asset.uri, asset.mimeType, asset.fileName);
-  const dest = `${FileSystem.cacheDirectory}${destName}_${Date.now()}.${ext}`;
-
-  try {
-    await FileSystem.copyAsync({ from: asset.uri, to: dest });
-    return { uri: dest, mimeType, ext };
-  } catch {
-    // Fall back to the original uri if copying fails for some reason —
-    // still better than crashing the picker flow.
-    return { uri: asset.uri, mimeType, ext };
-  }
+    const xhr = new XMLHttpRequest();
+    xhr.onload = () => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('FileReader failed'));
+      reader.readAsDataURL(xhr.response);
+    };
+    xhr.onerror = () => reject(new Error('XHR failed'));
+    xhr.open('GET', uri);
+    xhr.responseType = 'blob';
+    xhr.send();
+  });
 };
 
 const getDisplayLabel = (value: string, fieldName: ImageField, t: (k: string) => string): string => {
@@ -137,15 +99,12 @@ export default function GoogleIdVerificationScreen() {
   const [idNumberError, setIdNumberError] = useState<string | undefined>();
   const [idTypeError, setIdTypeError] = useState<string | undefined>();
 
-  // Local file:// uris (post-normalization) used for both preview and upload.
+  // Base64 data URIs (data:image/...;base64,...) used for both preview and upload —
+  // same shape as the register flow.
   const [idFrontImage, setIdFrontImage] = useState('');
   const [idBackImage, setIdBackImage] = useState('');
   const [selfieImage, setSelfieImage] = useState('');
 
-  // mimeType/ext captured at pick time — do NOT re-infer these at submit
-  // time from the uri, since a cache-dir file:// path is generated by us
-  // and its extension is already authoritative.
-  const [imageMeta, setImageMeta] = useState<Partial<Record<ImageField, ImageAsset>>>({});
   const [imageErrors, setImageErrors] = useState<Partial<Record<ImageField, string>>>({});
 
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -181,9 +140,8 @@ export default function GoogleIdVerificationScreen() {
   };
 
   const storeImage = async (asset: ImagePicker.ImagePickerAsset, field: ImageField) => {
-    const localized = await localizeAsset(asset, field);
-    imageSetters[field](localized.uri);
-    setImageMeta((prev) => ({ ...prev, [field]: localized }));
+    const dataUri = await toBase64DataUri(asset.uri);
+    imageSetters[field](dataUri);
     setImageErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
@@ -200,6 +158,8 @@ export default function GoogleIdVerificationScreen() {
     try {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
+        // allowsEditing on Android produces a short-lived temp URI that can expire
+        // before we finish reading it. Disable it on Android to avoid that race.
         allowsEditing: Platform.OS === 'ios',
         quality: 0.7,
       });
@@ -247,7 +207,6 @@ export default function GoogleIdVerificationScreen() {
 
   const removeImage = (field: ImageField) => {
     imageSetters[field]('');
-    setImageMeta((prev) => ({ ...prev, [field]: undefined }));
     setImageErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
@@ -306,25 +265,20 @@ export default function GoogleIdVerificationScreen() {
       const formData = new FormData();
       formData.append('id_type', idType);
       formData.append('id_number', idNumber);
+      // Same shape as register: send the base64 data URI strings directly
+      // instead of building { uri, name, type } file parts. This avoids the
+      // Android multipart file-streaming issue that was causing the images
+      // to arrive as undefined server-side.
+      formData.append('front_id', idFrontImage);
+      formData.append('back_id', idBackImage);
+      formData.append('selfie_with_id', selfieImage);
 
-      const appendImage = (uri: string, meta: ImageAsset | undefined, fieldName: string, filename: string) => {
-        // meta should always be set once storeImage() has run, but guard
-        // anyway rather than silently sending a broken part.
-        const { mimeType, ext } = meta ?? resolveImageMeta(uri);
-        formData.append(fieldName, {
-          uri: Platform.OS === 'android' && !uri.startsWith('file://') ? `file://${uri}` : uri,
-          name: `${filename}.${ext}`,
-          type: mimeType,
-        } as any);
-      };
-
-      appendImage(idFrontImage, imageMeta.idFrontImage, 'front_id', 'front_id');
-      appendImage(idBackImage, imageMeta.idBackImage, 'back_id', 'back_id');
-      appendImage(selfieImage, imageMeta.selfieImage, 'selfie_with_id', 'selfie_with_id');
-
-      // Let Axios set the Content-Type itself (multipart/form-data; boundary=...).
-      // Manually setting it without a boundary breaks multipart parsing on the backend.
-      const response = await authApiClient.patch('/id-verification', formData);
+      // Let Axios/RN set Content-Type itself. If authApiClient has a default
+      // 'application/json' Content-Type baked in, override it here so the
+      // multipart boundary isn't clobbered:
+      const response = await authApiClient.patch('/id-verification', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
 
       if (response.status === 200) {
         await fetchCurrentUser();
