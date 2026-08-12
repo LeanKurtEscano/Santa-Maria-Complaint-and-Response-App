@@ -400,34 +400,7 @@ const resources = {
   "pendingTitle": "Thank you for submitting your ID",
   "pendingMessage": "Your ID is under review. Please wait for your account to be verified before you can file a complaint."
 },
-"googleIdVerification": {
-  "title": "Verify Your Identity",
-  "subtitle": "You signed in with Google. Complete ID verification below to unlock all features, including filing complaints.",
-  "signedInAs": "Signed in as",
-  "selectIdTypeFirst": "Select an ID type first",
-  "chooseImageSource": "Choose Image Source",
-  "takePhoto": "Take Photo",
-  "takePhotoSubtitle": "Use your camera to capture",
-  "chooseFromGallery": "Choose from Gallery",
-  "chooseFromGallerySubtitle": "Select from your photos",
-  "success": "Your ID verification was submitted successfully.",
-  "subLabels": {
-    "front": "Front side of your ID",
-    "back": "Back side of your ID",
-    "selfie": "Selfie holding your ID"
-  },
-  "captured": {
-    "front": "ID Front captured",
-    "back": "ID Back captured",
-    "selfie": "Selfie captured",
-    "generic": "Image captured"
-  },
-  "errors": {
-    "imageProcessFailed": "Failed to process image. Please try again.",
-    "cameraPermission": "Camera permission is required!",
-    "submitFailed": "Failed to submit verification. Please try again."
-  }
-},
+
         location: {
           myLocation: "Your Location",
           required: "Location Required",
@@ -789,6 +762,35 @@ const resources = {
     "title": "Login to Chat with MaryBot",
     "subtitle": "To access MaryBot's assistance, please log in to your account. If you don't have an account yet, you can register for free.",
   },
+
+  "googleIdVerification": {
+  "title": "Verify Your Identity",
+  "subtitle": "You signed in with Google. Complete ID verification below to unlock all features, including filing complaints.",
+  "signedInAs": "Signed in as",
+  "selectIdTypeFirst": "Select an ID type first",
+  "chooseImageSource": "Choose Image Source",
+  "takePhoto": "Take Photo",
+  "takePhotoSubtitle": "Use your camera to capture",
+  "chooseFromGallery": "Choose from Gallery",
+  "chooseFromGallerySubtitle": "Select from your photos",
+  "success": "Your ID verification was submitted successfully.",
+  "subLabels": {
+    "front": "Front side of your ID",
+    "back": "Back side of your ID",
+    "selfie": "Selfie holding your ID"
+  },
+  "captured": {
+    "front": "ID Front captured",
+    "back": "ID Back captured",
+    "selfie": "Selfie captured",
+    "generic": "Image captured"
+  },
+  "errors": {
+    "imageProcessFailed": "Failed to process image. Please try again.",
+    "cameraPermission": "Camera permission is required!",
+    "submitFailed": "Failed to submit verification. Please try again."
+  }
+},
 
 
  "postIncidentFeedback": {
