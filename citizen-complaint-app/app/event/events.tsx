@@ -3,10 +3,13 @@ import {
   View, Text, FlatList, TouchableOpacity,
   Image, ActivityIndicator, TextInput, Animated, StatusBar,
 } from 'react-native';
-import { useRef, useEffect, useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useRef, useEffect, useState } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { CalendarDays, MapPin, Clock, Search, ChevronLeft, ChevronRight, X, ArrowRight } from 'lucide-react-native';
+import {
+  CalendarDays, MapPin, Clock, Search, ChevronLeft, ChevronRight,
+  X, ArrowRight, ArrowUp, ArrowDown,
+} from 'lucide-react-native';
 import { eventApiClient } from '@/lib/client/event';
 import ErrorScreen from '@/screen/general/ErrorScreen';
 import { getEventErrorType } from '@/utils/event/eventError';
@@ -16,6 +19,14 @@ import { useTranslation } from 'react-i18next';
 interface EventMedia { id: number; media_url: string; media_type: string; uploaded_at: string; }
 interface EventData  { id: number; event_name: string; description?: string; date: string; location?: string; media: EventMedia[]; }
 
+interface PaginatedEvents {
+  data: EventData[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
+
 const ACCENTS = [
   { color: THEME.primary, dark: THEME.primaryDark, text: '#BFDBFE' },
   { color: '#0E7490', dark: '#164E63', text: '#A5F3FC' },
@@ -24,6 +35,7 @@ const ACCENTS = [
 ];
 
 const PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 400;
 
 function formatDate(isoDate: string) {
   const d = new Date(isoDate);
@@ -162,7 +174,6 @@ function PaginationBar({
 }) {
   if (totalPages <= 1) return null;
 
-  // Build visible page numbers with ellipsis logic
   const getPageNumbers = (): (number | '...')[] => {
     if (totalPages <= 7) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -188,7 +199,6 @@ function PaginationBar({
       paddingHorizontal: 16,
       gap: 6,
     }}>
-      {/* Prev */}
       <TouchableOpacity
         onPress={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
@@ -211,7 +221,6 @@ function PaginationBar({
         <ChevronLeft size={16} color={currentPage === 1 ? '#CBD5E1' : '#475569'} />
       </TouchableOpacity>
 
-      {/* Page numbers */}
       {pages.map((page, i) =>
         page === '...' ? (
           <View key={`ellipsis-${i}`} style={{ width: 28, alignItems: 'center' }}>
@@ -249,7 +258,6 @@ function PaginationBar({
         )
       )}
 
-      {/* Next */}
       <TouchableOpacity
         onPress={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
@@ -278,49 +286,53 @@ function PaginationBar({
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function EventsScreen() {
   const router = useRouter();
-  const [query, setQuery]       = useState('');
-  const [focused, setFocused]   = useState(false);
+  const [query, setQuery]             = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [order, setOrder]             = useState<'asc' | 'desc'>('asc');
+  const [focused, setFocused]         = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const listRef  = useRef<FlatList>(null);
   const { t } = useTranslation();
 
-  const { data: events = [], isLoading, isError, error, refetch, isFetching } = useQuery<EventData[]>({
-    queryKey: ['events'],
-    queryFn:  async () => {
-      const res = await eventApiClient.get('/');
+  // Debounce the search text before it hits the query key / API call
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedQuery(query.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [query]);
+
+  // Reset to page 1 whenever search or order changes
+  useEffect(() => { setCurrentPage(1); }, [debouncedQuery, order]);
+
+  const { data, isLoading, isError, error, refetch, isFetching, isPlaceholderData } = useQuery<PaginatedEvents>({
+    queryKey: ['events', currentPage, debouncedQuery, order],
+    queryFn: async () => {
+      const res = await eventApiClient.get('/', {
+        params: {
+          page: currentPage,
+          size: PAGE_SIZE,
+          search: debouncedQuery || undefined,
+          order,
+        },
+      });
       return res.data;
     },
     staleTime: 1000 * 60 * 5,
     retry: 2,
+    placeholderData: keepPreviousData, // keeps old page visible while the next one loads
   });
 
-  const filtered = useMemo(
-    () => query
-      ? events.filter((e) =>
-          e.event_name.toLowerCase().includes(query.toLowerCase()) ||
-          e.location?.toLowerCase().includes(query.toLowerCase()))
-      : events,
-    [events, query],
-  );
-
-  // Reset to page 1 whenever the search query changes
-  useEffect(() => { setCurrentPage(1); }, [query]);
-
-  const usePagination = filtered.length >= PAGE_SIZE;
-  const totalPages    = usePagination ? Math.ceil(filtered.length / PAGE_SIZE) : 1;
-
-  const paginatedData = useMemo(
-    () => usePagination
-      ? filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-      : filtered,
-    [filtered, currentPage, usePagination],
-  );
+  const events     = data?.data ?? [];
+  const totalItems = data?.total ?? 0;
+  const totalPages = data?.pages ?? Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+  const usePagination = totalPages > 1;
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
+
+  const toggleOrder = () => setOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
 
   useEffect(() => {
     if (!isLoading) {
@@ -346,7 +358,7 @@ export default function EventsScreen() {
           </View>
           {!isLoading && !isError && (
             <View style={{ backgroundColor: THEME.primaryDark, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 }}>
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{filtered.length}</Text>
+              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{totalItems}</Text>
             </View>
           )}
           {isFetching && !isLoading && (
@@ -354,11 +366,11 @@ export default function EventsScreen() {
           )}
         </View>
 
-        {/* Search — only show when data loaded */}
+        {/* Search + sort toggle — only show when not in hard error state */}
         {!isError && (
-          <View className="px-4 pb-3">
+          <View className="px-4 pb-3 flex-row items-center gap-2">
             <View
-              className="flex-row items-center rounded-xl px-3 gap-2.5"
+              className="flex-1 flex-row items-center rounded-xl px-3 gap-2.5"
               style={{ backgroundColor: focused ? '#fff' : '#F8FAFC', borderWidth: 1.5, borderColor: focused ? THEME.primary : '#E2E8F0' }}
             >
               <Search size={15} color={focused ? THEME.primary : '#94A3B8'} />
@@ -377,10 +389,30 @@ export default function EventsScreen() {
                 </TouchableOpacity>
               )}
             </View>
+
+            {/* Sort toggle */}
+            <TouchableOpacity
+              onPress={toggleOrder}
+              accessibilityLabel={order === 'asc' ? 'Sort ascending by date' : 'Sort descending by date'}
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#F8FAFC',
+                borderWidth: 1.5,
+                borderColor: '#E2E8F0',
+              }}
+            >
+              {order === 'asc'
+                ? <ArrowUp size={16} color={THEME.primary} />
+                : <ArrowDown size={16} color={THEME.primary} />}
+            </TouchableOpacity>
           </View>
         )}
 
-        {/* Pagination summary pill — shown when pagination is active */}
+        {/* Pagination summary pill */}
         {!isLoading && !isError && usePagination && (
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingBottom: 10, gap: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F1F5F9', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 }}>
@@ -389,7 +421,7 @@ export default function EventsScreen() {
               </Text>
               <View style={{ width: 3, height: 3, borderRadius: 2, backgroundColor: '#CBD5E1' }} />
               <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '500' }}>
-                {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length} events
+                {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalItems)} of {totalItems} events
               </Text>
             </View>
           </View>
@@ -411,20 +443,20 @@ export default function EventsScreen() {
           fullScreen={false}
           secondaryAction={{ label: 'Go Back', onPress: () => router.back() }}
         />
-      ) : filtered.length === 0 ? (
+      ) : events.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 }}>
           <View style={{ width: 56, height: 56, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
             <CalendarDays size={24} color="#64748B" />
           </View>
           <View style={{ alignItems: 'center', gap: 4 }}>
             <Text style={{ color: '#0F172A', fontSize: 15, fontWeight: '600' }}>
-              {query ? t('viewAllEvents.noResults') : t('viewAllEvents.noEventsYet')}
+              {debouncedQuery ? t('viewAllEvents.noResults') : t('viewAllEvents.noEventsYet')}
             </Text>
             <Text style={{ color: '#64748B', fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
-              {query ? t('viewAllEvents.noResultsMessage', { query }) : t('viewAllEvents.noEventsMessage')}
+              {debouncedQuery ? t('viewAllEvents.noResultsMessage', { query: debouncedQuery }) : t('viewAllEvents.noEventsMessage')}
             </Text>
           </View>
-          {query ? (
+          {debouncedQuery ? (
             <TouchableOpacity onPress={() => setQuery('')} style={{ backgroundColor: THEME.primary, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 }}>
               <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>{t('viewAllEvents.clearSearch')}</Text>
             </TouchableOpacity>
@@ -433,10 +465,10 @@ export default function EventsScreen() {
       ) : (
         <FlatList
           ref={listRef}
-          data={paginatedData}
+          data={events}
           keyExtractor={(item) => String(item.id)}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 16 }}
+          contentContainerStyle={{ paddingTop: 16, paddingBottom: 16, opacity: isPlaceholderData ? 0.6 : 1 }}
           renderItem={({ item, index }) => (
             <EventRow
               event={item}
@@ -444,7 +476,6 @@ export default function EventsScreen() {
               onPress={() => router.push(`/event/${item.id}`)}
             />
           )}
-          
           ListFooterComponent={
             usePagination ? (
               <PaginationBar

@@ -280,8 +280,8 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   };
 
   // ── Confirm disabled when: map error | still syncing | user outside boundary ──
-  const isConfirmDisabled = mapError || syncingLocation || userOutsideBoundary;
- // const isConfirmDisabled = mapError || syncingLocation 
+ // const isConfirmDisabled = mapError || syncingLocation || userOutsideBoundary;
+  const isConfirmDisabled = mapError || syncingLocation 
   const isGpsDisabled = gettingGps || cooldownRemaining > 0;
   const pinColor = THEME.primary;
 
@@ -515,7 +515,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
             isConfirmDisabled && styles.confirmButtonDisabled,
           ]}
           activeOpacity={0.85}
-          disabled={isConfirmDisabled}
+          //disabled={isConfirmDisabled}
         >
           {syncingLocation
             ? <ActivityIndicator size="small" color="#ffffff" />

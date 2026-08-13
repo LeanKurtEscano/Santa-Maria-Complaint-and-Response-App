@@ -41,16 +41,26 @@ export default function HomeScreen() {
   const { isAuthenticated, userData, loading: authLoading } = useCurrentUser();
 
   // ── Queries ──────────────────────────────────────────────────────────────
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-    isRefetching,
-  } = useQuery<Announcement[]>({
-    queryKey: ['announcements'],
-    queryFn: async () => (await announcementApiClient.get('/')).data,
-  });
+const {
+  data: announcements = [],
+  isLoading,
+  isError,
+  refetch,
+  isRefetching,
+} = useQuery<Announcement[]>({
+  queryKey: ['announcements', 'recent'],
+  queryFn: async () => {
+    const res = await announcementApiClient.get('/', {
+      params: {
+        page: 1,
+        size: 5,
+        order: 'desc', // most recently created first
+      },
+    });
+    return res.data.data; // unwrap PaginatedResponse -> array
+  },
+  staleTime: 1000 * 60 * 5,
+});
 
   const {
     data: stats,
@@ -65,17 +75,26 @@ export default function HomeScreen() {
     enabled: !authLoading && isAuthenticated && !!userData,
   });
 
-  const {
-    data: events = [],
-    isLoading: isLoadingEvents,
-    isError: isErrorEvents,
-    refetch: refetchEvents,
-  } = useQuery<EventData[]>({
-    queryKey: ['events'],
-    queryFn: async () => (await eventApiClient.get('/')).data,
-    staleTime: 1000 * 60 * 5,
-    retry: 2,
-  });
+ const {
+  data: events = [],
+  isLoading: isLoadingEvents,
+  isError: isErrorEvents,
+  refetch: refetchEvents,
+} = useQuery<EventData[]>({
+  queryKey: ['events', 'upcoming'],
+  queryFn: async () => {
+    const res = await eventApiClient.get('/', {
+      params: {
+        page: 1,
+        size: 4,
+        order: 'asc', // soonest-upcoming first; use 'desc' if you want most-recently-added
+      },
+    });
+    return res.data.data; // <-- unwrap: backend returns { data, total, page, size, pages }
+  },
+  staleTime: 1000 * 60 * 5,
+  retry: 2,
+});
 
   // ── Derived states ────────────────────────────────────────────────────────
   const isAnyLoading = isLoading || isLoadingEvents || authLoading || (isAuthenticated && isLoadingStats);
@@ -224,7 +243,7 @@ export default function HomeScreen() {
             onAction={() => router.push('/announcements/all')}
           />
           <AnnouncementsList
-            data={data}
+            data={announcements}
             isLoading={false}
             isError={false}
             onRetry={refetch}

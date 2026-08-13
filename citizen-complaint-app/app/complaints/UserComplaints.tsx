@@ -13,12 +13,13 @@ import {
 } from "@/constants/complaint/complaint";
 import { THEME } from '@/constants/theme';
 import { Complaint } from "@/types/complaints/complaint";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
+  ArrowUpDown,
   Building2,
   CheckCircle2,
   ChevronLeft,
@@ -30,7 +31,7 @@ import {
   Search,
   XCircle,
 } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -45,7 +46,17 @@ import {
 
 import { useCurrentUser } from "@/store/useCurrentUserStore";
 import AuthGuard from "@/screen/general/AuthGuard";
+
 const PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 400;
+
+interface PaginatedComplaints {
+  data: Complaint[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
 
 // ─── Complaint Card ───────────────────────────────────────────────────────────
 
@@ -54,14 +65,11 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
  const { t } = useTranslation();
   const catKey = complaint.category?.category_name ?? "";
 
-  // Category label — catKey is already snake_case, just look it up directly
-  // If "other", fall back to getCategoryLabel (shows "Other")
   const isOther = catKey === "other";
   const catLabel = isOther
     ? getCategoryLabel(catKey, complaint.title)
     : t(`complaints.titles.${catKey}`, { defaultValue: getCategoryLabel(catKey, complaint.title) });
 
-  // Title key: "Road Damage / Pothole" → "road_damage"
   const titleKey = complaint.title
     ?.split("/")[0]
     .trim()
@@ -80,7 +88,6 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
       className="bg-white border border-gray-100 rounded-2xl p-4 mb-3 shadow-sm"
     >
       <View className="flex-row items-start gap-3">
-        {/* Icon */}
         <View
           className="w-11 h-11 rounded-xl items-center justify-center flex-shrink-0"
           style={{ backgroundColor: `${THEME.primary}15` }}
@@ -88,9 +95,7 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
           <CategoryIcon categoryKey={catKey} size={20} />
         </View>
 
-        {/* Content */}
         <View className="flex-1">
-          {/* Category + Status */}
           <View className="flex-row items-center justify-between mb-1 gap-2">
             <Text
               className="text-xs font-semibold uppercase tracking-wide flex-1"
@@ -106,19 +111,16 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
             />
           </View>
 
-          {/* Title */}
           <Text className="text-sm font-bold text-gray-900 mb-1" numberOfLines={1}>
              {translatedTitle}
           </Text>
 
-          {/* Description */}
           {complaint.description && (
             <Text className="text-xs text-gray-500 mb-2 leading-4" numberOfLines={2}>
               {complaint.description}
             </Text>
           )}
 
-          {/* Meta */}
           <View className="flex-row items-center gap-3 flex-wrap">
             {complaint.barangay && (
               <View className="flex-row items-center gap-1">
@@ -142,7 +144,6 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
             )}
           </View>
 
-          {/* ID */}
           <Text className="text-xs text-gray-300 mt-1.5">
             {t("complaints.card.id", { id: String(complaint.id).padStart(5, "0") })}
           </Text>
@@ -180,7 +181,6 @@ function PaginationBar({
   const startItem = (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems);
 
-  // Build page number buttons — show at most 5 around current
   const getPageNumbers = () => {
     const pages: (number | "...")[] = [];
     if (totalPages <= 5) {
@@ -213,7 +213,6 @@ function PaginationBar({
         elevation: 4,
       }}
     >
-      {/* Items range label */}
       <Text
         style={{
           textAlign: "center",
@@ -226,9 +225,7 @@ function PaginationBar({
           {t("complaints.pagination.showing", { start: startItem, end: endItem, total: totalItems })}
       </Text>
 
-      {/* Controls row */}
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
-        {/* Prev button */}
         <TouchableOpacity
           onPress={onPrev}
           disabled={currentPage === 1}
@@ -246,7 +243,6 @@ function PaginationBar({
           <ChevronLeft size={16} color={currentPage === 1 ? "#d1d5db" : THEME.primary} />
         </TouchableOpacity>
 
-        {/* Page number pills */}
         {getPageNumbers().map((p, idx) =>
           p === "..." ? (
             <Text
@@ -283,7 +279,6 @@ function PaginationBar({
           )
         )}
 
-        {/* Next button */}
         <TouchableOpacity
           onPress={onNext}
           disabled={currentPage === totalPages}
@@ -301,8 +296,6 @@ function PaginationBar({
           <ChevronRight size={16} color={currentPage === totalPages ? "#d1d5db" : THEME.primary} />
         </TouchableOpacity>
       </View>
-
-     
     </View>
   );
 }
@@ -347,19 +340,19 @@ function LoadingState() {
   );
 }
 
-// ─── Filter Modal ─────────────────────────────────────────────────────────────
+// ─── Filter Modal (single-select) ──────────────────────────────────────────────
 
 function FilterModal({
   visible,
   onClose,
-  selectedStatuses,
-  onToggleStatus,
+  selectedStatus,
+  onSelectStatus,
   onClear,
 }: {
   visible: boolean;
   onClose: () => void;
-  selectedStatuses: string[];
-  onToggleStatus: (status: string) => void;
+  selectedStatus: string | null;
+  onSelectStatus: (status: string) => void;
   onClear: () => void;
 }) {
   const { t } = useTranslation();
@@ -381,15 +374,15 @@ function FilterModal({
           </TouchableOpacity>
         </View>
 
-        {/* Filter Chips */}
+        {/* Filter Chips — single select, tapping the active one clears it */}
         <View className="flex-row flex-wrap gap-2 mb-6">
           {ALL_STATUSES.map((s) => {
             const cfg = getStatusConfig(s);
-            const active = selectedStatuses.includes(s);
+            const active = selectedStatus === s;
             return (
               <TouchableOpacity
                 key={s}
-                onPress={() => onToggleStatus(s)}
+                onPress={() => onSelectStatus(s)}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
@@ -447,18 +440,42 @@ export default function UserComplaints() {
   const {userData, isAuthenticated} = useCurrentUser();
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [filterVisible, setFilterVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  
-  const { data, isPending, error, refetch } = useQuery<Complaint[]>({
-    queryKey: ["my-complaints"],
+
+  // Debounce search text before it hits the query key / API call
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [search]);
+
+  // Reset to page 1 whenever search, status, or order changes
+  useEffect(() => { setCurrentPage(1); }, [debouncedSearch, selectedStatus, order]);
+
+  const { data, isPending, error, refetch, isPlaceholderData } = useQuery<PaginatedComplaints>({
+    queryKey: ["my-complaints", currentPage, debouncedSearch, selectedStatus, order],
     queryFn: async () => {
-      const response = await complaintApiClient.get("/my-complaints");
+      const response = await complaintApiClient.get("/my-complaints", {
+        params: {
+          page: currentPage,
+          size: PAGE_SIZE,
+          search: debouncedSearch || undefined,
+          complaint_status: selectedStatus || undefined,
+          order,
+        },
+      });
       return response.data;
     },
     enabled: isAuthenticated, // Only fetch if authenticated
+    placeholderData: keepPreviousData,
   });
+
+  const complaints = data?.data ?? [];
+  const totalItems = data?.total ?? 0;
+  const totalPages = data?.pages ?? Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -466,43 +483,18 @@ export default function UserComplaints() {
     setRefreshing(false);
   };
 
-  const toggleStatus = (s: string) => {
-    setSelectedStatuses((prev) =>
-      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
-    );
-    // Reset to page 1 when filter changes
-    setCurrentPage(1);
+  // Tapping the already-active status clears the filter; otherwise selects it
+  const selectStatus = (s: string) => {
+    setSelectedStatus((prev) => (prev === s ? null : s));
   };
 
-  // Reset page on search change
   const handleSearchChange = (text: string) => {
     setSearch(text);
-    setCurrentPage(1);
   };
 
-  const filtered = useMemo(() => {
-    if (!data) return [];
-    return data.filter((c) => {
-      const matchSearch =
-        !search ||
-        c.title.toLowerCase().includes(search.toLowerCase()) ||
-        c.description?.toLowerCase().includes(search.toLowerCase()) ||
-        c.category?.category_name.toLowerCase().includes(search.toLowerCase());
-      const matchStatus =
-        selectedStatuses.length === 0 ||
-        selectedStatuses.includes(c.status?.toLowerCase() ?? "");
-      return matchSearch && matchStatus;
-    });
-  }, [data, search, selectedStatuses]);
+  const toggleOrder = () => setOrder((prev) => (prev === "asc" ? "desc" : "asc"));
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-
-  const paginated = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, currentPage]);
-
-  const activeFilterCount = selectedStatuses.length;
+  const activeFilterCount = selectedStatus ? 1 : 0;
   const isFiltered = search.length > 0 || activeFilterCount > 0;
 
   const goToPrev = () => setCurrentPage((p) => Math.max(1, p - 1));
@@ -563,21 +555,31 @@ export default function UserComplaints() {
           </Text>
         </View>
 
-        {/* Search */}
-        <View className="flex-row items-center bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100 mb-3">
-          <Search size={16} color="#9ca3af" />
-          <TextInput
-            className="flex-1 ml-2 text-sm text-gray-800"
-            placeholder={t("complaints.search.placeholder")}
-            placeholderTextColor="#9ca3af"
-            value={search}
-            onChangeText={handleSearchChange}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => handleSearchChange("")}>
-              <XCircle size={16} color="#9ca3af" />
-            </TouchableOpacity>
-          )}
+        {/* Search + Sort toggle */}
+        <View className="flex-row items-center gap-2 mb-3">
+          <View className="flex-1 flex-row items-center bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+            <Search size={16} color="#9ca3af" />
+            <TextInput
+              className="flex-1 ml-2 text-sm text-gray-800"
+              placeholder={t("complaints.search.placeholder")}
+              placeholderTextColor="#9ca3af"
+              value={search}
+              onChangeText={handleSearchChange}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => handleSearchChange("")}>
+                <XCircle size={16} color="#9ca3af" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <TouchableOpacity
+            onPress={toggleOrder}
+            accessibilityLabel={order === "asc" ? "Sort oldest first" : "Sort newest first"}
+            className="w-11 h-11 rounded-xl items-center justify-center border border-gray-100 bg-gray-50"
+          >
+            <ArrowUpDown size={16} color={THEME.primary} />
+          </TouchableOpacity>
         </View>
 
         {/* Filter Row */}
@@ -599,27 +601,19 @@ export default function UserComplaints() {
             </Text>
           </TouchableOpacity>
 
-          {data && (
-            <Text className="text-xs text-gray-400">
-              {t(
-                data.length !== 1
-                  ? "complaints.count_plural"
-                  : "complaints.count",
-                { filtered: filtered.length, total: data.length }
-              )}
-            </Text>
-          )}
+          <Text className="text-xs text-gray-400">
+            {t("complaints.count_plural", { filtered: totalItems, total: totalItems })}
+          </Text>
         </View>
 
-        {/* Active Filter Pills */}
-        {selectedStatuses.length > 0 && (
+        {/* Active Filter Pill */}
+        {selectedStatus && (
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-            {selectedStatuses.map((s) => {
-              const cfg = getStatusConfig(s);
+            {(() => {
+              const cfg = getStatusConfig(selectedStatus);
               return (
                 <TouchableOpacity
-                  key={s}
-                  onPress={() => toggleStatus(s)}
+                  onPress={() => setSelectedStatus(null)}
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
@@ -647,7 +641,7 @@ export default function UserComplaints() {
                   <XCircle size={10} color={cfg.dot} />
                 </TouchableOpacity>
               );
-            })}
+            })()}
           </View>
         )}
       </View>
@@ -657,9 +651,9 @@ export default function UserComplaints() {
         <LoadingState />
       ) : (
         <FlatList
-          data={paginated}
+          data={complaints}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={{ padding: 16, paddingBottom: 16 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 16, opacity: isPlaceholderData ? 0.6 : 1 }}
           showsVerticalScrollIndicator={false}
           onRefresh={handleRefresh}
           refreshing={refreshing}
@@ -673,12 +667,12 @@ export default function UserComplaints() {
         />
       )}
 
-      {/* Pagination — only rendered when there are 10+ complaints */}
-      {!isPending && filtered.length >= PAGE_SIZE && (
+      {/* Pagination */}
+      {!isPending && totalPages > 1 && (
         <PaginationBar
           currentPage={currentPage}
           totalPages={totalPages}
-          totalItems={filtered.length}
+          totalItems={totalItems}
           pageSize={PAGE_SIZE}
           onPrev={goToPrev}
           onNext={goToNext}
@@ -690,11 +684,10 @@ export default function UserComplaints() {
       <FilterModal
         visible={filterVisible}
         onClose={() => setFilterVisible(false)}
-        selectedStatuses={selectedStatuses}
-        onToggleStatus={toggleStatus}
+        selectedStatus={selectedStatus}
+        onSelectStatus={selectStatus}
         onClear={() => {
-          setSelectedStatuses([]);
-          setCurrentPage(1);
+          setSelectedStatus(null);
         }}
       />
     </View>

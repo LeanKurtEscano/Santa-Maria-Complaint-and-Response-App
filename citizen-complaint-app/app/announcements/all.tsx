@@ -2,48 +2,64 @@ import {
   View, Text, TextInput, FlatList, TouchableOpacity,
   ActivityIndicator, RefreshControl, Image
 } from 'react-native'
-import React, { useState, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Announcement } from '@/types/general/home'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { announcementApiClient } from '@/lib/client/announcement'
 import { THEME } from '@/constants/theme'
 import { useTranslation } from 'react-i18next'
 import { uploaderLabel } from '@/utils/home/home'
 import { router } from 'expo-router'
+
 const PAGE_SIZE = 10
+const SEARCH_DEBOUNCE_MS = 400
+
+interface PaginatedAnnouncements {
+  data: Announcement[]
+  total: number
+  page: number
+  size: number
+  pages: number
+}
 
 const all = () => {
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(1)
 
-  const { data, isLoading, isError, refetch, isRefetching } = useQuery<Announcement[]>({
-    queryKey: ['announcements'],
-    queryFn: async () => (await announcementApiClient.get('/')).data,
+  // Debounce the search text before it hits the query key / API call
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(handle)
+  }, [search])
+
+  // Reset to page 1 whenever search or order changes
+  useEffect(() => { setPage(1) }, [debouncedSearch, order])
+
+  const { data, isLoading, isError, refetch, isRefetching, isPlaceholderData } = useQuery<PaginatedAnnouncements>({
+    queryKey: ['announcements', page, debouncedSearch, order],
+    queryFn: async () => (await announcementApiClient.get('/', {
+      params: {
+        page,
+        size: PAGE_SIZE,
+        search: debouncedSearch || undefined,
+        order,
+      },
+    })).data,
+    placeholderData: keepPreviousData,
   })
 
-  const filtered = useMemo(() => {
-    if (!data) return []
-    const q = search.toLowerCase()
-    return data.filter(
-      (a) =>
-        a.title.toLowerCase().includes(q) ||
-        a.content.toLowerCase().includes(q)
-    )
-  }, [data, search])
-
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const announcements = data?.data ?? []
+  const totalItems = data?.total ?? 0
+  const totalPages = data?.pages ?? Math.max(1, Math.ceil(totalItems / PAGE_SIZE))
 
   const handleSearch = (text: string) => {
     setSearch(text)
-    setPage(1)
   }
 
-  const getUploaderName = (uploader: Announcement['uploader']) => {
-    const full = `${uploader?.first_name ?? ''} ${uploader?.last_name ?? ''}`.trim()
-    return full || t('announcements.unknown')
-  }
+  const toggleOrder = () => setOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -125,43 +141,62 @@ const all = () => {
           {t('announcements.title')}
         </Text>
         <Text style={{ color: THEME.primaryLight, fontSize: 13, marginTop: 2 }}>
-          {filtered.length} {t('announcements.count')}
+          {totalItems} {t('announcements.count')}
         </Text>
 
 
-        {/* Search Bar */}
-        <View style={{
-          marginTop: 16,
-          flexDirection: 'row',
-          alignItems: 'center',
-          backgroundColor: 'rgba(255,255,255,0.15)',
-          borderRadius: 10,
-          paddingHorizontal: 12,
-          paddingVertical: 2,
-          borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.25)',
-        }}>
-          <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
-          <TextInput
-            value={search}
-            onChangeText={handleSearch}
-            placeholder={t('announcements.search_placeholder')}
-            placeholderTextColor="rgba(255,255,255,0.6)"
-            style={{ flex: 1, color: '#fff', fontSize: 14, paddingVertical: 10 }}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => handleSearch('')}>
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 18, paddingLeft: 8 }}>✕</Text>
-            </TouchableOpacity>
-          )}
+        {/* Search Bar + Sort toggle */}
+        <View style={{ marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 2,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.25)',
+          }}>
+            <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
+            <TextInput
+              value={search}
+              onChangeText={handleSearch}
+              placeholder={t('announcements.search_placeholder')}
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              style={{ flex: 1, color: '#fff', fontSize: 14, paddingVertical: 10 }}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => handleSearch('')}>
+                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 18, paddingLeft: 8 }}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <TouchableOpacity
+            onPress={toggleOrder}
+            accessibilityLabel={order === 'asc' ? 'Sort oldest first' : 'Sort newest first'}
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 10,
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.25)',
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 16 }}>{order === 'asc' ? '↑' : '↓'}</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
       {/* Announcement List */}
       <FlatList
-        data={paginated}
+        data={announcements}
         keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32, opacity: isPlaceholderData ? 0.6 : 1 }}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
