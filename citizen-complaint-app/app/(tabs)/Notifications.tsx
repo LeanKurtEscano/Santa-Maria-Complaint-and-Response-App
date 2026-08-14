@@ -3,9 +3,8 @@ import { getAccessToken } from "@/utils/general/token";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { Notification } from "@/types/general/notification";
 import { TYPE_CONFIG } from "@/constants/general/notification";
-import { useEffect, useRef, useCallback, useState } from "react";
-import { SSEStatus } from "@/types/general/notification";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import {
   View,
   Text,
@@ -19,14 +18,13 @@ import {
 import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import EventSource from "react-native-sse";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { formatTime } from "@/utils/date/date";
-import { refreshAccessToken } from "@/utils/general/token";
 import { THEME } from "@/constants/theme";
 import AuthGuard from "@/screen/general/AuthGuard";
 import { useCurrentUser } from "@/store/useCurrentUserStore";
+import { useSSEStore } from "@/store/useSSEStore";
 
 // ─── Notification Card ────────────────────────────────────────────────────────
 
@@ -180,6 +178,7 @@ const NotificationCard = React.memo(({
     </Animated.View>
   );
 });
+
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
 const EmptyState = () => {
@@ -202,6 +201,24 @@ const EmptyState = () => {
   );
 };
 
+// ─── Pagination config ──────────────────────────────────────────────────────
+
+const PAGE_SIZE = 20;
+
+interface PaginationMeta {
+  page: number;
+  page_size: number;
+  total_items: number;
+  total_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
+}
+
+interface NotificationsPage {
+  data: Notification[];
+  pagination: PaginationMeta;
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 const Notifications = () => {
@@ -211,48 +228,60 @@ const Notifications = () => {
   const LOG_TAG = "[Notifications]";
   const { setNotifications, markAsRead, markAllAsRead, unreadCount } =
     useNotificationStore();
-  const {isAuthenticated} = useCurrentUser();
+  const { isAuthenticated } = useCurrentUser();
 
   const [markingAll, setMarkingAll] = useState(false);
-  const [sseStatus, setSseStatus] = useState<SSEStatus>("connecting");
   const [newIds, setNewIds] = useState<Set<number>>(new Set());
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const prevIdsRef = useRef<Set<number>>(new Set());
-  const eventSourceRef = useRef<any>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  // SSE connection itself lives in the root layout for the whole app
+  // lifetime — this screen just reads status for the pulse indicator.
+  const sseStatus = useSSEStore((s) => s.status);
 
-   if(!isAuthenticated) {
-      return <AuthGuard />;
-    }
+  // ── Fetch (paginated) ───────────────────────────────────────────────────
 
-  // ── Fetch ────────────────────────────────────────────────────────────────
-
-  const fetchNotificationsApi = async (): Promise<Notification[]> => {
-    console.log(`${LOG_TAG} fetchNotificationsApi() — calling GET /`);
-    const res = await notificationApiClient.get("/");
+  const fetchNotificationsPage = async ({
+    pageParam = 1,
+  }: {
+    pageParam?: number;
+  }): Promise<NotificationsPage> => {
     console.log(
-      `${LOG_TAG} fetchNotificationsApi() — received ${res.data?.length ?? 0} notifications`
+      `${LOG_TAG} fetchNotificationsPage() — calling GET / page=${pageParam} size=${PAGE_SIZE}`
+    );
+    const res = await notificationApiClient.get("/", {
+      params: { page: pageParam, page_size: PAGE_SIZE },
+    });
+    console.log(
+      `${LOG_TAG} fetchNotificationsPage() — received ${res.data?.data?.length ?? 0} of ${res.data?.pagination?.total_items ?? 0} (page ${res.data?.pagination?.page}/${res.data?.pagination?.total_pages})`
     );
     return res.data;
   };
 
   const {
-    data: notifications = [],
+    data,
     isLoading,
     refetch,
-  } = useQuery({
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["notifications"],
-    queryFn: fetchNotificationsApi,
+    queryFn: fetchNotificationsPage,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.has_next ? lastPage.pagination.page + 1 : undefined,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
     staleTime: 10_000,
     placeholderData: (prev) => prev,
-    notifyOnChangeProps: ["data", "error"],
   });
 
-
-  console.log(notifications)
+  const notifications = useMemo(
+    () => data?.pages.flatMap((p) => p.data) ?? [],
+    [data]
+  );
 
   // ── Sync query data → zustand store + detect new IDs for animation ───────
 
@@ -307,93 +336,6 @@ const Notifications = () => {
     return () => pulse.stop();
   }, [sseStatus]);
 
-  // ── SSE ──────────────────────────────────────────────────────────────────
-
-  const connectSSE = useCallback(async () => {
-    console.log(`${LOG_TAG} connectSSE() — initializing`);
-    setSseStatus("connecting");
-
-    if (eventSourceRef.current) {
-      console.log(`${LOG_TAG} connectSSE() — closing previous connection`);
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-
-    const token = await getAccessToken();
-    if (!token) {
-      console.warn(`${LOG_TAG} connectSSE() — no token, aborting`);
-      setSseStatus("disconnected");
-      return;
-    }
-    console.log(`${LOG_TAG} connectSSE() — token retrieved ✓`);
-
-    const baseURL = `${process.env.EXPO_PUBLIC_IP_URL}/api/v1/notifications`;
-    const url = `${baseURL}/stream`;
-    console.log(`${LOG_TAG} connectSSE() — connecting to: ${url}`);
-
-    const es = new EventSource(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const handleEvent = (eventType: string) => () => {
-      console.log(
-        `${LOG_TAG} SSE event="${eventType}" received — invalidating query`
-      );
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-    };
-
-    es.addEventListener("info", handleEvent("info"));
-    es.addEventListener("update", handleEvent("update"));
-    es.addEventListener("success", handleEvent("success"));
-    es.addEventListener("message", handleEvent("message"));
-    es.addEventListener("complaint_resolved", handleEvent("complaint_resolved"));
-    es.addEventListener("complaint_under_review", handleEvent("complaint_under_review"));
-    es.addEventListener("complaint_update", handleEvent("complaint_update"));
-    es.addEventListener("existing_incident", handleEvent("existing_incident"));
-
-    es.onopen = () => {
-      
-      console.log(`${LOG_TAG} connectSSE() — connection opened ✓`);
-      setSseStatus("connected");
-    };
-
-    es.onerror = async (err: any) => {
-
-   console.log(`${LOG_TAG} raw SSE error:`, JSON.stringify(err), err);
-  setSseStatus("disconnected");
-  es.close();
-  eventSourceRef.current = null;
-
-  // react-native-sse surfaces 401 inconsistently — always try a refresh first
-  const newToken = await refreshAccessToken();
-
-  if (!newToken) {
-    console.warn(`${LOG_TAG} Refresh failed — forcing logout`);
-    const { useCurrentUser } = await import('@/store/useCurrentUserStore');
-    useCurrentUser.getState().clearUser();
-    return;
-  }
-
-  console.log(`${LOG_TAG} Token refreshed ✓ — reconnecting SSE`);
-  setTimeout(connectSSE, 500);
-};
-
-    eventSourceRef.current = es;
-    console.log(`${LOG_TAG} connectSSE() — registered ✓`);
-  }, [queryClient]);
-
-  useEffect(() => {
-    console.log(`${LOG_TAG} mount`);
-    connectSSE();
-    return () => {
-      console.log(`${LOG_TAG} unmount — closing SSE`);
-      eventSourceRef.current?.close();
-      eventSourceRef.current = null;
-    };
-  }, [connectSSE]);
-
   // ── Mark single as read ──────────────────────────────────────────────────
 
   const handleMarkRead = useCallback(async (id: number) => {
@@ -404,7 +346,6 @@ const Notifications = () => {
       console.log(`${LOG_TAG} handleMarkRead() — API success for id=${id}`);
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     } catch (err) {
-    
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     }
   }, [markAsRead, queryClient]);
@@ -424,7 +365,6 @@ const Notifications = () => {
       console.log(`${LOG_TAG} handleMarkAllRead() — API success`);
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     } catch (err) {
-     
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     } finally {
       setMarkingAll(false);
@@ -443,6 +383,15 @@ const Notifications = () => {
     }
   }, [refetch]);
 
+  // ── Load next page (infinite scroll) ──────────────────────────────────────
+
+  const onEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      console.log(`${LOG_TAG} onEndReached() — fetching next page`);
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
   // ── Render item ──────────────────────────────────────────────────────────
 
   const renderItem = useCallback(({ item }: { item: Notification }) => (
@@ -452,6 +401,12 @@ const Notifications = () => {
       isNew={newIds.has(item.id)}
     />
   ), [handleMarkRead, newIds]);
+
+  // ── Guard (must come AFTER all hooks above, so hook order stays stable) ──
+
+  if (!isAuthenticated) {
+    return <AuthGuard />;
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -465,10 +420,6 @@ const Notifications = () => {
               Notifications
             </Text>
           </View>
-
-          {/* ── DEBUG: SSE Status Indicator (remove before deploy) ── */}
-
-{/* ── END DEBUG ── */}
 
           <View className="flex-row items-center gap-2.5">
             {unreadCount > 0 && (
@@ -529,6 +480,15 @@ const Notifications = () => {
           keyExtractor={(item) => String(item.id)}
           renderItem={renderItem}
           ListEmptyComponent={<EmptyState />}
+          onEndReachedThreshold={0.4}
+          onEndReached={onEndReached}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View className="py-4">
+                <ActivityIndicator size="small" color={THEME.primary} />
+              </View>
+            ) : null
+          }
           contentContainerStyle={[
             { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 },
             notifications.length === 0 && { flex: 1 },

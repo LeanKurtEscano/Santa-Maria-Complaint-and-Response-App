@@ -3,6 +3,7 @@ import "../global.css";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, AppState, View } from "react-native";
 import { useCurrentUser } from "@/store/useCurrentUserStore";
+import { useSSEStore } from "@/store/useSSEStore";
 import { QueryClientProvider } from '@tanstack/react-query';
 import "../lib/localization/i18n";
 import queryClient from "@/lib/api/queryClient";
@@ -24,7 +25,9 @@ Notifications.setNotificationHandler({
 });
 
 function RootLayoutNav() {
-  const { userData, loading, checkAuthStatus } = useCurrentUser();
+  const { userData, loading, checkAuthStatus, isAuthenticated } = useCurrentUser();
+  const connectSSE = useSSEStore((s) => s.connect);
+  const disconnectSSE = useSSEStore((s) => s.disconnect);
   const segments = useSegments();
   const router = useRouter();
   const [initError, setInitError] = useState<any>(null);
@@ -67,6 +70,41 @@ function RootLayoutNav() {
         if (!isAuthenticated || !userData) return; // 👈 guard
         console.log("🔄 App active → syncing push token");
         useCurrentUser.getState().syncPushToken();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  // ✅ 🔥 FIX 2: GLOBAL SSE CONNECTION — connect once auth is known, for the
+  // whole app lifetime, instead of only while the Notifications screen is
+  // mounted. Disconnects cleanly on logout so we don't leak a stream tied
+  // to a stale token/user.
+  useEffect(() => {
+    if (isAuthenticated && userData) {
+      console.log("🔌 Auth ready → connecting SSE");
+      connectSSE();
+    } else {
+      disconnectSSE();
+    }
+  }, [isAuthenticated, userData?.id]);
+
+  // Reconnect SSE whenever the app returns to foreground — mobile OSes
+  // suspend the underlying socket while backgrounded, so onerror alone
+  // won't fire to trigger a reconnect on its own.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        const { userData, isAuthenticated } = useCurrentUser.getState();
+        if (!isAuthenticated || !userData) return;
+
+        const status = useSSEStore.getState().status;
+        if (status !== "connected") {
+          console.log(`🔄 App active → reconnecting SSE (status was ${status})`);
+          connectSSE();
+        }
       }
     });
 
