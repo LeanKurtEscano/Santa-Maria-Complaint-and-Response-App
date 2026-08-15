@@ -1,7 +1,7 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import "../global.css";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, AppState, View } from "react-native";
+import { ActivityIndicator, AppState, Platform, View } from "react-native";
 import { useCurrentUser } from "@/store/useCurrentUserStore";
 import { useSSEStore } from "@/store/useSSEStore";
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -13,6 +13,8 @@ import * as Notifications from "expo-notifications"; // 👈 add import
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ClerkProvider } from "@clerk/expo";
 import * as SecureStore from 'expo-secure-store';
+import { useNotificationSync } from "@/hooks/general/useNotificationSync";
+
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -24,8 +26,19 @@ Notifications.setNotificationHandler({
   }),
 });
 
+if (Platform.OS === "android") {
+  Notifications.setNotificationChannelAsync("default", {
+    name: "default",
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: "#346739", // matches your app theme color
+    sound: "default",
+  });
+}
+
 function RootLayoutNav() {
   const { userData, loading, checkAuthStatus, isAuthenticated } = useCurrentUser();
+  useNotificationSync();
   const connectSSE = useSSEStore((s) => s.connect);
   const disconnectSSE = useSSEStore((s) => s.disconnect);
   const segments = useSegments();
@@ -47,22 +60,22 @@ function RootLayoutNav() {
     clearTokens(); */}
   }, []);
 
-  // ✅ 🔥 FIX 1: LISTEN FOR NOTIFICATIONS
-  useEffect(() => {
-    const receivedSub = Notifications.addNotificationReceivedListener(notification => {
-      console.log("📩 Notification received:", notification);
-    });
+useEffect(() => {
+  const receivedSub = Notifications.addNotificationReceivedListener(notification => {
+    console.log("📩 Notification received:", notification);
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  });
 
-    const responseSub = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log("👉 Notification clicked:", response);
-    });
+  const responseSub = Notifications.addNotificationResponseReceivedListener(response => {
+    console.log("👉 Notification clicked:", response);
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  });
 
-    return () => {
-      receivedSub.remove();
-      responseSub.remove();
-    };
-  }, []);
-
+  return () => {
+    receivedSub.remove();
+    responseSub.remove();
+  };
+}, []);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") {

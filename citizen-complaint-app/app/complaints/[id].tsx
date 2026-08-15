@@ -1749,7 +1749,6 @@ export default function ComplaintDetail() {
     enabled: !!id,
   });
 
-console.log("Complaint Detail Data:", data);
 
   if (error) {
     const appError = handleApiError(
