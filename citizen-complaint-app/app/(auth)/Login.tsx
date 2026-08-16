@@ -74,8 +74,8 @@ export default function LoginScreen({ navigation }: any) {
             await useCurrentUser.getState().syncPushToken();
 
             // small delay ensures backend receives token
-            await new Promise(res => setTimeout(res, 300));
-            router.replace('/(tabs)');
+           // await new Promise(res => setTimeout(res, 300));
+           // router.replace('/(tabs)');
         },
     });
 
@@ -144,8 +144,8 @@ export default function LoginScreen({ navigation }: any) {
 
             await fetchCurrentUser();
             await useCurrentUser.getState().syncPushToken();
-            await new Promise(res => setTimeout(res, 300));
-            router.replace('/(tabs)');
+            //await new Promise(res => setTimeout(res, 300));
+           // router.replace('/(tabs)');
         } catch (error: any) {
             console.log('Google login error:', error);
             setErrors({ general: t('loginFailed') });
