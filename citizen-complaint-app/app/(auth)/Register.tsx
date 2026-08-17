@@ -115,19 +115,23 @@ export default function RegisterScreen() {
    * Step3's processAndStoreImage). We store them as-is — NO re-conversion.
    * Re-converting would call fetch() on a data: URI which fails on Android.
    */
-  const storeRegistrationData = async (data: RegistrationFormData) => {
+ const storeRegistrationData = async (data: RegistrationFormData) => {
+  try {
     await AsyncStorage.setItem(
       'registrationData',
       JSON.stringify({
         ...data,
         age,
-        // Images are already base64 data URIs — stored directly
         idFrontImage: data.idFrontImage || null,
         idBackImage: data.idBackImage || null,
         selfieImage: data.selfieImage || null,
       }),
     );
-  };
+  } catch (error) {
+    console.error('Failed to store registration data:', error);
+    throw new Error('STORAGE_FULL');
+  }
+};
 
   const clearSavedFormData = async () => {
     try {
@@ -244,6 +248,14 @@ export default function RegisterScreen() {
         },
       });
     } catch (error: any) {
+
+      console.error('Registration error:', error);
+
+      if (error?.message === 'STORAGE_FULL') {
+    setNetworkError(
+      'Unable to save your registration data on this device. Please try retaking your ID photos or restart the app.',
+    );
+  } 
       if (error?.response?.status === 400) {
         const detail = error?.response?.data?.detail || '';
         if (detail.toLowerCase().includes('phone')) {

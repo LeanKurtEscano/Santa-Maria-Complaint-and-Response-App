@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import * as ImageManipulator from 'expo-image-manipulator';
 import {
   View,
   Text,
@@ -78,6 +79,15 @@ const toBase64DataUri = (uri: string): Promise<string> => {
   });
 };
 
+const resizeImage = async (uri: string): Promise<string> => {
+  const result = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: 1280 } }], // height auto-scales to preserve aspect ratio
+    { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG },
+  );
+  return result.uri;
+};
+
 /**
  * Shows a human-readable label for the image field value.
  * base64 URIs are replaced with a friendly name.
@@ -134,23 +144,27 @@ const Step3IdVerification = ({
   };
 
   const processAndStoreImage = async (
-    uri: string,
-    field: 'idFrontImage' | 'idBackImage' | 'selfieImage',
-  ) => {
-    setImageLoading(true);
-    try {
-      // Convert to base64 immediately so the value is stable on Android even
-      // after the picker closes, the app is backgrounded, or at submit time.
-      const base64Uri = await toBase64DataUri(uri);
-      setValue(field, base64Uri as any);
-      clearErrors(field);
-      await saveFormData();
-    } catch {
-      setError(field, { type: 'manual', message: 'Failed to process image. Please try again.' });
-    } finally {
-      setImageLoading(false);
-    }
-  };
+  uri: string,
+  field: 'idFrontImage' | 'idBackImage' | 'selfieImage',
+) => {
+  setImageLoading(true);
+  try {
+    // Resize FIRST — shrinking a huge base64 string after the fact doesn't
+    // help; we need the smaller file before it's ever encoded.
+    const resizedUri = await resizeImage(uri);
+
+    // Convert to base64 immediately so the value is stable on Android even
+    // after the picker closes, the app is backgrounded, or at submit time.
+    const base64Uri = await toBase64DataUri(resizedUri);
+    setValue(field, base64Uri as any);
+    clearErrors(field);
+    await saveFormData();
+  } catch {
+    setError(field, { type: 'manual', message: 'Failed to process image. Please try again.' });
+  } finally {
+    setImageLoading(false);
+  }
+};
 
   const pickFromCamera = async () => {
     if (!currentImageField) return;

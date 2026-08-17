@@ -511,10 +511,17 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     }
   };
 
-  const handleBack = () => {
-    if (navigation) navigation.goBack();
-    else router.back();
-  };
+const handleBack = async () => {
+  if (!isResetPassword) {
+    try {
+      await AsyncStorage.removeItem('registrationData');
+    } catch {
+      // best-effort cleanup, don't block navigation on it
+    }
+  }
+  if (navigation) navigation.goBack();
+  else router.back();
+};
 
   // ── Masking helpers ─────────────────────────────────────────────────────
   const maskEmail = (email: string) => {

@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import {
   CreditCard,
   Camera,
@@ -44,36 +45,79 @@ type ImageField = 'idFrontImage' | 'idBackImage' | 'selfieImage';
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Converts any image URI to a stable base64 data URI immediately after pick.
+ * Resizes an image to a max width and compresses it, then returns a base64
+ * data URI.
  *
- * WHY: On newer Android, image picker returns content:// or short-lived file://
- * URIs that expire once the picker closes or the app is backgrounded, and RN's
- * networking layer does not reliably stream content:// uris into a multipart
- * body — the field arrives empty/undefined server-side even though picking
- * "succeeded" locally. Converting to base64 right away sidesteps that entirely
- * (same approach used in the register flow, which works on both platforms).
+ * WHY RESIZE: `quality` in the camera/library picker is a *relative* JPEG
+ * compression setting, not a fixed output size cap. High-res sensors
+ * (common on newer Android phones, and some iPhones) can still produce
+ * base64 payloads well over typical backend multipart limits (e.g. 1024KB)
+ * even at quality: 0.7, since base64 also inflates raw bytes by ~33%.
+ * Capping the longest dimension to 1280px gives a predictable upper bound
+ * on payload size regardless of the source camera's resolution — this is
+ * more than enough detail for ID/selfie verification (human review or OCR).
  *
- * NOTE: We use XMLHttpRequest instead of fetch() because fetch() of a
- * content:// URI is unreliable on Android's JS engine.
+ * WHY NOT XHR/content:// READ DIRECTLY: expo-image-manipulator handles
+ * reading content:// and file:// URIs internally and returns a clean
+ * base64 string, so we no longer need the XMLHttpRequest + FileReader
+ * workaround that was used purely to sidestep unreliable content:// fetch()
+ * behavior on Android.
  */
-const toBase64DataUri = (uri: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    if (!uri) return reject(new Error('No URI provided'));
-    // Already base64 — nothing to do.
-    if (uri.startsWith('data:')) return resolve(uri);
+const resizeAndEncode = async (uri: string): Promise<string> => {
+  if (!uri) throw new Error('No URI provided');
 
-    const xhr = new XMLHttpRequest();
-    xhr.onload = () => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('FileReader failed'));
-      reader.readAsDataURL(xhr.response);
-    };
-    xhr.onerror = () => reject(new Error('XHR failed'));
-    xhr.open('GET', uri);
-    xhr.responseType = 'blob';
-    xhr.send();
-  });
+  const manipulated = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: 1280 } }], // longest side capped; height auto-scales
+    {
+      compress: 0.6,
+      format: ImageManipulator.SaveFormat.JPEG,
+      base64: true,
+    }
+  );
+
+  if (!manipulated.base64) {
+    throw new Error('Failed to encode image');
+  }
+
+  return `data:image/jpeg;base64,${manipulated.base64}`;
+};
+
+/**
+ * Translates raw backend/network error strings into plain-language messages
+ * a non-technical user can act on. Falls back to a generic message rather
+ * than showing raw server text (stack-trace-y strings like "Part exceeded
+ * maximum size of 1024KB." or "Internal Server Error" are meaningless to
+ * users and look broken/unpolished).
+ */
+const getFriendlySubmitError = (
+  rawMessage: string | undefined,
+  status: number | undefined,
+  t: (k: string) => string
+): string => {
+  const text = (rawMessage ?? '').toLowerCase();
+
+  if (text.includes('exceeded maximum size') || text.includes('too large') || text.includes('payload too large')) {
+    return t('googleIdVerification.errors.imageTooLarge');
+  }
+  if (text.includes('network') || text.includes('timeout') || status === undefined) {
+    return t('googleIdVerification.errors.networkError');
+  }
+  if (status === 401 || status === 403) {
+    return t('googleIdVerification.errors.sessionExpired');
+  }
+  if (status !== undefined && status >= 500) {
+    return t('googleIdVerification.errors.serverError');
+  }
+  if (text.includes('already') && (text.includes('verified') || text.includes('exists'))) {
+    return t('googleIdVerification.errors.alreadyVerified');
+  }
+  if (text.includes('invalid') && text.includes('id')) {
+    return t('googleIdVerification.errors.invalidIdDetails');
+  }
+
+  // Fall back to the generic message rather than showing raw backend text.
+  return t('googleIdVerification.errors.submitFailed');
 };
 
 const getDisplayLabel = (value: string, fieldName: ImageField, t: (k: string) => string): string => {
@@ -100,7 +144,7 @@ export default function GoogleIdVerificationScreen() {
   const [idTypeError, setIdTypeError] = useState<string | undefined>();
 
   // Base64 data URIs (data:image/...;base64,...) used for both preview and upload —
-  // same shape as the register flow.
+  // same shape as the register flow, now resized before encoding.
   const [idFrontImage, setIdFrontImage] = useState('');
   const [idBackImage, setIdBackImage] = useState('');
   const [selfieImage, setSelfieImage] = useState('');
@@ -140,7 +184,7 @@ export default function GoogleIdVerificationScreen() {
   };
 
   const storeImage = async (asset: ImagePicker.ImagePickerAsset, field: ImageField) => {
-    const dataUri = await toBase64DataUri(asset.uri);
+    const dataUri = await resizeAndEncode(asset.uri);
     imageSetters[field](dataUri);
     setImageErrors((prev) => ({ ...prev, [field]: undefined }));
   };
@@ -168,7 +212,8 @@ export default function GoogleIdVerificationScreen() {
       if (!result.canceled) {
         await storeImage(result.assets[0], currentImageField);
       }
-    } catch {
+    } catch (error) {
+      console.log('Camera capture/encode error:', error);
       setImageErrors((prev) => ({
         ...prev,
         [currentImageField]: t('googleIdVerification.errors.imageProcessFailed'),
@@ -182,6 +227,12 @@ export default function GoogleIdVerificationScreen() {
   const pickFromLibrary = async () => {
     if (!currentImageField) return;
 
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      showToast(t('googleIdVerification.errors.libraryPermission'), 'error');
+      return;
+    }
+
     setImageLoading(true);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -194,7 +245,8 @@ export default function GoogleIdVerificationScreen() {
       if (!result.canceled) {
         await storeImage(result.assets[0], currentImageField);
       }
-    } catch {
+    } catch (error) {
+      console.log('Library pick/encode error:', error);
       setImageErrors((prev) => ({
         ...prev,
         [currentImageField]: t('googleIdVerification.errors.imageProcessFailed'),
@@ -268,7 +320,9 @@ export default function GoogleIdVerificationScreen() {
       // Same shape as register: send the base64 data URI strings directly
       // instead of building { uri, name, type } file parts. This avoids the
       // Android multipart file-streaming issue that was causing the images
-      // to arrive as undefined server-side.
+      // to arrive as undefined server-side. Images are resized/compressed
+      // before this point (see resizeAndEncode) to stay under the backend's
+      // per-part size limit.
       formData.append('front_id', idFrontImage);
       formData.append('back_id', idBackImage);
       formData.append('selfie_with_id', selfieImage);
@@ -287,15 +341,16 @@ export default function GoogleIdVerificationScreen() {
       showToast(t('googleIdVerification.success'), 'success');
       router.push('/(tabs)/Profile');
     } catch (error: any) {
+      // Keep the raw error in logs for debugging — never shown to the user.
       console.log('ID verification error:', JSON.stringify(error?.response?.data, null, 2));
-      console.log('Status:', error?.response?.status);
+      console.log('ID verification error status:', error?.response?.status);
 
       const detail = error?.response?.data?.detail;
-      const message = Array.isArray(detail)
+      const rawMessage = Array.isArray(detail)
         ? detail.map((d: any) => d?.msg ?? JSON.stringify(d)).join('\n')
         : detail;
 
-      setSubmitError(message ?? t('googleIdVerification.errors.submitFailed'));
+      setSubmitError(getFriendlySubmitError(rawMessage, error?.response?.status, t));
     } finally {
       setIsLoading(false);
     }

@@ -1345,7 +1345,14 @@ const resources = {
   },
   "errors": {
     "imageProcessFailed": "Hindi naproseso ang larawan. Pakisubukan muli.",
-    "cameraPermission": "Kailangan ang pahintulot sa camera!",
+    "cameraPermission": "Kailangan ang pahintulot sa camera para makakuha ng larawan. Paki-enable ito sa settings ng iyong device.",
+    "libraryPermission": "Kailangan ang pahintulot para ma-access ang iyong mga larawan. Paki-enable ito sa settings ng iyong device.",
+    "imageTooLarge": "Masyadong malaki ang isa sa iyong mga larawan. Pakisubukan muli — awtomatiko naming ire-resize ito.",
+    "networkError": "Hindi makakonekta. Pakisuri ang iyong internet connection at subukan muli.",
+    "sessionExpired": "Nag-expire na ang iyong session. Mag-log in muli.",
+    "serverError": "May naganap na problema sa aming panig. Pakisubukan muli sa ilang saglit.",
+    "alreadyVerified": "Na-verify na ang ID na ito.",
+    "invalidIdDetails": "Mukhang mali ang mga detalye ng ID na inilagay mo. Paki-check ulit at subukan muli.",
     "submitFailed": "Hindi naisumite ang pag-verify. Pakisubukan muli."
   }
 },
