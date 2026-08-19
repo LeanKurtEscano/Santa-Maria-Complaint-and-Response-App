@@ -53,7 +53,10 @@ export default function OnboardingScreen() {
   // 9 elements: logo, appName, tagline, divider, feat0, feat1, feat2, cta, loginRow
   const anims = useRef(Array.from({ length: 9 }, makeAnim)).current;
   const logoScale = useRef(new Animated.Value(0.6)).current;
-
+const goToLogin = async () => {
+  await AsyncStorage.setItem('hasSeenOnboarding', 'true');
+  router.replace('/(auth)');
+};
   useEffect(() => {
     // Redirect if already onboarded
     AsyncStorage.getItem('hasSeenOnboarding').then((val) => {
@@ -179,7 +182,7 @@ export default function OnboardingScreen() {
 
           <Animated.View style={[styles.loginRow, a(8)]}>
             <Text style={styles.loginMuted}>Already have an account?</Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)')} activeOpacity={0.7}>
+            <TouchableOpacity onPress={goToLogin} activeOpacity={0.7}>
               <Text style={[styles.loginLink, { color: THEME.primary }]}> Log In</Text>
             </TouchableOpacity>
           </Animated.View>

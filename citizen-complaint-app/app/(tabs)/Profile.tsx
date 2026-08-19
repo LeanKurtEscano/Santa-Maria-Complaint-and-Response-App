@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +39,7 @@ import { THEME } from '@/constants/theme';
 import AuthGuard from '@/screen/general/AuthGuard';
 
 // ---------------------------------------------------------------------------
-// LogoutConfirmModal
+// LogoutConfirmModal  (unchanged)
 // ---------------------------------------------------------------------------
 interface LogoutConfirmModalProps {
   visible: boolean;
@@ -63,7 +64,6 @@ function LogoutConfirmModal({
       statusBarTranslucent
       onRequestClose={onCancel}
     >
-      {/* Backdrop */}
       <TouchableOpacity
         activeOpacity={1}
         onPress={onCancel}
@@ -75,7 +75,6 @@ function LogoutConfirmModal({
           paddingHorizontal: 24,
         }}
       >
-        {/* Card — stop event propagation so taps inside don't close the modal */}
         <TouchableOpacity
           activeOpacity={1}
           onPress={() => {}}
@@ -91,7 +90,6 @@ function LogoutConfirmModal({
             elevation: 12,
           }}
         >
-          {/* Icon strip */}
           <View
             style={{
               alignItems: 'center',
@@ -114,7 +112,6 @@ function LogoutConfirmModal({
             </View>
           </View>
 
-          {/* Content */}
           <View style={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 8 }}>
             <Text
               style={{
@@ -142,7 +139,6 @@ function LogoutConfirmModal({
             </Text>
           </View>
 
-          {/* Actions */}
           <View
             style={{
               flexDirection: 'row',
@@ -151,7 +147,6 @@ function LogoutConfirmModal({
               paddingVertical: 20,
             }}
           >
-            {/* Cancel */}
             <TouchableOpacity
               onPress={onCancel}
               disabled={loading}
@@ -169,7 +164,6 @@ function LogoutConfirmModal({
               </Text>
             </TouchableOpacity>
 
-            {/* Confirm */}
             <TouchableOpacity
               onPress={onConfirm}
               disabled={loading}
@@ -214,6 +208,8 @@ export default function ProfileScreen() {
   // Local state for the logout modal
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  // Local state for pull-to-refresh
+  const [refreshing, setRefreshing] = useState(false);
 
   const {
     userData,
@@ -244,6 +240,21 @@ export default function ProfileScreen() {
     } finally {
       setLogoutLoading(false);
       setShowLogoutModal(false);
+    }
+  };
+
+  // Pull-to-refresh — re-fetches the current user so verification status
+  // (is_verified flipping true after an admin approves) and any other
+  // profile fields update without leaving/re-entering the tab.
+  // `background: true` is passed so this doesn't flip the full-screen
+  // `loading` state (which would unmount this screen and show the spinner
+  // screen instead) — RefreshControl's own spinner handles the loading UI.
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchCurrentUser(true);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -287,6 +298,16 @@ export default function ProfileScreen() {
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[THEME.primary]}
+            tintColor={THEME.primary}
+            title={t('profile.pullToRefresh', { defaultValue: 'Pull to refresh' })}
+            titleColor="#6B7280"
+          />
+        }
       >
         {/* Header */}
         <View style={{ backgroundColor: THEME.primary }} className="px-6 pt-6 pb-12">
@@ -414,7 +435,6 @@ export default function ProfileScreen() {
           </View>
 
           {/* Verification Status — Not Verified */}
-        {/* Verification Status — Not Verified */}
           {!userData.is_verified && (() => {
             const hasSubmittedIdDocs = !!(
               userData.front_id &&

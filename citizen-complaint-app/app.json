@@ -92,7 +92,8 @@
       "expo-web-browser",
       "expo-font",
       "expo-localization",
-      "@clerk/expo"
+      "@clerk/expo",
+      "@clerk/expo-google-signin"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -102,7 +103,9 @@
       "router": {},
       "eas": {
         "projectId": "803edf0b-f96a-4f5c-96db-7ac1fe268656"
-      }
+      },
+    "EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID": "663665418051-n5q7oaveaega3na6c3dmjjlp80qj1rq8.apps.googleusercontent.com",
+  "EXPO_PUBLIC_CLERK_GOOGLE_ANDROID_CLIENT_ID": "663665418051-g1ua5l9mnvuf8okn7c981pm1c7p5sbqq.apps.googleusercontent.com"
     },
     "owner": "lean_kurt_escano"
   }

@@ -29,7 +29,7 @@ import { useState } from 'react';
 // Minimum enforces meaningful complaints (prevents "noise" or "pothole" alone).
 // Maximum keeps records manageable for barangay staff across high-volume usage.
 export const COMPLAINT_DETAILS_MIN_LENGTH = 40;
-export const COMPLAINT_DETAILS_MAX_LENGTH = 300;
+export const COMPLAINT_DETAILS_MAX_LENGTH = 500;
 
 const DETAILS_WARN_THRESHOLD = Math.floor(COMPLAINT_DETAILS_MAX_LENGTH * 0.9);  // 270 — "you're close to the limit"
 const DETAILS_GOOD_THRESHOLD = COMPLAINT_DETAILS_MIN_LENGTH;                    // 40  — minimum satisfied
@@ -68,30 +68,25 @@ export function validateCustomTitle(value: string, t: (key: string) => string): 
 }
 
 export function validateComplaintDetails(value: string, t: (key: string) => string): string | null {
-  // Repeated characters: 5 or more of the same character in a row
-  if (/(.)\1{4,}/.test(value)) {
+  // Repeated characters: 6+ of the same character in a row (was 5+)
+  if (/(.)\1{5,}/.test(value)) {
     return t('complaint_form.details_validation_repeated_chars');
   }
 
   const words = value.trim().toLowerCase().split(/\s+/);
 
   if (words.length >= 5) {
-    // For longer inputs: flag if same word appears 3+ times OR makes up 60%+ of all words
+    // Only flag blatant spam: same word 5+ times AND makes up 75%+ of all words
     const freq: Record<string, number> = {};
     for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
     const maxCount = Math.max(...Object.values(freq));
-    if (maxCount >= 3 || maxCount / words.length >= 0.6) {
-      return t('complaint_form.details_validation_repeated_words');
-    }
-  } else if (words.length >= 2) {
-    // For short phrases (< 5 words): only flag blatant spam like "tapon tapon tapon"
-    const freq: Record<string, number> = {};
-    for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
-    const maxCount = Math.max(...Object.values(freq));
-    if (maxCount >= 3) {
+    if (maxCount >= 5 && maxCount / words.length >= 0.75) {
       return t('complaint_form.details_validation_repeated_words');
     }
   }
+  // Removed the 2-4 word short-phrase branch entirely —
+  // too easy to false-positive on residents naturally repeating
+  // a word for emphasis in short complaints.
 
   return null;
 }

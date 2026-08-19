@@ -338,8 +338,8 @@ export default function GoogleIdVerificationScreen() {
         await fetchCurrentUser();
       }
 
-      showToast(t('googleIdVerification.success'), 'success');
-      router.push('/(tabs)/Profile');
+   
+      router.push('/(tabs)');
     } catch (error: any) {
       // Keep the raw error in logs for debugging — never shown to the user.
       console.log('ID verification error:', JSON.stringify(error?.response?.data, null, 2));

@@ -13,17 +13,31 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useSubmitForm } from '@/hooks/general/useSubmitForm';
 import { useRouter } from 'expo-router';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle, WifiOff, Smartphone, ChevronRight } from 'lucide-react-native';
+import {
+    Mail,
+    Lock,
+    Eye,
+    EyeOff,
+    AlertCircle,
+    CheckCircle,
+    WifiOff,
+    Smartphone,
+    ChevronRight,
+} from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { authApiClient } from '@/lib/client/user';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
 import * as SecureStore from 'expo-secure-store';
 import { THEME } from '@/constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// 👇 Clerk (used only to run the Google OAuth flow and grab a token — not your session system)
+
+// Clerk browser OAuth - used for iOS / Expo Go testing
 import { useSSO, useAuth } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
+
+// Native Google Sign-In is imported separately and only used by AndroidGoogleSignIn
+import { useSignInWithGoogle } from '@clerk/expo/google';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -33,22 +47,235 @@ interface LoginFormData {
     role: string;
 }
 
+interface GoogleLoginProps {
+    onSuccess: (clerkToken: string) => Promise<void>;
+    onError: (error: any) => void;
+    googleLoading: boolean;
+    setGoogleLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+/**
+ * ANDROID ONLY
+ *
+ * Uses Clerk native Google Sign-In.
+ * This requires a native Android build and does NOT work in Expo Go.
+ */
+function AndroidGoogleSignIn({
+    onSuccess,
+    onError,
+    googleLoading,
+    setGoogleLoading,
+}: GoogleLoginProps) {
+    const { startGoogleAuthenticationFlow } = useSignInWithGoogle();
+    const { getToken, signOut } = useAuth();
+
+    const handleAndroidGoogleLogin = async () => {
+        setGoogleLoading(true);
+
+        let createdSessionId: string | undefined;
+
+        try {
+            // Clean up any stale Clerk session.
+            try {
+                await signOut();
+            } catch {
+                // No existing Clerk session.
+            }
+
+            // Native Android Google authentication.
+            const result = await startGoogleAuthenticationFlow();
+
+            createdSessionId = result.createdSessionId;
+
+            const { setActive } = result;
+
+            if (!createdSessionId || !setActive) {
+                return;
+            }
+
+            // Activate the Clerk session.
+            await setActive({
+                session: createdSessionId,
+            });
+
+            // Get Clerk JWT.
+            const clerkToken = await getToken();
+
+            if (!clerkToken) {
+                throw new Error(
+                    'Unable to retrieve Clerk authentication token.'
+                );
+            }
+
+            console.log(
+                'Android native Google authentication successful'
+            );
+
+            // Send Clerk token to your backend.
+            await onSuccess(clerkToken);
+        } catch (error: any) {
+            console.log(
+                'Android native Google login error:',
+                error
+            );
+
+            // Native Google cancellation.
+            if (
+                error?.code === 'SIGN_IN_CANCELLED' ||
+                error?.code === '-5'
+            ) {
+                return;
+            }
+
+            onError(error);
+        } finally {
+            // Remove the temporary Clerk session.
+            if (createdSessionId) {
+                try {
+                    await signOut();
+                } catch (signOutError) {
+                    console.log(
+                        'Android Clerk signOut cleanup failed:',
+                        signOutError
+                    );
+                }
+            }
+
+            setGoogleLoading(false);
+        }
+    };
+
+    return (
+        <TouchableOpacity
+            onPress={handleAndroidGoogleLogin}
+            disabled={googleLoading}
+            activeOpacity={0.85}
+            className="flex-row items-center rounded-2xl overflow-hidden mb-6"
+            style={{
+                backgroundColor: '#fff',
+                borderWidth: 1.5,
+                borderColor: '#E5E7EB',
+                minHeight: 52,
+            }}
+        >
+            <View
+                style={{
+                    width: 56,
+                    alignSelf: 'stretch',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}
+            >
+                {googleLoading ? (
+                    <ActivityIndicator
+                        size="small"
+                        color="#374151"
+                    />
+                ) : (
+                    <Image
+                        source={require('../../assets/images/google-icon.png')}
+                        style={{
+                            width: 20,
+                            height: 20,
+                        }}
+                        resizeMode="contain"
+                    />
+                )}
+            </View>
+
+            <Text
+                style={{
+                    flex: 1,
+                    textAlign: 'center',
+                    fontSize: 14,
+                    fontWeight: '700',
+                    color: '#374151',
+                    paddingVertical: 14,
+                }}
+            >
+                Continue with Google
+            </Text>
+
+            <View
+                style={{
+                    width: 56,
+                }}
+            />
+        </TouchableOpacity>
+    );
+}
+
 export default function LoginScreen({ navigation }: any) {
     const router = useRouter();
     const { t, i18n } = useTranslation();
     const { fetchCurrentUser } = useCurrentUser();
+
     const [formData, setFormData] = useState<LoginFormData>({
         email: '',
         password: '',
         role: 'user',
     });
-    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+    const [errors, setErrors] = useState<{
+        [key: string]: string;
+    }>({});
+
     const [showPassword, setShowPassword] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
 
-    // 👇 Clerk hooks for the Google flow only
+    // Browser OAuth for iOS / Expo Go testing.
     const { startSSOFlow } = useSSO();
+
+    // Used by the iOS browser flow.
     const { getToken, signOut } = useAuth();
+
+    /**
+     * This function receives the Clerk token from either:
+     *
+     * Android:
+     *   Native Google Sign-In
+     *
+     * iOS:
+     *   Browser OAuth / Expo Go
+     *
+     * Then exchanges it for YOUR application's tokens.
+     */
+    const exchangeClerkToken = async (clerkToken: string) => {
+        if (!clerkToken) {
+            throw new Error(
+                'Unable to retrieve Clerk authentication token.'
+            );
+        }
+
+        const { data } = await authApiClient.post(
+            '/login/google',
+            {
+                clerk_token: clerkToken,
+            }
+        );
+
+        console.log(
+            'Google login successful:',
+            data.access_token,
+            data.refresh_token
+        );
+
+        await SecureStore.setItemAsync(
+            'complaint_token',
+            data.access_token
+        );
+
+        await SecureStore.setItemAsync(
+            'complaint_refresh_token',
+            data.refresh_token
+        );
+
+        await fetchCurrentUser();
+
+        await useCurrentUser
+            .getState()
+            .syncPushToken();
+    };
 
     const loginMutation = useSubmitForm<LoginFormData>({
         url: '/login',
@@ -56,26 +283,53 @@ export default function LoginScreen({ navigation }: any) {
         client: authApiClient,
         validators: [
             (data) => {
-                const errors: { [key: string]: string } = {};
-                if (!data.email) errors.email = t('required');
-                if (!data.password) errors.password = t('required');
-                if (data.email && !/\S+@\S+\.\S+/.test(data.email)) {
+                const errors: {
+                    [key: string]: string;
+                } = {};
+
+                if (!data.email) {
+                    errors.email = t('required');
+                }
+
+                if (!data.password) {
+                    errors.password = t('required');
+                }
+
+                if (
+                    data.email &&
+                    !/\S+@\S+\.\S+/.test(data.email)
+                ) {
                     errors.email = t('invalidEmail');
                 }
-                return Object.keys(errors).length > 0 ? errors : null;
+
+                return Object.keys(errors).length > 0
+                    ? errors
+                    : null;
             },
         ],
         onSuccess: async (data) => {
-            await SecureStore.setItemAsync('complaint_token', data.access_token);
-            await SecureStore.setItemAsync('complaint_refresh_token', data.refresh_token);
-            console.log('Login successful:', data);
+            await SecureStore.setItemAsync(
+                'complaint_token',
+                data.access_token
+            );
+
+            await SecureStore.setItemAsync(
+                'complaint_refresh_token',
+                data.refresh_token
+            );
+
+            console.log(
+                'Login successful:',
+                data
+            );
+
             await fetchCurrentUser();
 
-            await useCurrentUser.getState().syncPushToken();
+            await useCurrentUser
+                .getState()
+                .syncPushToken();
 
-            // small delay ensures backend receives token
-           // await new Promise(res => setTimeout(res, 300));
-           // router.replace('/(tabs)');
+            // router.replace('/(tabs)');
         },
     });
 
@@ -84,125 +338,216 @@ export default function LoginScreen({ navigation }: any) {
     };
 
     const handleLogin = () => {
-        AsyncStorage.removeItem('registrationFormData');
+        AsyncStorage.removeItem(
+            'registrationFormData'
+        );
+
         loginMutation.mutate(formData, {
             onError: (error: any) => {
                 if (error?.type === 'validation') {
                     setErrors(error.errors);
                 } else if (error?.status === 404) {
-                    setErrors({ email: t('noAccountEmail') });
+                    setErrors({
+                        email: t('noAccountEmail'),
+                    });
                 } else if (error?.status === 401) {
-                    setErrors({ password: t('incorrectPassword') });
-                } else if (error?.code === 'OFFLINE' || error?.code === 'NETWORK_ERROR' || error?.code === 'TIMEOUT') {
-                    setErrors({ general: t('networkError') });
+                    setErrors({
+                        password: t('incorrectPassword'),
+                    });
+                } else if (
+                    error?.code === 'OFFLINE' ||
+                    error?.code ===
+                        'NETWORK_ERROR' ||
+                    error?.code === 'TIMEOUT'
+                ) {
+                    setErrors({
+                        general: t('networkError'),
+                    });
                 } else {
-                    setErrors({ general: t('loginFailed') });
+                    setErrors({
+                        general: t('loginFailed'),
+                    });
                 }
             },
         });
     };
 
-    // 👇 Google login: use Clerk purely to get a Google-verified token,
-    // exchange it for YOUR OWN access/refresh tokens, then discard the Clerk session.
-    const handleGoogleLogin = async () => {
+    /**
+     * iOS ONLY
+     *
+     * Keep the existing browser OAuth flow so
+     * this continues working in Expo Go.
+     */
+    const handleIOSGoogleLogin = async () => {
         setErrors({});
         setGoogleLoading(true);
-        let createdSessionId: string | undefined;
+
+        let createdSessionId:
+            | string
+            | undefined;
+
         try {
-            // Defensive: clear any stale Clerk session left over from a previous
-            // attempt (e.g. app was killed mid-flow, or an older build of this
-            // screen). Safe no-op if nothing is signed in.
+            // Remove stale Clerk session.
             try {
                 await signOut();
             } catch {
-                // ignore — nothing to sign out of
+                // Nothing signed in.
             }
 
-            const ssoResult = await startSSOFlow({
-                strategy: 'oauth_google',
-                redirectUrl: AuthSession.makeRedirectUri(),
-            });
-            createdSessionId = ssoResult.createdSessionId;
+            const ssoResult = await startSSOFlow(
+                {
+                    strategy: 'oauth_google',
+                    redirectUrl:
+                        AuthSession.makeRedirectUri(),
+                }
+            );
+
+            createdSessionId =
+                ssoResult.createdSessionId;
+
             const { setActive } = ssoResult;
 
-            if (!createdSessionId || !setActive) {
-                setGoogleLoading(false);
-                return; // user cancelled
+            if (
+                !createdSessionId ||
+                !setActive
+            ) {
+                return;
             }
 
-            await setActive({ session: createdSessionId });
-            const clerkToken = await getToken();
-
-            const { data } = await authApiClient.post('/login/google', {
-                clerk_token: clerkToken,
+            await setActive({
+                session: createdSessionId,
             });
 
-            console.log('Google login successful:', data.access_token, data.refresh_token);
+            const clerkToken = await getToken();
 
-            await SecureStore.setItemAsync('complaint_token', data.access_token);
-            await SecureStore.setItemAsync('complaint_refresh_token', data.refresh_token);
+            if (!clerkToken) {
+                throw new Error(
+                    'Unable to retrieve Clerk authentication token.'
+                );
+            }
 
-            await fetchCurrentUser();
-            await useCurrentUser.getState().syncPushToken();
-            //await new Promise(res => setTimeout(res, 300));
-           // router.replace('/(tabs)');
+            await exchangeClerkToken(
+                clerkToken
+            );
         } catch (error: any) {
-            console.log('Google login error:', error);
-            setErrors({ general: t('loginFailed') });
+            console.log(
+                'iOS Google login error:',
+                error
+            );
+
+            setErrors({
+                general: t('loginFailed'),
+            });
         } finally {
-            // Always drop the Clerk session, success or failure — Clerk is only
-            // ever a middleman here, and leaving a session active is what causes
-            // "You're already signed in" on the next attempt.
             if (createdSessionId) {
                 try {
                     await signOut();
-                } catch (signOutError) {
-                    console.log('Clerk signOut cleanup failed:', signOutError);
+                } catch (
+                    signOutError
+                ) {
+                    console.log(
+                        'iOS Clerk signOut cleanup failed:',
+                        signOutError
+                    );
                 }
             }
+
             setGoogleLoading(false);
         }
     };
 
-    // Fixed icon strip width so both buttons' text starts at the same x position
+    /**
+     * Only used as a wrapper for the platform-specific
+     * Google login button.
+     */
+    const handleGoogleError = (error: any) => {
+        console.log(
+            'Google login error:',
+            error
+        );
+
+        setErrors({
+            general:
+                error?.message ||
+                t('loginFailed'),
+        });
+    };
+
     const ICON_STRIP_WIDTH = 56;
 
     return (
         <SafeAreaView className="flex-1 bg-white">
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                behavior={
+                    Platform.OS === 'ios'
+                        ? 'padding'
+                        : 'height'
+                }
                 className="flex-1"
             >
                 <ScrollView
-                    contentContainerStyle={{ flexGrow: 1 }}
+                    contentContainerStyle={{
+                        flexGrow: 1,
+                    }}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
                     {/* Language Selector */}
                     <View className="absolute top-4 right-6 z-10 flex-row gap-2">
                         <TouchableOpacity
-                            onPress={() => changeLanguage('en')}
+                            onPress={() =>
+                                changeLanguage('en')
+                            }
                             className="px-3.5 py-2 rounded-lg"
-                            style={{ backgroundColor: i18n.language === 'en' ? THEME.primary : '#F5F5F5' }}
+                            style={{
+                                backgroundColor:
+                                    i18n.language ===
+                                    'en'
+                                        ? THEME.primary
+                                        : '#F5F5F5',
+                            }}
                             activeOpacity={0.7}
                         >
-                            <Text className={`text-xs font-semibold ${i18n.language === 'en' ? 'text-white' : 'text-neutral-600'}`}>
+                            <Text
+                                className={`text-xs font-semibold ${
+                                    i18n.language ===
+                                    'en'
+                                        ? 'text-white'
+                                        : 'text-neutral-600'
+                                }`}
+                            >
                                 EN
                             </Text>
                         </TouchableOpacity>
+
                         <TouchableOpacity
-                            onPress={() => changeLanguage('tl')}
+                            onPress={() =>
+                                changeLanguage('tl')
+                            }
                             className="px-3.5 py-2 rounded-lg"
-                            style={{ backgroundColor: i18n.language === 'tl' ? THEME.primary : '#F5F5F5' }}
+                            style={{
+                                backgroundColor:
+                                    i18n.language ===
+                                    'tl'
+                                        ? THEME.primary
+                                        : '#F5F5F5',
+                            }}
                             activeOpacity={0.7}
                         >
-                            <Text className={`text-xs font-semibold ${i18n.language === 'tl' ? 'text-white' : 'text-neutral-600'}`}>
+                            <Text
+                                className={`text-xs font-semibold ${
+                                    i18n.language ===
+                                    'tl'
+                                        ? 'text-white'
+                                        : 'text-neutral-600'
+                                }`}
+                            >
                                 TL
                             </Text>
                         </TouchableOpacity>
                     </View>
 
-                    {/* Header Section with Logo */}
+                    {/* Header Section */}
                     <View className="items-center pt-16 pb-8 px-6">
                         <View className="w-28 h-28 mb-6 items-center justify-center bg-white rounded-full shadow-sm border-4 border-primary-50">
                             <Image
@@ -211,80 +556,133 @@ export default function LoginScreen({ navigation }: any) {
                                 resizeMode="cover"
                             />
                         </View>
+
                         <Text className="text-2xl font-bold text-neutral-900 mb-1.5 tracking-tight">
-                             Mary App
+                            Mary App
                         </Text>
+
                         <Text className="text-sm text-neutral-500 text-center max-w-[280px] leading-5">
-                            {t('welcomeMessage')}
+                            {t(
+                                'welcomeMessage'
+                            )}
                         </Text>
                     </View>
 
-                    {/* Login Form Container */}
+                    {/* Login Form */}
                     <View className="flex-1 px-6 pt-2">
-                        {/* Form Header */}
                         <View className="mb-8">
                             <Text className="text-3xl font-bold text-neutral-900 mb-2">
                                 {t('login')}
                             </Text>
+
                             <Text className="text-sm text-neutral-500 leading-5">
-                                {t('loginSubtitle') || 'Sign in to continue to your account'}
+                                {t(
+                                    'loginSubtitle'
+                                ) ||
+                                    'Sign in to continue to your account'}
                             </Text>
                         </View>
 
-                        {/* Network Error Alert */}
+                        {/* Network Error */}
                         {errors.general && (
                             <View className="bg-error-50 border border-error-500 rounded-xl p-4 mb-6 flex-row items-start">
                                 <View className="mr-3 flex-shrink-0">
-                                    {errors.general.includes('network') || errors.general.includes('connection') ? (
-                                        <WifiOff size={20} color="#EF4444" />
+                                    {errors.general.includes(
+                                        'network'
+                                    ) ||
+                                    errors.general.includes(
+                                        'connection'
+                                    ) ? (
+                                        <WifiOff
+                                            size={20}
+                                            color="#EF4444"
+                                        />
                                     ) : (
-                                        <AlertCircle size={20} color="#EF4444" />
+                                        <AlertCircle
+                                            size={20}
+                                            color="#EF4444"
+                                        />
                                     )}
                                 </View>
+
                                 <Text className="text-sm text-error-600 flex-1 leading-5">
                                     {errors.general}
                                 </Text>
                             </View>
                         )}
 
-                        {/* Email Input */}
+                        {/* Email */}
                         <View className="mb-5">
                             <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                                 {t('email')}
                             </Text>
+
                             <View
                                 className={`flex-row items-center border-2 rounded-xl px-4 py-3.5 bg-white ${
-                                    errors.email ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                                    errors.email
+                                        ? 'border-error-500 bg-error-50'
+                                        : 'border-neutral-200'
                                 }`}
                             >
                                 <View className="mr-3 flex-shrink-0">
-                                    <Mail size={20} color={errors.email ? '#EF4444' : '#9CA3AF'} />
+                                    <Mail
+                                        size={20}
+                                        color={
+                                            errors.email
+                                                ? '#EF4444'
+                                                : '#9CA3AF'
+                                        }
+                                    />
                                 </View>
+
                                 <TextInput
                                     className="flex-1 text-base text-neutral-900"
                                     placeholder="juan.delacruz@email.com"
                                     placeholderTextColor="#9CA3AF"
-                                    value={formData.email}
-                                    onChangeText={(text) => {
-                                        setFormData({ ...formData, email: text });
-                                        setErrors({ ...errors, email: '', general: '' });
+                                    value={
+                                        formData.email
+                                    }
+                                    onChangeText={(
+                                        text
+                                    ) => {
+                                        setFormData({
+                                            ...formData,
+                                            email: text,
+                                        });
+
+                                        setErrors({
+                                            ...errors,
+                                            email: '',
+                                            general:
+                                                '',
+                                        });
                                     }}
                                     keyboardType="email-address"
                                     autoCapitalize="none"
                                     autoComplete="email"
                                     autoCorrect={false}
                                 />
-                                {formData.email && !errors.email && (
-                                    <View className="ml-3 flex-shrink-0">
-                                        <CheckCircle size={20} color="#22C55E" />
-                                    </View>
-                                )}
+
+                                {formData.email &&
+                                    !errors.email && (
+                                        <View className="ml-3 flex-shrink-0">
+                                            <CheckCircle
+                                                size={20}
+                                                color="#22C55E"
+                                            />
+                                        </View>
+                                    )}
                             </View>
+
                             {errors.email && (
                                 <View className="flex-row items-center mt-2 px-1">
                                     <View className="mr-1.5 flex-shrink-0">
-                                        <AlertCircle size={14} color="#EF4444" />
+                                        <AlertCircle
+                                            size={14}
+                                            color="#EF4444"
+                                        />
                                     </View>
+
                                     <Text className="text-error-600 text-xs flex-1">
                                         {errors.email}
                                     </Text>
@@ -292,49 +690,92 @@ export default function LoginScreen({ navigation }: any) {
                             )}
                         </View>
 
-                        {/* Password Input */}
+                        {/* Password */}
                         <View className="mb-4">
                             <Text className="text-sm font-semibold text-neutral-700 mb-2.5">
                                 {t('password')}
                             </Text>
+
                             <View
                                 className={`flex-row items-center border-2 rounded-xl px-4 py-3.5 bg-white ${
-                                    errors.password ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                                    errors.password
+                                        ? 'border-error-500 bg-error-50'
+                                        : 'border-neutral-200'
                                 }`}
                             >
                                 <View className="mr-3 flex-shrink-0">
-                                    <Lock size={20} color={errors.password ? '#EF4444' : '#9CA3AF'} />
+                                    <Lock
+                                        size={20}
+                                        color={
+                                            errors.password
+                                                ? '#EF4444'
+                                                : '#9CA3AF'
+                                        }
+                                    />
                                 </View>
+
                                 <TextInput
                                     className="flex-1 text-base text-neutral-900"
                                     placeholder="••••••••"
                                     placeholderTextColor="#9CA3AF"
-                                    value={formData.password}
-                                    onChangeText={(text) => {
-                                        setFormData({ ...formData, password: text });
-                                        setErrors({ ...errors, password: '', general: '' });
+                                    value={
+                                        formData.password
+                                    }
+                                    onChangeText={(
+                                        text
+                                    ) => {
+                                        setFormData({
+                                            ...formData,
+                                            password: text,
+                                        });
+
+                                        setErrors({
+                                            ...errors,
+                                            password:
+                                                '',
+                                            general:
+                                                '',
+                                        });
                                     }}
-                                    secureTextEntry={!showPassword}
+                                    secureTextEntry={
+                                        !showPassword
+                                    }
                                     autoComplete="password"
                                     autoCorrect={false}
                                 />
+
                                 <TouchableOpacity
-                                    onPress={() => setShowPassword(!showPassword)}
+                                    onPress={() =>
+                                        setShowPassword(
+                                            !showPassword
+                                        )
+                                    }
                                     className="ml-3 p-1 flex-shrink-0"
                                     activeOpacity={0.7}
                                 >
                                     {showPassword ? (
-                                        <EyeOff size={20} color="#9CA3AF" />
+                                        <EyeOff
+                                            size={20}
+                                            color="#9CA3AF"
+                                        />
                                     ) : (
-                                        <Eye size={20} color="#9CA3AF" />
+                                        <Eye
+                                            size={20}
+                                            color="#9CA3AF"
+                                        />
                                     )}
                                 </TouchableOpacity>
                             </View>
+
                             {errors.password && (
                                 <View className="flex-row items-center mt-2 px-1">
                                     <View className="mr-1.5 flex-shrink-0">
-                                        <AlertCircle size={14} color="#EF4444" />
+                                        <AlertCircle
+                                            size={14}
+                                            color="#EF4444"
+                                        />
                                     </View>
+
                                     <Text className="text-error-600 text-xs flex-1">
                                         {errors.password}
                                     </Text>
@@ -346,23 +787,42 @@ export default function LoginScreen({ navigation }: any) {
                         <TouchableOpacity
                             className="self-end mb-8"
                             activeOpacity={0.7}
-                            onPress={() => router.push('/(auth)/ForgotPassword')}
+                            onPress={() =>
+                                router.push(
+                                    '/(auth)/ForgotPassword'
+                                )
+                            }
                         >
-                            <Text className="text-sm font-semibold" style={{ color: THEME.primary }}>
-                                {t('forgotPassword')}
+                            <Text
+                                className="text-sm font-semibold"
+                                style={{
+                                    color: THEME.primary,
+                                }}
+                            >
+                                {t(
+                                    'forgotPassword'
+                                )}
                             </Text>
                         </TouchableOpacity>
 
-                        {/* Login Button */}
+                        {/* Login */}
                         <TouchableOpacity
                             onPress={handleLogin}
-                            disabled={loginMutation.isPending}
+                            disabled={
+                                loginMutation.isPending
+                            }
                             className="rounded-xl py-4 items-center mb-6 shadow-sm"
-                            style={{ backgroundColor: THEME.primary }}
+                            style={{
+                                backgroundColor:
+                                    THEME.primary,
+                            }}
                             activeOpacity={0.85}
                         >
                             {loginMutation.isPending ? (
-                                <ActivityIndicator color="#ffffff" size="small" />
+                                <ActivityIndicator
+                                    color="#ffffff"
+                                    size="small"
+                                />
                             ) : (
                                 <Text className="text-white text-base font-bold tracking-wide">
                                     {t('login')}
@@ -373,179 +833,294 @@ export default function LoginScreen({ navigation }: any) {
                         {/* Divider */}
                         <View className="flex-row items-center my-6">
                             <View className="flex-1 h-px bg-neutral-200" />
+
                             <Text className="px-4 text-xs text-neutral-400 font-medium uppercase tracking-wider">
                                 {t('or') || 'OR'}
                             </Text>
+
                             <View className="flex-1 h-px bg-neutral-200" />
                         </View>
 
-                        {/* Google Sign-In */}
-                        <TouchableOpacity
-                            onPress={handleGoogleLogin}
-                            disabled={googleLoading}
-                            activeOpacity={0.85}
-                            className="flex-row items-center rounded-2xl overflow-hidden mb-6"
-                            style={{
-                                backgroundColor: '#fff',
-                                borderWidth: 1.5,
-                                borderColor: '#E5E7EB',
-                                minHeight: 52,
-                            }}
-                        >
-                            <View
+                        {/* ================================
+                            GOOGLE SIGN-IN
+                            ================================ */}
+
+                        {Platform.OS === 'android' ? (
+                            // Android:
+                            // Native Google Sign-In
+                            <AndroidGoogleSignIn
+                                onSuccess={
+                                    exchangeClerkToken
+                                }
+                                onError={
+                                    handleGoogleError
+                                }
+                                googleLoading={
+                                    googleLoading
+                                }
+                                setGoogleLoading={
+                                    setGoogleLoading
+                                }
+                            />
+                        ) : Platform.OS === 'ios' ? (
+                            // iOS:
+                            // Existing browser OAuth flow,
+                            // which continues working in Expo Go.
+                            <TouchableOpacity
+                                onPress={
+                                    handleIOSGoogleLogin
+                                }
+                                disabled={
+                                    googleLoading
+                                }
+                                activeOpacity={0.85}
+                                className="flex-row items-center rounded-2xl overflow-hidden mb-6"
                                 style={{
-                                    width: ICON_STRIP_WIDTH,
-                                    alignSelf: 'stretch',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
+                                    backgroundColor:
+                                        '#fff',
+                                    borderWidth: 1.5,
+                                    borderColor:
+                                        '#E5E7EB',
+                                    minHeight: 52,
                                 }}
                             >
-                                {googleLoading ? (
-                                    <ActivityIndicator size="small" color="#374151" />
-                                ) : (
-                                    <Image
-                                        source={require("../../assets/images/google-icon.png")}
-                                        style={{ width: 20, height: 20 }}
-                                        resizeMode="contain"
-                                    />
-                                )}
-                            </View>
-                            <Text
-                                style={{
-                                    flex: 1,
-                                    textAlign: 'center',
-                                    fontSize: 14,
-                                    fontWeight: '700',
-                                    color: '#374151',
-                                    paddingVertical: 14,
-                                }}
-                            >
-                                {t('continueWithGoogle') || 'Continue with Google'}
-                            </Text>
-                            <View style={{ width: ICON_STRIP_WIDTH }} />
-                        </TouchableOpacity>
+                                <View
+                                    style={{
+                                        width:
+                                            ICON_STRIP_WIDTH,
+                                        alignSelf:
+                                            'stretch',
+                                        alignItems:
+                                            'center',
+                                        justifyContent:
+                                            'center',
+                                    }}
+                                >
+                                    {googleLoading ? (
+                                        <ActivityIndicator
+                                            size="small"
+                                            color="#374151"
+                                        />
+                                    ) : (
+                                        <Image
+                                            source={require("../../assets/images/google-icon.png")}
+                                            style={{
+                                                width: 20,
+                                                height: 20,
+                                            }}
+                                            resizeMode="contain"
+                                        />
+                                    )}
+                                </View>
+
+                                <Text
+                                    style={{
+                                        flex: 1,
+                                        textAlign:
+                                            'center',
+                                        fontSize: 14,
+                                        fontWeight:
+                                            '700',
+                                        color: '#374151',
+                                        paddingVertical:
+                                            14,
+                                    }}
+                                >
+                                    {t(
+                                        'continueWithGoogle'
+                                    ) ||
+                                        'Continue with Google'}
+                                </Text>
+
+                                <View
+                                    style={{
+                                        width:
+                                            ICON_STRIP_WIDTH,
+                                    }}
+                                />
+                            </TouchableOpacity>
+                        ) : null}
 
                         {/* Register Buttons */}
                         <View className="gap-3">
                             <Text className="text-center text-neutral-500 text-sm mb-1">
-                                {t('noAccount') || "Don't have an account?"}
+                                {t('noAccount') ||
+                                    "Don't have an account?"}
                             </Text>
 
                             {/* Register with Email */}
                             <TouchableOpacity
                                 onPress={() =>
                                     router.push({
-                                        pathname: '/(auth)/Register',
-                                        params: { apiRoute: '/register' },
+                                        pathname:
+                                            '/(auth)/Register',
+                                        params: {
+                                            apiRoute:
+                                                '/register',
+                                        },
                                     })
                                 }
                                 activeOpacity={0.85}
                                 className="flex-row items-center rounded-2xl overflow-hidden"
                                 style={{
-                                    backgroundColor: '#F0FDF4',
+                                    backgroundColor:
+                                        '#F0FDF4',
                                     borderWidth: 1.5,
-                                    borderColor: '#BBF7D0',
+                                    borderColor:
+                                        '#BBF7D0',
                                     minHeight: 52,
                                 }}
                             >
-                                {/* Icon strip — fixed width so text of both buttons aligns */}
                                 <View
                                     style={{
-                                        width: ICON_STRIP_WIDTH,
-                                        alignSelf: 'stretch',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        backgroundColor: THEME.primary,
+                                        width:
+                                            ICON_STRIP_WIDTH,
+                                        alignSelf:
+                                            'stretch',
+                                        alignItems:
+                                            'center',
+                                        justifyContent:
+                                            'center',
+                                        backgroundColor:
+                                            THEME.primary,
                                     }}
                                 >
-                                    <Mail size={20} color="#fff" />
+                                    <Mail
+                                        size={20}
+                                        color="#fff"
+                                    />
                                 </View>
 
-                                {/* Label — flex-1 so it fills remaining space and centers within it */}
                                 <Text
                                     style={{
                                         flex: 1,
-                                        textAlign: 'center',
+                                        textAlign:
+                                            'center',
                                         fontSize: 14,
-                                        fontWeight: '700',
+                                        fontWeight:
+                                            '700',
                                         color: THEME.primary,
-                                        paddingVertical: 14,
+                                        paddingVertical:
+                                            14,
                                     }}
                                 >
-                                    {t('registerWithEmail') || 'Register with Email'}
+                                    {t(
+                                        'registerWithEmail'
+                                    ) ||
+                                        'Register with Email'}
                                 </Text>
 
-                                {/* Chevron — same fixed width as icon strip to keep label truly centered */}
-                                <View style={{ width: ICON_STRIP_WIDTH, alignItems: 'center' }}>
-                                    <ChevronRight size={16} color={THEME.primary} />
+                                <View
+                                    style={{
+                                        width:
+                                            ICON_STRIP_WIDTH,
+                                        alignItems:
+                                            'center',
+                                    }}
+                                >
+                                    <ChevronRight
+                                        size={16}
+                                        color={
+                                            THEME.primary
+                                        }
+                                    />
                                 </View>
                             </TouchableOpacity>
 
-                            {/* Register with Phone 
-                            
+                            {/* Register with Phone */}
+                            {/*
                             <TouchableOpacity
                                 onPress={() =>
                                     router.push({
-                                        pathname: '/(auth)/Register',
-                                        params: { apiRoute: '/register-phone-number' },
+                                        pathname:
+                                            '/(auth)/Register',
+                                        params: {
+                                            apiRoute:
+                                                '/register-phone-number',
+                                        },
                                     })
                                 }
                                 activeOpacity={0.85}
                                 className="flex-row items-center rounded-2xl overflow-hidden"
                                 style={{
-                                    backgroundColor: '#F0F9FF',
+                                    backgroundColor:
+                                        '#F0F9FF',
                                     borderWidth: 1.5,
-                                    borderColor: '#BAE6FD',
+                                    borderColor:
+                                        '#BAE6FD',
                                     minHeight: 52,
                                 }}
                             >
-                               
                                 <View
                                     style={{
-                                        width: ICON_STRIP_WIDTH,
-                                        alignSelf: 'stretch',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        backgroundColor: '#0EA5E9',
+                                        width:
+                                            ICON_STRIP_WIDTH,
+                                        alignSelf:
+                                            'stretch',
+                                        alignItems:
+                                            'center',
+                                        justifyContent:
+                                            'center',
+                                        backgroundColor:
+                                            '#0EA5E9',
                                     }}
                                 >
-                                    <Smartphone size={20} color="#fff" />
+                                    <Smartphone
+                                        size={20}
+                                        color="#fff"
+                                    />
                                 </View>
 
-                              
                                 <Text
                                     style={{
                                         flex: 1,
-                                        textAlign: 'center',
+                                        textAlign:
+                                            'center',
                                         fontSize: 14,
-                                        fontWeight: '700',
+                                        fontWeight:
+                                            '700',
                                         color: '#0EA5E9',
-                                        paddingVertical: 14,
+                                        paddingVertical:
+                                            14,
                                     }}
                                 >
-                                    {t('registerWithPhone') || 'Register with Phone Number'}
+                                    {t(
+                                        'registerWithPhone'
+                                    ) ||
+                                        'Register with Phone Number'}
                                 </Text>
 
-                              
-                                <View style={{ width: ICON_STRIP_WIDTH, alignItems: 'center' }}>
-                                    <ChevronRight size={16} color="#0EA5E9" />
+                                <View
+                                    style={{
+                                        width:
+                                            ICON_STRIP_WIDTH,
+                                        alignItems:
+                                            'center',
+                                    }}
+                                >
+                                    <ChevronRight
+                                        size={16}
+                                        color="#0EA5E9"
+                                    />
                                 </View>
                             </TouchableOpacity>
-                            
-                            
-                            
                             */}
-                            
                         </View>
 
                         {/* Footer */}
                         <View className="items-center py-10 mt-auto">
                             <View className="w-12 h-1 bg-neutral-200 rounded-full mb-4" />
+
                             <Text className="text-xs text-neutral-400 text-center leading-5">
-                                {t('republicPhilippines')}
+                                {t(
+                                    'republicPhilippines'
+                                )}
                             </Text>
+
                             <Text className="text-xs text-neutral-400 text-center leading-5">
-                                {t('municipalitySantaMaria')}
+                                {t(
+                                    'municipalitySantaMaria'
+                                )}
                             </Text>
                         </View>
                     </View>

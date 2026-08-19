@@ -35,7 +35,7 @@ export default function ComplaintsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
-  const { isAuthenticated,userData } = useCurrentUser();
+  const { isAuthenticated, userData, fetchCurrentUser } = useCurrentUser();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -44,18 +44,14 @@ export default function ComplaintsScreen() {
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const { setToastVisible, toastVisible, toastMessage, toastType, showToast } = useToastStore();
 
-  if (!isAuthenticated) {
-    return <AuthGuard />;
-  }
-
-   if (!userData?.is_verified) {
-    const hasSubmittedIdDocs = !!(
-      userData?.front_id &&
-      userData?.back_id &&
-      userData?.selfie_with_id
-    );
-    return <VerifyGuard pending={hasSubmittedIdDocs} />;
-  }
+  // ── ALL HOOKS MUST RUN BEFORE ANY EARLY RETURN ──────────────────────────
+  // Previously the AuthGuard/VerifyGuard `if` checks sat above the
+  // useEffect/useInfiniteQuery calls below. That meant an unverified user
+  // (early return fires) and a freshly-verified user (early return doesn't
+  // fire, so all the remaining hooks now run) produced two different hook
+  // call orders across renders — the exact thing React's Rules of Hooks
+  // forbid, and the cause of the "change in the order of Hooks" error the
+  // moment is_verified flips from false -> true.
 
   // Bouncing arrow animation — loops while button is visible
   useEffect(() => {
@@ -103,6 +99,10 @@ export default function ComplaintsScreen() {
         : undefined;
     },
     initialPageParam: 1,
+    // Only fetch once we know the user is authenticated + verified — no point
+    // paginating barangays behind a guard screen. Keeps the query "paused"
+    // (isPending stays true, no network call) rather than skipped entirely.
+    enabled: isAuthenticated && !!userData?.is_verified,
   });
 
   // Flatten all fetched pages into a single array
@@ -125,9 +125,17 @@ export default function ComplaintsScreen() {
     return filtered.slice().sort((a, b) => a.barangay_name.localeCompare(b.barangay_name));
   }, [allBarangays, searchQuery]);
 
+  // Pull-to-refresh now also re-checks the user's verification status, not
+  // just the barangay list. That way, once an admin verifies you, pulling
+  // to refresh on this tab (even while VerifyGuard is showing) will flip
+  // userData.is_verified and swap you into the real screen — no need to
+  // leave and come back to the tab.
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([
+      fetchCurrentUser(true),
+      userData?.is_verified ? refetch() : Promise.resolve(),
+    ]);
     setRefreshing(false);
   };
 
@@ -169,17 +177,6 @@ export default function ComplaintsScreen() {
     });
   };
 
-  if (error) {
-    const appError = handleApiError(new Error(t('complaintsScreen.errors.loadFailed')));
-    return (
-      <ErrorScreen
-        type={appError.type}
-        title={t('complaintsScreen.errors.screenTitle')}
-        onRetry={refetch}
-      />
-    );
-  }
-
   const renderBarangayItem = ({ item }: { item: Barangay }) => (
     <TouchableOpacity
       onPress={() => handleBarangayPress(item)}
@@ -213,6 +210,37 @@ export default function ComplaintsScreen() {
       </View>
     );
   };
+
+  // ── EARLY RETURNS — now safely after every hook above ───────────────────
+  if (!isAuthenticated) {
+    return <AuthGuard />;
+  }
+
+  if (!userData?.is_verified) {
+    const hasSubmittedIdDocs = !!(
+      userData?.front_id &&
+      userData?.back_id &&
+      userData?.selfie_with_id
+    );
+    return (
+      <VerifyGuard
+        pending={hasSubmittedIdDocs}
+        onRefresh={handleRefresh}
+        refreshing={refreshing}
+      />
+    );
+  }
+
+  if (error) {
+    const appError = handleApiError(new Error(t('complaintsScreen.errors.loadFailed')));
+    return (
+      <ErrorScreen
+        type={appError.type}
+        title={t('complaintsScreen.errors.screenTitle')}
+        onRetry={refetch}
+      />
+    );
+  }
 
   const isSearchActive = searchQuery.trim().length > 0;
   const resultCount = filteredData.length;
@@ -397,7 +425,6 @@ export default function ComplaintsScreen() {
               elevation: 10,
             }}
           >
-            {/* Bouncing arrow icon */}
             <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
               <ChevronRight
                 size={18}
