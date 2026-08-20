@@ -80,10 +80,7 @@ export const ALL_STATUSES = [
   "reviewed_by_lgu",
   "resolved_by_lgu",
   "rejected_by_lgu",
-  "forwarded_to_department",
-  "reviewed_by_department",
-  "resolved_by_department",
-  "rejected_by_department",
+  
   "rejected",
   "pending",
 ] as const;

@@ -21,10 +21,14 @@ interface EventData  { id: number; event_name: string; description?: string; dat
 
 interface PaginatedEvents {
   data: EventData[];
-  total: number;
-  page: number;
-  size: number;
-  pages: number;
+  pagination: {
+    total_items: number;
+    total_pages: number;
+    page: number;
+    page_size: number;
+    has_next: boolean;
+    has_previous: boolean;
+  };
 }
 
 const ACCENTS = [
@@ -322,11 +326,13 @@ export default function EventsScreen() {
     placeholderData: keepPreviousData, // keeps old page visible while the next one loads
   });
 
-  const events     = data?.data ?? [];
-  const totalItems = data?.total ?? 0;
-  const totalPages = data?.pages ?? Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
-  const usePagination = totalPages > 1;
 
+  console.log('EventsScreen: data', data, 'isLoading', isLoading, 'isError', isError, 'error', error, 'isFetching', isFetching, 'isPlaceholderData', isPlaceholderData);
+
+  const events     = data?.data ?? [];
+const totalItems = data?.pagination?.total_items ?? 0;
+const totalPages = data?.pagination?.total_pages ?? 1;
+const usePagination = totalPages > 1;
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     listRef.current?.scrollToOffset({ offset: 0, animated: true });

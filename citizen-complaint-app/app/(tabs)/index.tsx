@@ -29,7 +29,8 @@ import { handleApiError } from '@/utils/general/errorHandler';
 import { ActivityIndicator } from 'react-native';
 import { OrdinanceCard } from '@/components/home/OrdinanceCard';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
-
+import GeneralToast from '@/components/Toast/GeneralToast';
+import useToastStore from '@/store/useGlobalModal';
 const HEADER_SCROLL_DISTANCE = 80;
 
 export default function HomeScreen() {
@@ -39,7 +40,7 @@ export default function HomeScreen() {
   const [chatOpen, setChatOpen] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
   const { isAuthenticated, userData, loading: authLoading } = useCurrentUser();
-
+ const { setToastVisible, toastVisible, toastMessage, toastType, showToast } = useToastStore();
   // ── Queries ──────────────────────────────────────────────────────────────
 const {
   data: announcements = [],
@@ -261,6 +262,13 @@ const {
       <BottomCTA
         onPress={() => router.push('/(tabs)/Complaints')}
         label={t('cta.submit_complaint')}
+      />
+
+       <GeneralToast
+        visible={toastVisible}
+        onHide={() => setToastVisible(false)}
+        message={toastMessage}
+        type={toastType}
       />
 
     </SafeAreaView>

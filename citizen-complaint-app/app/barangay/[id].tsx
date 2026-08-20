@@ -262,41 +262,44 @@ const handleSubmit = async () => {
 
     // ── Push notification prompt ─────────────────────────────────────────────
     if (!userData?.push_notifications_enabled) {
-      await new Promise<void>((resolve) => {
-        Alert.alert(
-          '🔔 Stay Updated',
-          'Do you want to receive notifications about your complaint status?',
-          [
-            {
-              text: 'No Thanks',
-              style: 'cancel',
-              onPress: () => resolve(),
-            },
-            {
-              text: 'Yes, Notify Me',
-              onPress: async () => {
-                try {
-                  const token = await askForNotificationPermission();
-                  if (!token) {
-                    showGlobalToast('Permission denied for notifications.', 'error');
-                    resolve();
-                    return;
-                  }
-                  await userApiClient.post('/push-token', { token });
-                  await userApiClient.post('/enable-push-notifications', { enabled: true });
-                  fetchCurrentUser(true);
-                  showGlobalToast('Notifications enabled!', 'success');
-                } catch (err) {
-                  showGlobalToast('Failed to enable notifications.', 'error');
-                } finally {
-                  resolve();
-                }
-              },
-            },
-          ]
-        );
-      });
-    }
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+
+    Alert.alert(
+      '🔔 Stay Updated',
+      'Do you want to receive notifications about your complaint status?',
+      [
+        { text: 'No Thanks', style: 'cancel', onPress: done },
+        {
+          text: 'Yes, Notify Me',
+          onPress: async () => {
+            try {
+              const token = await askForNotificationPermission();
+              if (!token) {
+                showGlobalToast('Permission denied for notifications.', 'error');
+                return;
+              }
+              await userApiClient.post('/push-token', { token });
+              await userApiClient.post('/enable-push-notifications', { enabled: true });
+              fetchCurrentUser(true);
+              showGlobalToast('Notifications enabled!', 'success');
+            } catch (err) {
+              showGlobalToast('Failed to enable notifications.', 'error');
+            } finally {
+              done();
+            }
+          },
+        },
+      ],
+      { cancelable: true, onDismiss: done } // safety net for outside-tap / back-button dismiss
+    );
+  });
+}
 
   } catch (error: any) {
     const httpStatus = error?.response?.status;

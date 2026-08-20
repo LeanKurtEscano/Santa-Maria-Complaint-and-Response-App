@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,14 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { File } from 'expo-file-system';
 import {
   CreditCard,
   Camera,
@@ -39,48 +41,128 @@ import { useCurrentUser } from '@/store/useCurrentUserStore';
 import GeneralToast from '@/components/Toast/GeneralToast';
 import useToastStore from '@/store/useGlobalModal';
 import { authApiClient, userApiClient } from '@/lib/client/user';
-
+import { askForNotificationPermission } from '@/hooks/general/usePushNotifications';
 type ImageField = 'idFrontImage' | 'idBackImage' | 'selfieImage';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Resizes an image to a max width and compresses it, then returns a base64
- * data URI.
+ * MEMORY NOTES (Android):
  *
- * WHY RESIZE: `quality` in the camera/library picker is a *relative* JPEG
- * compression setting, not a fixed output size cap. High-res sensors
- * (common on newer Android phones, and some iPhones) can still produce
- * base64 payloads well over typical backend multipart limits (e.g. 1024KB)
- * even at quality: 0.7, since base64 also inflates raw bytes by ~33%.
- * Capping the longest dimension to 1280px gives a predictable upper bound
- * on payload size regardless of the source camera's resolution — this is
- * more than enough detail for ID/selfie verification (human review or OCR).
+ * The dominant memory cost in this pipeline isn't the final base64 string —
+ * it's the *decode* step inside ImageManipulator. A modern Android camera
+ * can produce a 10-50MP JPEG. To resize it, the native layer has to first
+ * decode that into an uncompressed bitmap (roughly width * height * 4 bytes),
+ * which for a 12MP photo is 140MB+ of transient native memory, before it
+ * ever gets resized/re-encoded down to something small. On lower-RAM Android
+ * devices this decode spike is what causes silent failures/crashes — no
+ * amount of *output* compression avoids it, since it happens before
+ * compression is applied.
  *
- * WHY NOT XHR/content:// READ DIRECTLY: expo-image-manipulator handles
- * reading content:// and file:// URIs internally and returns a clean
- * base64 string, so we no longer need the XMLHttpRequest + FileReader
- * workaround that was used purely to sidestep unreliable content:// fetch()
- * behavior on Android.
+ * We can't avoid the initial decode from JS/Expo, but we can:
+ *  1. Ask for a smaller *output* budget on Android specifically (lower
+ *     ceiling reduces the chance we're anywhere near a device's limit).
+ *  2. Verify the actual encoded size and adaptively re-encode smaller if
+ *     we're still over budget, instead of trusting a single fixed setting.
+ *  3. Retry once at a much smaller size if the manipulator throws at all
+ *     (memory-pressure failures on Android often surface as a thrown error
+ *     rather than a hard crash).
+ *  4. Delete the temp file the manipulator writes to cache once we've read
+ *     its base64, so repeated attempts (retries, re-picks) don't also pile
+ *     up disk pressure on top of memory pressure.
+ */
+
+// Conservative per-image budget, comfortably under the backend's 1024KB
+// per-part limit (base64 inflates raw bytes by ~33%, so budget in base64
+// characters, not source bytes).
+const TARGET_BASE64_BYTES = 700 * 1024;
+
+// Android gets a smaller ceiling and harder floor than iOS — Android devices
+// span a much wider (and lower) RAM range.
+const INITIAL_WIDTH = Platform.OS === 'android' ? 1024 : 1280;
+const INITIAL_QUALITY = Platform.OS === 'android' ? 0.5 : 0.6;
+const MIN_WIDTH = Platform.OS === 'android' ? 640 : 800;
+const MIN_QUALITY = 0.3;
+const MAX_ATTEMPTS = 3;
+
+const base64ByteLength = (base64: string): number => {
+  // Rough but sufficient estimate: 4 base64 chars encode 3 bytes.
+  const padding = (base64.match(/=+$/) || [''])[0].length;
+  return Math.floor((base64.length * 3) / 4) - padding;
+};
+
+const deleteQuietly = (uri?: string) => {
+  if (!uri) return;
+  try {
+    // SDK 54's class-based API: File.delete() is sync and throws if the
+    // file doesn't exist, so guard with `exists` first.
+    const file = new File(uri);
+    if (file.exists) {
+      file.delete();
+    }
+  } catch {
+    // Best-effort cache cleanup — never let this fail the actual flow.
+  }
+};
+
+/**
+ * Resizes an image to a memory-safe max width and compresses it, then
+ * returns a base64 data URI. Adaptively steps down size/quality if the
+ * first pass is still too large, and retries once at a much smaller size
+ * if the manipulator itself throws (typical shape of a memory-pressure
+ * failure on Android).
  */
 const resizeAndEncode = async (uri: string): Promise<string> => {
   if (!uri) throw new Error('No URI provided');
 
-  const manipulated = await ImageManipulator.manipulateAsync(
-    uri,
-    [{ resize: { width: 1280 } }], // longest side capped; height auto-scales
-    {
-      compress: 0.6,
-      format: ImageManipulator.SaveFormat.JPEG,
-      base64: true,
-    }
-  );
+  let width = INITIAL_WIDTH;
+  let quality = INITIAL_QUALITY;
+  let lastError: unknown;
 
-  if (!manipulated.base64) {
-    throw new Error('Failed to encode image');
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let manipulated: ImageManipulator.ImageResult | undefined;
+    try {
+      manipulated = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width } }],
+        {
+          compress: quality,
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true,
+        }
+      );
+
+      if (!manipulated.base64) {
+        throw new Error('Failed to encode image');
+      }
+
+      const sizeBytes = base64ByteLength(manipulated.base64);
+      const isLastAttempt = attempt === MAX_ATTEMPTS;
+      const atFloor = width <= MIN_WIDTH && quality <= MIN_QUALITY;
+
+      if (sizeBytes <= TARGET_BASE64_BYTES || isLastAttempt || atFloor) {
+        const dataUri = `data:image/jpeg;base64,${manipulated.base64}`;
+        // We only needed the base64 string — drop the cached file the
+        // manipulator wrote to disk so retries/re-picks don't accumulate.
+        void deleteQuietly(manipulated.uri);
+        return dataUri;
+      }
+
+      // Still too big: step down and try again.
+      void deleteQuietly(manipulated.uri);
+      width = Math.max(MIN_WIDTH, Math.round(width * 0.75));
+      quality = Math.max(MIN_QUALITY, Number((quality - 0.1).toFixed(2)));
+    } catch (err) {
+      lastError = err;
+      void deleteQuietly(manipulated?.uri);
+      // Likely a decode/memory failure on this attempt — retry smaller
+      // rather than giving up immediately.
+      width = Math.max(MIN_WIDTH, Math.round(width * 0.6));
+      quality = MIN_QUALITY;
+    }
   }
 
-  return `data:image/jpeg;base64,${manipulated.base64}`;
+  throw lastError instanceof Error ? lastError : new Error('Failed to encode image');
 };
 
 /**
@@ -144,7 +226,7 @@ export default function GoogleIdVerificationScreen() {
   const [idTypeError, setIdTypeError] = useState<string | undefined>();
 
   // Base64 data URIs (data:image/...;base64,...) used for both preview and upload —
-  // same shape as the register flow, now resized before encoding.
+  // same shape as the register flow, now resized/adaptively-compressed before encoding.
   const [idFrontImage, setIdFrontImage] = useState('');
   const [idBackImage, setIdBackImage] = useState('');
   const [selfieImage, setSelfieImage] = useState('');
@@ -161,6 +243,13 @@ export default function GoogleIdVerificationScreen() {
   const [imageLoading, setImageLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | undefined>();
+
+  // `isLoading` (state) is what disables the button visually, but state
+  // updates are async and don't take effect until the next render — a fast
+  // double-tap can fire handleSubmit twice before the disabled prop lands.
+  // This ref is checked/set synchronously so a second tap in the same
+  // frame is a true no-op, not just visually blocked.
+  const isSubmittingRef = useRef(false);
 
   const idPlaceholder = idType ? getIdNumberPlaceholder(idType) : t('googleIdVerification.selectIdTypeFirst');
   const idHint = getIdNumberHint(idType);
@@ -184,6 +273,9 @@ export default function GoogleIdVerificationScreen() {
   };
 
   const storeImage = async (asset: ImagePicker.ImagePickerAsset, field: ImageField) => {
+    // Drop any previous image for this field first so we're not briefly
+    // holding the old large string alongside the new one being built.
+    imageSetters[field]('');
     const dataUri = await resizeAndEncode(asset.uri);
     imageSetters[field](dataUri);
     setImageErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -206,6 +298,7 @@ export default function GoogleIdVerificationScreen() {
         // before we finish reading it. Disable it on Android to avoid that race.
         allowsEditing: Platform.OS === 'ios',
         quality: 0.7,
+        exif: false,
       });
 
       setShowImagePickerModal(false);
@@ -239,6 +332,7 @@ export default function GoogleIdVerificationScreen() {
         mediaTypes: ['images'],
         allowsEditing: Platform.OS === 'ios',
         quality: 0.7,
+        exif: false,
       });
 
       setShowImagePickerModal(false);
@@ -309,9 +403,12 @@ export default function GoogleIdVerificationScreen() {
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
+    if (isSubmittingRef.current) return;
+
     setSubmitError(undefined);
     if (!validate()) return;
 
+    isSubmittingRef.current = true;
     setIsLoading(true);
     try {
       const formData = new FormData();
@@ -320,9 +417,9 @@ export default function GoogleIdVerificationScreen() {
       // Same shape as register: send the base64 data URI strings directly
       // instead of building { uri, name, type } file parts. This avoids the
       // Android multipart file-streaming issue that was causing the images
-      // to arrive as undefined server-side. Images are resized/compressed
-      // before this point (see resizeAndEncode) to stay under the backend's
-      // per-part size limit.
+      // to arrive as undefined server-side. Images are resized/adaptively
+      // compressed before this point (see resizeAndEncode) to stay under
+      // the backend's per-part size limit and reduce peak memory use.
       formData.append('front_id', idFrontImage);
       formData.append('back_id', idBackImage);
       formData.append('selfie_with_id', selfieImage);
@@ -338,7 +435,56 @@ export default function GoogleIdVerificationScreen() {
         await fetchCurrentUser();
       }
 
-   
+      // Clear the large base64 strings out of state now that they've been
+      // sent — nothing downstream needs them, and we're about to navigate
+      // away anyway.
+      setIdFrontImage('');
+      setIdBackImage('');
+      setSelfieImage('');
+
+      if (!userData?.push_notifications_enabled) {
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+
+    Alert.alert(
+      '🔔 Stay Updated',
+      'Do you want to receive notifications about your ID verification status?',
+      [
+        { text: 'No Thanks', style: 'cancel', onPress: done },
+        {
+          text: 'Yes, Notify Me',
+          onPress: async () => {
+            try {
+              const token = await askForNotificationPermission();
+              if (!token) {
+                showToast(t('googleIdVerification.errors.notificationPermissionDenied') ?? 'Permission denied for notifications.', 'error');
+                return;
+              }
+              await userApiClient.post('/push-token', { token });
+              await userApiClient.post('/enable-push-notifications', { enabled: true });
+              await fetchCurrentUser(true);
+              showToast('Notifications enabled!', 'success');
+            } catch (err) {
+              showToast('Failed to enable notifications.', 'error');
+            } finally {
+              done();
+            }
+          },
+        },
+      ],
+      { cancelable: true, onDismiss: done } // safety net for outside-tap / back-button dismiss on Android
+    );
+  });
+}
+
+
+
+
       router.push('/(tabs)');
     } catch (error: any) {
       // Keep the raw error in logs for debugging — never shown to the user.
@@ -352,6 +498,7 @@ export default function GoogleIdVerificationScreen() {
 
       setSubmitError(getFriendlySubmitError(rawMessage, error?.response?.status, t));
     } finally {
+      isSubmittingRef.current = false;
       setIsLoading(false);
     }
   };

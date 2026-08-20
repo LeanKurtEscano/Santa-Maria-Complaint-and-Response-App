@@ -16,12 +16,15 @@ const SEARCH_DEBOUNCE_MS = 400
 
 interface PaginatedAnnouncements {
   data: Announcement[]
-  total: number
-  page: number
-  size: number
-  pages: number
+  pagination: {
+    total_items: number
+    total_pages: number
+    page: number
+    page_size: number
+    has_next: boolean
+    has_previous: boolean
+  }
 }
-
 const all = () => {
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
@@ -50,11 +53,11 @@ const all = () => {
     })).data,
     placeholderData: keepPreviousData,
   })
-
-  const announcements = data?.data ?? []
-  const totalItems = data?.total ?? 0
-  const totalPages = data?.pages ?? Math.max(1, Math.ceil(totalItems / PAGE_SIZE))
-
+  
+  console.log(data, isLoading, isError, isRefetching, isPlaceholderData)
+const announcements = data?.data ?? []
+const totalItems = data?.pagination?.total_items ?? 0
+const totalPages = data?.pagination?.total_pages ?? 1
   const handleSearch = (text: string) => {
     setSearch(text)
   }

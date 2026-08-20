@@ -3,18 +3,30 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Image,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+
+// Clerk browser OAuth - used for iOS / Expo Go testing
+import { useSSO, useAuth } from '@clerk/expo';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+
+// Native Google Sign-In is imported separately and only used by AndroidGoogleSignIn
+import { useSignInWithGoogle } from '@clerk/expo/google';
 
 import { RegistrationFormData } from '@/types/auth/register';
 import { authApiClient } from '@/lib/client/user';
+import { useCurrentUser } from '@/store/useCurrentUserStore';
 import {
   validateFirstName,
   validateMiddleName,
@@ -29,9 +41,149 @@ import Step1PersonalInfo from '@/components/register/Step1';
 import Step2ContactInfo from '@/components/register/Step2';
 import Step3IdVerification from '@/components/register/Step3';
 
+WebBrowser.maybeCompleteAuthSession();
+
+interface GoogleLoginProps {
+  onSuccess: (clerkToken: string) => Promise<void>;
+  onError: (error: any) => void;
+  googleLoading: boolean;
+  setGoogleLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+/**
+ * ANDROID ONLY
+ *
+ * Uses Clerk native Google Sign-In.
+ * This requires a native Android build and does NOT work in Expo Go.
+ *
+ * NOTE: identical to the one in LoginScreen. Consider extracting this into
+ * a shared `components/auth/AndroidGoogleSignIn.tsx` so both screens import
+ * the same implementation instead of maintaining two copies.
+ */
+function AndroidGoogleSignIn({
+  onSuccess,
+  onError,
+  googleLoading,
+  setGoogleLoading,
+}: GoogleLoginProps) {
+  const { startGoogleAuthenticationFlow } = useSignInWithGoogle();
+  const { getToken, signOut } = useAuth();
+
+  const handleAndroidGoogleLogin = async () => {
+    setGoogleLoading(true);
+
+    let createdSessionId: string | undefined;
+
+    try {
+      // Clean up any stale Clerk session.
+      try {
+        await signOut();
+      } catch {
+        // No existing Clerk session.
+      }
+
+      // Native Android Google authentication.
+      const result = await startGoogleAuthenticationFlow();
+
+      createdSessionId = result.createdSessionId;
+
+      const { setActive } = result;
+
+      if (!createdSessionId || !setActive) {
+        return;
+      }
+
+      // Activate the Clerk session.
+      await setActive({ session: createdSessionId });
+
+      // Get Clerk JWT.
+      const clerkToken = await getToken();
+
+      if (!clerkToken) {
+        throw new Error('Unable to retrieve Clerk authentication token.');
+      }
+
+      console.log('Android native Google authentication successful');
+
+      // Send Clerk token to your backend.
+      await onSuccess(clerkToken);
+    } catch (error: any) {
+      console.log('Android native Google login error:', error);
+
+      // Native Google cancellation.
+      if (error?.code === 'SIGN_IN_CANCELLED' || error?.code === '-5') {
+        return;
+      }
+
+      onError(error);
+    } finally {
+      // Remove the temporary Clerk session.
+      if (createdSessionId) {
+        try {
+          await signOut();
+        } catch (signOutError) {
+          console.log('Android Clerk signOut cleanup failed:', signOutError);
+        }
+      }
+
+      setGoogleLoading(false);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={handleAndroidGoogleLogin}
+      disabled={googleLoading}
+      activeOpacity={0.85}
+      className="flex-row items-center rounded-2xl overflow-hidden mb-6"
+      style={{
+        backgroundColor: '#fff',
+        borderWidth: 1.5,
+        borderColor: '#E5E7EB',
+        minHeight: 52,
+      }}
+    >
+      <View
+        style={{
+          width: 56,
+          alignSelf: 'stretch',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {googleLoading ? (
+          <ActivityIndicator size="small" color="#374151" />
+        ) : (
+          <Image
+            source={require('../../assets/images/google-icon.png')}
+            style={{ width: 20, height: 20 }}
+            resizeMode="contain"
+          />
+        )}
+      </View>
+
+      <Text
+        style={{
+          flex: 1,
+          textAlign: 'center',
+          fontSize: 14,
+          fontWeight: '700',
+          color: '#374151',
+          paddingVertical: 14,
+        }}
+      >
+        Continue with Google
+      </Text>
+
+      <View style={{ width: 56 }} />
+    </TouchableOpacity>
+  );
+}
+
 export default function RegisterScreen() {
   const router = useRouter();
   const { t, i18n } = useTranslation();
+  const { fetchCurrentUser } = useCurrentUser();
 
   const [step, setStep] = useState(1);
   const [age, setAge] = useState<number | null>(null);
@@ -44,6 +196,16 @@ export default function RegisterScreen() {
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [recaptchaVerified, setRecaptchaVerified] = useState(false);
   const [recaptchaError, setRecaptchaError] = useState<string | undefined>(undefined);
+
+  // Google Sign-In state
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+
+  // Browser OAuth for iOS / Expo Go testing.
+  const { startSSOFlow } = useSSO();
+
+  // Used by the iOS browser flow.
+  const { getToken, signOut } = useAuth();
 
   const form = useForm<RegistrationFormData>({
     defaultValues: {
@@ -115,23 +277,23 @@ export default function RegisterScreen() {
    * Step3's processAndStoreImage). We store them as-is — NO re-conversion.
    * Re-converting would call fetch() on a data: URI which fails on Android.
    */
- const storeRegistrationData = async (data: RegistrationFormData) => {
-  try {
-    await AsyncStorage.setItem(
-      'registrationData',
-      JSON.stringify({
-        ...data,
-        age,
-        idFrontImage: data.idFrontImage || null,
-        idBackImage: data.idBackImage || null,
-        selfieImage: data.selfieImage || null,
-      }),
-    );
-  } catch (error) {
-    console.error('Failed to store registration data:', error);
-    throw new Error('STORAGE_FULL');
-  }
-};
+  const storeRegistrationData = async (data: RegistrationFormData) => {
+    try {
+      await AsyncStorage.setItem(
+        'registrationData',
+        JSON.stringify({
+          ...data,
+          age,
+          idFrontImage: data.idFrontImage || null,
+          idBackImage: data.idBackImage || null,
+          selfieImage: data.selfieImage || null,
+        }),
+      );
+    } catch (error) {
+      console.error('Failed to store registration data:', error);
+      throw new Error('STORAGE_FULL');
+    }
+  };
 
   const clearSavedFormData = async () => {
     try {
@@ -140,6 +302,111 @@ export default function RegisterScreen() {
       console.error('Error clearing saved form data:', error);
     }
   };
+
+  /**
+   * Exchanges a Clerk token (from Google Sign-In) for your application's
+   * tokens, then logs the user straight in — bypassing the multi-step
+   * manual registration form entirely, since Google already verified
+   * their identity/email.
+   */
+  const exchangeClerkToken = async (clerkToken: string) => {
+    if (!clerkToken) {
+      throw new Error('Unable to retrieve Clerk authentication token.');
+    }
+
+    const { data } = await authApiClient.post('/login/google', {
+      clerk_token: clerkToken,
+    });
+
+    await SecureStore.setItemAsync('complaint_token', data.access_token);
+    await SecureStore.setItemAsync('complaint_refresh_token', data.refresh_token);
+
+    await fetchCurrentUser();
+    await useCurrentUser.getState().syncPushToken();
+
+    await clearSavedFormData();
+
+    router.replace('/(tabs)');
+  };
+
+  const handleGoogleSuccess = async (clerkToken: string) => {
+    setGoogleError(null);
+    try {
+      await exchangeClerkToken(clerkToken);
+    } catch (error: any) {
+      console.log('Google registration/login error:', error);
+      setGoogleError(
+        error?.response?.data?.message ||
+          error?.message ||
+          t('loginFailed') ||
+          'Google sign-in failed. Please try again.',
+      );
+    }
+  };
+
+  const handleGoogleError = (error: any) => {
+    console.log('Google login error:', error);
+    setGoogleError(error?.message || t('loginFailed') || 'Google sign-in failed.');
+  };
+
+  /**
+   * iOS ONLY
+   *
+   * Browser-based Clerk SSO flow, kept so this continues working in Expo Go.
+   */
+  const handleIOSGoogleLogin = async () => {
+    setGoogleError(null);
+    setGoogleLoading(true);
+
+    let createdSessionId: string | undefined;
+
+    try {
+      // Remove stale Clerk session.
+      try {
+        await signOut();
+      } catch {
+        // Nothing signed in.
+      }
+
+      const ssoResult = await startSSOFlow({
+        strategy: 'oauth_google',
+        redirectUrl: AuthSession.makeRedirectUri(),
+      });
+
+      createdSessionId = ssoResult.createdSessionId;
+
+      const { setActive } = ssoResult;
+
+      if (!createdSessionId || !setActive) {
+        return;
+      }
+
+      await setActive({ session: createdSessionId });
+
+      const clerkToken = await getToken();
+
+      if (!clerkToken) {
+        throw new Error('Unable to retrieve Clerk authentication token.');
+      }
+
+      await exchangeClerkToken(clerkToken);
+    } catch (error: any) {
+      console.log('iOS Google login error:', error);
+      setGoogleError(t('loginFailed') || 'Google sign-in failed. Please try again.');
+    } finally {
+      if (createdSessionId) {
+        try {
+          await signOut();
+        } catch (signOutError) {
+          console.log('iOS Clerk signOut cleanup failed:', signOutError);
+        }
+      }
+
+      setGoogleLoading(false);
+    }
+  };
+
+  const ICON_STRIP_WIDTH = 56;
 
   // ── Step navigation with validation ──────────────────────────────────────
 
@@ -248,14 +515,13 @@ export default function RegisterScreen() {
         },
       });
     } catch (error: any) {
-
       console.error('Registration error:', error);
 
       if (error?.message === 'STORAGE_FULL') {
-    setNetworkError(
-      'Unable to save your registration data on this device. Please try retaking your ID photos or restart the app.',
-    );
-  } 
+        setNetworkError(
+          'Unable to save your registration data on this device. Please try retaking your ID photos or restart the app.',
+        );
+      }
       if (error?.response?.status === 400) {
         const detail = error?.response?.data?.detail || '';
         if (detail.toLowerCase().includes('phone')) {
@@ -381,6 +647,85 @@ export default function RegisterScreen() {
               saveFormData={saveFormData}
             />
           )}
+
+          {/* ================================
+              GOOGLE SIGN-IN
+              ================================ */}
+
+          {/* Divider */}
+          <View className="flex-row items-center my-6">
+            <View className="flex-1 h-px bg-neutral-200" />
+            <Text className="px-4 text-xs text-neutral-400 font-medium uppercase tracking-wider">
+              {t('or') || 'OR'}
+            </Text>
+            <View className="flex-1 h-px bg-neutral-200" />
+          </View>
+
+          {googleError && (
+            <View className="bg-error-50 border border-error-500 rounded-xl p-4 mb-4">
+              <Text className="text-sm text-error-600 leading-5">{googleError}</Text>
+            </View>
+          )}
+
+          {Platform.OS === 'android' ? (
+            // Android:
+            // Native Google Sign-In
+            <AndroidGoogleSignIn
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              googleLoading={googleLoading}
+              setGoogleLoading={setGoogleLoading}
+            />
+          ) : Platform.OS === 'ios' ? (
+            // iOS:
+            // Browser OAuth flow, which continues working in Expo Go.
+            <TouchableOpacity
+              onPress={handleIOSGoogleLogin}
+              disabled={googleLoading}
+              activeOpacity={0.85}
+              className="flex-row items-center rounded-2xl overflow-hidden mb-6"
+              style={{
+                backgroundColor: '#fff',
+                borderWidth: 1.5,
+                borderColor: '#E5E7EB',
+                minHeight: 52,
+              }}
+            >
+              <View
+                style={{
+                  width: ICON_STRIP_WIDTH,
+                  alignSelf: 'stretch',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {googleLoading ? (
+                  <ActivityIndicator size="small" color="#374151" />
+                ) : (
+                  <Image
+                    source={require('../../assets/images/google-icon.png')}
+                    style={{ width: 20, height: 20 }}
+                    resizeMode="contain"
+                  />
+                )}
+              </View>
+
+              <Text
+                style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  fontSize: 14,
+                  fontWeight: '700',
+                  color: '#374151',
+                  paddingVertical: 14,
+                }}
+              >
+                {t('continueWithGoogle') || 'Continue with Google'}
+              </Text>
+
+              <View style={{ width: ICON_STRIP_WIDTH }} />
+            </TouchableOpacity>
+          ) : null}
 
           {/* Login Link */}
           <View className="flex-row justify-center items-center mt-6">
