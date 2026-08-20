@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { File } from 'expo-file-system';
 import {
   View,
   Text,
@@ -50,42 +51,127 @@ interface Step3Props {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Converts any image URI to a stable base64 data URI immediately after pick.
+ * MEMORY NOTES (Android):
  *
- * WHY: On newer Android, image picker returns content:// or short-lived file://
- * URIs that expire once the picker closes or the app is backgrounded. Converting
- * to base64 right away makes the value stable for the lifetime of the session.
+ * The dominant memory cost in this pipeline isn't the final base64 string —
+ * it's the *decode* step inside ImageManipulator. A modern Android camera
+ * can produce a 10-50MP JPEG. To resize it, the native layer has to first
+ * decode that into an uncompressed bitmap (roughly width * height * 4 bytes),
+ * which for a 12MP photo is 140MB+ of transient native memory, before it
+ * ever gets resized/re-encoded down to something small. On lower-RAM Android
+ * devices this decode spike is what causes silent failures/crashes — no
+ * amount of *output* compression avoids it, since it happens before
+ * compression is applied.
  *
- * NOTE: We use XMLHttpRequest instead of fetch() because fetch() of a
- * content:// URI is unreliable on Android's JS engine.
+ * We can't avoid the initial decode from JS/Expo, but we can:
+ *  1. Ask for a smaller *output* budget on Android specifically (lower
+ *     ceiling reduces the chance we're anywhere near a device's limit).
+ *  2. Verify the actual encoded size and adaptively re-encode smaller if
+ *     we're still over budget, instead of trusting a single fixed setting.
+ *  3. Retry once at a much smaller size if the manipulator throws at all
+ *     (memory-pressure failures on Android often surface as a thrown error
+ *     rather than a hard crash).
+ *  4. Delete the temp file the manipulator writes to cache once we've read
+ *     its base64, so repeated attempts (retries, re-picks) don't also pile
+ *     up disk pressure on top of memory pressure.
  */
-const toBase64DataUri = (uri: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    if (!uri) return reject(new Error('No URI provided'));
-    // Already base64 — nothing to do.
-    if (uri.startsWith('data:')) return resolve(uri);
 
-    const xhr = new XMLHttpRequest();
-    xhr.onload = () => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('FileReader failed'));
-      reader.readAsDataURL(xhr.response);
-    };
-    xhr.onerror = () => reject(new Error('XHR failed'));
-    xhr.open('GET', uri);
-    xhr.responseType = 'blob';
-    xhr.send();
-  });
+// Conservative per-image budget, comfortably under the backend's 1024KB
+// per-part limit (base64 inflates raw bytes by ~33%, so budget in base64
+// characters, not source bytes).
+const TARGET_BASE64_BYTES = 700 * 1024;
+
+// Android gets a smaller ceiling and harder floor than iOS — Android devices
+// span a much wider (and lower) RAM range.
+const INITIAL_WIDTH = Platform.OS === 'android' ? 1024 : 1280;
+const INITIAL_QUALITY = Platform.OS === 'android' ? 0.5 : 0.6;
+const MIN_WIDTH = Platform.OS === 'android' ? 640 : 800;
+const MIN_QUALITY = 0.3;
+const MAX_ATTEMPTS = 3;
+
+const base64ByteLength = (base64: string): number => {
+  // Rough but sufficient estimate: 4 base64 chars encode 3 bytes.
+  const padding = (base64.match(/=+$/) || [''])[0].length;
+  return Math.floor((base64.length * 3) / 4) - padding;
 };
 
-const resizeImage = async (uri: string): Promise<string> => {
-  const result = await ImageManipulator.manipulateAsync(
-    uri,
-    [{ resize: { width: 1280 } }], // height auto-scales to preserve aspect ratio
-    { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG },
-  );
-  return result.uri;
+const deleteQuietly = (uri?: string) => {
+  if (!uri) return;
+  try {
+    // SDK 54's class-based API: File.delete() is sync and throws if the
+    // file doesn't exist, so guard with `exists` first.
+    const file = new File(uri);
+    if (file.exists) {
+      file.delete();
+    }
+  } catch {
+    // Best-effort cache cleanup — never let this fail the actual flow.
+  }
+};
+
+/**
+ * Resizes an image to a memory-safe max width and compresses it, then
+ * returns a base64 data URI. Adaptively steps down size/quality if the
+ * first pass is still too large, and retries once at a much smaller size
+ * if the manipulator itself throws (typical shape of a memory-pressure
+ * failure on Android).
+ *
+ * Returns base64 directly from manipulateAsync — no separate XHR/blob/
+ * FileReader round trip needed, and no dependency on content:// / file://
+ * URIs staying alive after the picker closes, since we resolve everything
+ * to a base64 data URI in this single call.
+ */
+const resizeAndEncode = async (uri: string): Promise<string> => {
+  if (!uri) throw new Error('No URI provided');
+
+  let width = INITIAL_WIDTH;
+  let quality = INITIAL_QUALITY;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let manipulated: ImageManipulator.ImageResult | undefined;
+    try {
+      manipulated = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width } }],
+        {
+          compress: quality,
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true,
+        }
+      );
+
+      if (!manipulated.base64) {
+        throw new Error('Failed to encode image');
+      }
+
+      const sizeBytes = base64ByteLength(manipulated.base64);
+      const isLastAttempt = attempt === MAX_ATTEMPTS;
+      const atFloor = width <= MIN_WIDTH && quality <= MIN_QUALITY;
+
+      if (sizeBytes <= TARGET_BASE64_BYTES || isLastAttempt || atFloor) {
+        const dataUri = `data:image/jpeg;base64,${manipulated.base64}`;
+        // We only needed the base64 string — drop the cached file the
+        // manipulator wrote to disk so retries/re-picks don't accumulate.
+        void deleteQuietly(manipulated.uri);
+        return dataUri;
+      }
+
+      // Still too big: step down and try again.
+      void deleteQuietly(manipulated.uri);
+      width = Math.max(MIN_WIDTH, Math.round(width * 0.75));
+      quality = Math.max(MIN_QUALITY, Number((quality - 0.1).toFixed(2)));
+    } catch (err) {
+      lastError = err;
+      void deleteQuietly(manipulated?.uri);
+      // Likely a decode/memory failure on this attempt — retry smaller
+      // rather than giving up immediately.
+      width = Math.max(MIN_WIDTH, Math.round(width * 0.6));
+      quality = MIN_QUALITY;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Failed to encode image');
 };
 
 /**
@@ -144,27 +230,27 @@ const Step3IdVerification = ({
   };
 
   const processAndStoreImage = async (
-  uri: string,
-  field: 'idFrontImage' | 'idBackImage' | 'selfieImage',
-) => {
-  setImageLoading(true);
-  try {
-    // Resize FIRST — shrinking a huge base64 string after the fact doesn't
-    // help; we need the smaller file before it's ever encoded.
-    const resizedUri = await resizeImage(uri);
-
-    // Convert to base64 immediately so the value is stable on Android even
-    // after the picker closes, the app is backgrounded, or at submit time.
-    const base64Uri = await toBase64DataUri(resizedUri);
-    setValue(field, base64Uri as any);
-    clearErrors(field);
-    await saveFormData();
-  } catch {
-    setError(field, { type: 'manual', message: 'Failed to process image. Please try again.' });
-  } finally {
-    setImageLoading(false);
-  }
-};
+    uri: string,
+    field: 'idFrontImage' | 'idBackImage' | 'selfieImage',
+  ) => {
+    setImageLoading(true);
+    try {
+      // Resize, compress, and get a stable base64 data URI in one memory-safe
+      // pass. Handles low-RAM Android devices via a smaller output budget,
+      // adaptive step-down if still too large, and a retry-smaller pass if
+      // the manipulator itself throws (typical shape of a memory-pressure
+      // failure). Base64 is stable for the rest of the session even after
+      // the picker closes or the app backgrounds.
+      const base64Uri = await resizeAndEncode(uri);
+      setValue(field, base64Uri as any);
+      clearErrors(field);
+      await saveFormData();
+    } catch {
+      setError(field, { type: 'manual', message: 'Failed to process image. Please try again.' });
+    } finally {
+      setImageLoading(false);
+    }
+  };
 
   const pickFromCamera = async () => {
     if (!currentImageField) return;

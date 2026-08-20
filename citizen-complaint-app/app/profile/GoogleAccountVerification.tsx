@@ -1,4 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { File } from 'expo-file-system';
 import {
   View,
   Text,
@@ -8,14 +10,10 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
-  Alert
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Controller, UseFormReturn } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
-import { File } from 'expo-file-system';
 import {
   CreditCard,
   Camera,
@@ -25,9 +23,8 @@ import {
   Check,
   AlertCircle,
   FileText,
-  ShieldCheck,
-  ChevronLeft
 } from 'lucide-react-native';
+import { RegistrationFormData } from '@/types/auth/register';
 import { THEME } from '@/constants/theme';
 import { ID_TYPES } from '@/constants/auth/registration';
 import {
@@ -36,13 +33,20 @@ import {
   getIdNumberHint,
 } from '@/utils/validation/id';
 import ErrorMessage from '@/components/register/ErrorMessage';
+import Recaptcha from '@/components/register/Recaptcha';
 import TermsAndAgreementModal from '@/components/modals/TermsAndAgreement';
-import { useCurrentUser } from '@/store/useCurrentUserStore';
-import GeneralToast from '@/components/Toast/GeneralToast';
-import useToastStore from '@/store/useGlobalModal';
-import { authApiClient, userApiClient } from '@/lib/client/user';
-import { askForNotificationPermission } from '@/hooks/general/usePushNotifications';
-type ImageField = 'idFrontImage' | 'idBackImage' | 'selfieImage';
+
+interface Step3Props {
+  form: UseFormReturn<RegistrationFormData>;
+  onBack: () => void;
+  onSubmit: () => void;
+  isLoading: boolean;
+  recaptchaVerified: boolean;
+  setRecaptchaVerified: (v: boolean) => void;
+  recaptchaError: string | undefined;
+  setRecaptchaError: (e: string | undefined) => void;
+  saveFormData: () => Promise<void>;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -111,6 +115,11 @@ const deleteQuietly = (uri?: string) => {
  * first pass is still too large, and retries once at a much smaller size
  * if the manipulator itself throws (typical shape of a memory-pressure
  * failure on Android).
+ *
+ * Returns base64 directly from manipulateAsync — no separate XHR/blob/
+ * FileReader round trip needed, and no dependency on content:// / file://
+ * URIs staying alive after the picker closes, since we resolve everything
+ * to a base64 data URI in this single call.
  */
 const resizeAndEncode = async (uri: string): Promise<string> => {
   if (!uri) throw new Error('No URI provided');
@@ -166,119 +175,81 @@ const resizeAndEncode = async (uri: string): Promise<string> => {
 };
 
 /**
- * Translates raw backend/network error strings into plain-language messages
- * a non-technical user can act on. Falls back to a generic message rather
- * than showing raw server text (stack-trace-y strings like "Part exceeded
- * maximum size of 1024KB." or "Internal Server Error" are meaningless to
- * users and look broken/unpolished).
+ * Shows a human-readable label for the image field value.
+ * base64 URIs are replaced with a friendly name.
  */
-const getFriendlySubmitError = (
-  rawMessage: string | undefined,
-  status: number | undefined,
-  t: (k: string) => string
+const getDisplayLabel = (
+  value: string,
+  fieldName: 'idFrontImage' | 'idBackImage' | 'selfieImage',
 ): string => {
-  const text = (rawMessage ?? '').toLowerCase();
-
-  if (text.includes('exceeded maximum size') || text.includes('too large') || text.includes('payload too large')) {
-    return t('googleIdVerification.errors.imageTooLarge');
-  }
-  if (text.includes('network') || text.includes('timeout') || status === undefined) {
-    return t('googleIdVerification.errors.networkError');
-  }
-  if (status === 401 || status === 403) {
-    return t('googleIdVerification.errors.sessionExpired');
-  }
-  if (status !== undefined && status >= 500) {
-    return t('googleIdVerification.errors.serverError');
-  }
-  if (text.includes('already') && (text.includes('verified') || text.includes('exists'))) {
-    return t('googleIdVerification.errors.alreadyVerified');
-  }
-  if (text.includes('invalid') && text.includes('id')) {
-    return t('googleIdVerification.errors.invalidIdDetails');
-  }
-
-  // Fall back to the generic message rather than showing raw backend text.
-  return t('googleIdVerification.errors.submitFailed');
-};
-
-const getDisplayLabel = (value: string, fieldName: ImageField, t: (k: string) => string): string => {
   if (!value) return '';
-  const labels: Record<ImageField, string> = {
-    idFrontImage: t('googleIdVerification.captured.front'),
-    idBackImage: t('googleIdVerification.captured.back'),
-    selfieImage: t('googleIdVerification.captured.selfie'),
-  };
-  return labels[fieldName] ?? t('googleIdVerification.captured.generic');
+  if (value.startsWith('data:')) {
+    const labels: Record<string, string> = {
+      idFrontImage: 'ID Front captured',
+      idBackImage: 'ID Back captured',
+      selfieImage: 'Selfie captured',
+    };
+    return labels[fieldName] ?? 'Image captured';
+  }
+  return value.split('/').pop() ?? 'Image selected';
 };
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function GoogleIdVerificationScreen() {
+const Step3IdVerification = ({
+  form,
+  onBack,
+  onSubmit,
+  isLoading,
+  recaptchaVerified,
+  setRecaptchaVerified,
+  recaptchaError,
+  setRecaptchaError,
+  saveFormData,
+}: Step3Props) => {
   const { t } = useTranslation();
-  const router = useRouter();
-  const { userData, fetchCurrentUser } = useCurrentUser();
-  const { setToastVisible, toastVisible, toastMessage, toastType, showToast } = useToastStore();
+  const { control, formState: { errors }, watch, setValue, setError, clearErrors } = form;
 
-  const [idType, setIdType] = useState('');
-  const [idNumber, setIdNumber] = useState('');
-  const [idNumberError, setIdNumberError] = useState<string | undefined>();
-  const [idTypeError, setIdTypeError] = useState<string | undefined>();
-
-  // Base64 data URIs (data:image/...;base64,...) used for both preview and upload —
-  // same shape as the register flow, now resized/adaptively-compressed before encoding.
-  const [idFrontImage, setIdFrontImage] = useState('');
-  const [idBackImage, setIdBackImage] = useState('');
-  const [selfieImage, setSelfieImage] = useState('');
-
-  const [imageErrors, setImageErrors] = useState<Partial<Record<ImageField, string>>>({});
-
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [termsError, setTermsError] = useState<string | undefined>();
-  const [showTermsModal, setShowTermsModal] = useState(false);
-
+  const [selectedIdType, setSelectedIdType] = useState(watch('idType') || '');
   const [showIdTypeModal, setShowIdTypeModal] = useState(false);
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
-  const [currentImageField, setCurrentImageField] = useState<ImageField | null>(null);
+  const [currentImageField, setCurrentImageField] = useState<
+    'idFrontImage' | 'idBackImage' | 'selfieImage' | null
+  >(null);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [submitError, setSubmitError] = useState<string | undefined>();
 
-  // `isLoading` (state) is what disables the button visually, but state
-  // updates are async and don't take effect until the next render — a fast
-  // double-tap can fire handleSubmit twice before the disabled prop lands.
-  // This ref is checked/set synchronously so a second tap in the same
-  // frame is a true no-op, not just visually blocked.
-  const isSubmittingRef = useRef(false);
-
-  const idPlaceholder = idType ? getIdNumberPlaceholder(idType) : t('googleIdVerification.selectIdTypeFirst');
-  const idHint = getIdNumberHint(idType);
-
-  const imageSetters: Record<ImageField, (v: string) => void> = {
-    idFrontImage: setIdFrontImage,
-    idBackImage: setIdBackImage,
-    selfieImage: setSelfieImage,
-  };
-  const imageValues: Record<ImageField, string> = {
-    idFrontImage: idFrontImage,
-    idBackImage: idBackImage,
-    selfieImage: selfieImage,
-  };
+  const idPlaceholder = selectedIdType ? getIdNumberPlaceholder(selectedIdType) : 'Select an ID type first';
+  const idHint = getIdNumberHint(selectedIdType);
 
   // ── Image handling ────────────────────────────────────────────────────────
 
-  const handleImagePick = (field: ImageField) => {
+  const handleImagePick = (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
     setCurrentImageField(field);
     setShowImagePickerModal(true);
   };
 
-  const storeImage = async (asset: ImagePicker.ImagePickerAsset, field: ImageField) => {
-    // Drop any previous image for this field first so we're not briefly
-    // holding the old large string alongside the new one being built.
-    imageSetters[field]('');
-    const dataUri = await resizeAndEncode(asset.uri);
-    imageSetters[field](dataUri);
-    setImageErrors((prev) => ({ ...prev, [field]: undefined }));
+  const processAndStoreImage = async (
+    uri: string,
+    field: 'idFrontImage' | 'idBackImage' | 'selfieImage',
+  ) => {
+    setImageLoading(true);
+    try {
+      // Resize, compress, and get a stable base64 data URI in one memory-safe
+      // pass. Handles low-RAM Android devices via a smaller output budget,
+      // adaptive step-down if still too large, and a retry-smaller pass if
+      // the manipulator itself throws (typical shape of a memory-pressure
+      // failure). Base64 is stable for the rest of the session even after
+      // the picker closes or the app backgrounds.
+      const base64Uri = await resizeAndEncode(uri);
+      setValue(field, base64Uri as any);
+      clearErrors(field);
+      await saveFormData();
+    } catch {
+      setError(field, { type: 'manual', message: 'Failed to process image. Please try again.' });
+    } finally {
+      setImageLoading(false);
+    }
   };
 
   const pickFromCamera = async () => {
@@ -286,221 +257,46 @@ export default function GoogleIdVerificationScreen() {
 
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
     if (!permissionResult.granted) {
-      showToast(t('googleIdVerification.errors.cameraPermission'), 'error');
+      alert('Camera permission is required!');
       return;
     }
 
-    setImageLoading(true);
-    try {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        // allowsEditing on Android produces a short-lived temp URI that can expire
-        // before we finish reading it. Disable it on Android to avoid that race.
-        allowsEditing: Platform.OS === 'ios',
-        quality: 0.7,
-        exif: false,
-      });
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      // allowsEditing on Android produces a short-lived temp URI that can expire
+      // before submission. Disable it on Android to avoid that race condition.
+      allowsEditing: Platform.OS === 'ios',
+      quality: 0.7,
+    });
 
-      setShowImagePickerModal(false);
-      if (!result.canceled) {
-        await storeImage(result.assets[0], currentImageField);
-      }
-    } catch (error) {
-      console.log('Camera capture/encode error:', error);
-      setImageErrors((prev) => ({
-        ...prev,
-        [currentImageField]: t('googleIdVerification.errors.imageProcessFailed'),
-      }));
-    } finally {
-      setImageLoading(false);
-      setCurrentImageField(null);
+    setShowImagePickerModal(false);
+    if (!result.canceled) {
+      await processAndStoreImage(result.assets[0].uri, currentImageField);
     }
+    setCurrentImageField(null);
   };
 
   const pickFromLibrary = async () => {
     if (!currentImageField) return;
 
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      showToast(t('googleIdVerification.errors.libraryPermission'), 'error');
-      return;
-    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      // Same reason as above — disable editing on Android.
+      allowsEditing: Platform.OS === 'ios',
+      quality: 0.7,
+    });
 
-    setImageLoading(true);
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: Platform.OS === 'ios',
-        quality: 0.7,
-        exif: false,
-      });
-
-      setShowImagePickerModal(false);
-      if (!result.canceled) {
-        await storeImage(result.assets[0], currentImageField);
-      }
-    } catch (error) {
-      console.log('Library pick/encode error:', error);
-      setImageErrors((prev) => ({
-        ...prev,
-        [currentImageField]: t('googleIdVerification.errors.imageProcessFailed'),
-      }));
-    } finally {
-      setImageLoading(false);
-      setCurrentImageField(null);
+    setShowImagePickerModal(false);
+    if (!result.canceled) {
+      await processAndStoreImage(result.assets[0].uri, currentImageField);
     }
+    setCurrentImageField(null);
   };
 
-  const removeImage = (field: ImageField) => {
-    imageSetters[field]('');
-    setImageErrors((prev) => ({ ...prev, [field]: undefined }));
-  };
-
-  // ── Validation ────────────────────────────────────────────────────────────
-
-  const validate = (): boolean => {
-    let valid = true;
-
-    if (!idType) {
-      setIdTypeError(t('required'));
-      valid = false;
-    } else {
-      setIdTypeError(undefined);
-    }
-
-    const idErr = validateIdNumberByType(idNumber, idType, t);
-    if (!idNumber || idErr) {
-      setIdNumberError(idErr || t('required'));
-      valid = false;
-    } else {
-      setIdNumberError(undefined);
-    }
-
-    const nextImageErrors: Partial<Record<ImageField, string>> = {};
-    if (!idFrontImage) {
-      nextImageErrors.idFrontImage = t('required');
-      valid = false;
-    }
-    if (!idBackImage) {
-      nextImageErrors.idBackImage = t('required');
-      valid = false;
-    }
-    if (!selfieImage) {
-      nextImageErrors.selfieImage = t('required');
-      valid = false;
-    }
-    setImageErrors(nextImageErrors);
-
-    if (!agreedToTerms) {
-      setTermsError(t('required'));
-      valid = false;
-    } else {
-      setTermsError(undefined);
-    }
-
-    return valid;
-  };
-
-  // ── Submit ────────────────────────────────────────────────────────────────
-  const handleSubmit = async () => {
-    if (isSubmittingRef.current) return;
-
-    setSubmitError(undefined);
-    if (!validate()) return;
-
-    isSubmittingRef.current = true;
-    setIsLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('id_type', idType);
-      formData.append('id_number', idNumber);
-      // Same shape as register: send the base64 data URI strings directly
-      // instead of building { uri, name, type } file parts. This avoids the
-      // Android multipart file-streaming issue that was causing the images
-      // to arrive as undefined server-side. Images are resized/adaptively
-      // compressed before this point (see resizeAndEncode) to stay under
-      // the backend's per-part size limit and reduce peak memory use.
-      formData.append('front_id', idFrontImage);
-      formData.append('back_id', idBackImage);
-      formData.append('selfie_with_id', selfieImage);
-
-      // Let Axios/RN set Content-Type itself. If authApiClient has a default
-      // 'application/json' Content-Type baked in, override it here so the
-      // multipart boundary isn't clobbered:
-      const response = await authApiClient.patch('/id-verification', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      if (response.status === 200) {
-        await fetchCurrentUser();
-      }
-
-      // Clear the large base64 strings out of state now that they've been
-      // sent — nothing downstream needs them, and we're about to navigate
-      // away anyway.
-      setIdFrontImage('');
-      setIdBackImage('');
-      setSelfieImage('');
-
-      if (!userData?.push_notifications_enabled) {
-  await new Promise<void>((resolve) => {
-    let settled = false;
-    const done = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-
-    Alert.alert(
-      '🔔 Stay Updated',
-      'Do you want to receive notifications about your ID verification status?',
-      [
-        { text: 'No Thanks', style: 'cancel', onPress: done },
-        {
-          text: 'Yes, Notify Me',
-          onPress: async () => {
-            try {
-              const token = await askForNotificationPermission();
-              if (!token) {
-                showToast(t('googleIdVerification.errors.notificationPermissionDenied') ?? 'Permission denied for notifications.', 'error');
-                return;
-              }
-              await userApiClient.post('/push-token', { token });
-              await userApiClient.post('/enable-push-notifications', { enabled: true });
-              await fetchCurrentUser(true);
-              showToast('Notifications enabled!', 'success');
-            } catch (err) {
-              showToast('Failed to enable notifications.', 'error');
-            } finally {
-              done();
-            }
-          },
-        },
-      ],
-      { cancelable: true, onDismiss: done } // safety net for outside-tap / back-button dismiss on Android
-    );
-  });
-}
-
-
-
-
-      router.push('/(tabs)');
-    } catch (error: any) {
-      // Keep the raw error in logs for debugging — never shown to the user.
-      console.log('ID verification error:', JSON.stringify(error?.response?.data, null, 2));
-      console.log('ID verification error status:', error?.response?.status);
-
-      const detail = error?.response?.data?.detail;
-      const rawMessage = Array.isArray(detail)
-        ? detail.map((d: any) => d?.msg ?? JSON.stringify(d)).join('\n')
-        : detail;
-
-      setSubmitError(getFriendlySubmitError(rawMessage, error?.response?.status, t));
-    } finally {
-      isSubmittingRef.current = false;
-      setIsLoading(false);
-    }
+  const removeImage = async (field: 'idFrontImage' | 'idBackImage' | 'selfieImage') => {
+    setValue(field, '' as any, { shouldValidate: false, shouldDirty: true });
+    clearErrors(field);
+    await saveFormData();
   };
 
   // ── Sub-components ────────────────────────────────────────────────────────
@@ -511,376 +307,369 @@ export default function GoogleIdVerificationScreen() {
     required,
     subLabel,
   }: {
-    fieldName: ImageField;
+    fieldName: 'idFrontImage' | 'idBackImage' | 'selfieImage';
     label: string;
     required?: boolean;
     subLabel: string;
-  }) => {
-    const value = imageValues[fieldName];
-    const error = imageErrors[fieldName];
-
-    return (
-      <View className="mb-4">
-        <Text className="text-sm font-medium text-neutral-700 mb-2">
-          {label} {required && '*'}
-        </Text>
-        {value ? (
-          <View
-            className={`border-2 rounded-xl p-4 bg-white ${
-              error ? 'border-error-500' : 'border-neutral-200'
-            }`}
-          >
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center flex-1">
-                <ImageIcon size={20} color="#10B981" />
-                <Text className="ml-2 text-sm text-neutral-700 flex-1" numberOfLines={1}>
-                  {getDisplayLabel(value, fieldName, t)}
-                </Text>
+  }) => (
+    <View className="mb-4">
+      <Text className="text-sm font-medium text-neutral-700 mb-2">
+        {label} {required && '*'}
+      </Text>
+      <Controller
+        control={control}
+        name={fieldName}
+        rules={required ? { required: t('required') } : undefined}
+        render={({ field: { value } }) => (
+          <>
+            {value && value !== '' ? (
+              <View
+                className={`border-2 rounded-xl p-4 bg-white ${
+                  errors[fieldName] ? 'border-error-500' : 'border-neutral-200'
+                }`}
+              >
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center flex-1">
+                    <ImageIcon size={20} color="#10B981" />
+                    <Text className="ml-2 text-sm text-neutral-700 flex-1" numberOfLines={1}>
+                      {getDisplayLabel(value, fieldName)}
+                    </Text>
+                  </View>
+                  <View className="flex-row" style={{ gap: 8 }}>
+                    <TouchableOpacity
+                      onPress={() => handleImagePick(fieldName)}
+                      className="bg-primary-100 rounded-lg p-2"
+                      activeOpacity={0.7}
+                      disabled={imageLoading}
+                    >
+                      <Camera size={16} color={THEME.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => removeImage(fieldName)}
+                      className="bg-error-100 rounded-lg p-2"
+                      activeOpacity={0.7}
+                      disabled={imageLoading}
+                    >
+                      <X size={16} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
-              <View className="flex-row" style={{ gap: 8 }}>
-                <TouchableOpacity
-                  onPress={() => handleImagePick(fieldName)}
-                  className="bg-primary-100 rounded-lg p-2"
-                  activeOpacity={0.7}
-                  disabled={imageLoading}
-                >
-                  <Camera size={16} color={THEME.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => removeImage(fieldName)}
-                  className="bg-error-100 rounded-lg p-2"
-                  activeOpacity={0.7}
-                  disabled={imageLoading}
-                >
-                  <X size={16} color="#EF4444" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <TouchableOpacity
-            onPress={() => handleImagePick(fieldName)}
-            className={`border-2 border-dashed rounded-xl p-6 items-center ${
-              error ? 'border-error-500 bg-error-50' : 'border-neutral-300 bg-neutral-50'
-            }`}
-            activeOpacity={0.7}
-            disabled={imageLoading}
-          >
-            {imageLoading && currentImageField === fieldName ? (
-              <ActivityIndicator color={THEME.primary} />
             ) : (
-              <>
-                <Camera size={32} color="#9CA3AF" />
-                <Text style={{ color: THEME.primary }} className="font-medium mt-2">
-                  {t('tapToUpload')}
-                </Text>
-                <Text className="text-neutral-500 text-xs mt-1">{subLabel}</Text>
-              </>
+              <TouchableOpacity
+                onPress={() => handleImagePick(fieldName)}
+                className={`border-2 border-dashed rounded-xl p-6 items-center ${
+                  errors[fieldName]
+                    ? 'border-error-500 bg-error-50'
+                    : 'border-neutral-300 bg-neutral-50'
+                }`}
+                activeOpacity={0.7}
+                disabled={imageLoading}
+              >
+                {imageLoading && currentImageField === fieldName ? (
+                  <ActivityIndicator color={THEME.primary} />
+                ) : (
+                  <>
+                    <Camera size={32} color="#9CA3AF" />
+                    <Text style={{ color: THEME.primary }} className="font-medium mt-2">
+                      {t('tapToUpload')}
+                    </Text>
+                    <Text className="text-neutral-500 text-xs mt-1">{subLabel}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </>
         )}
-        <ErrorMessage message={error} />
-      </View>
-    );
-  };
+      />
+      <ErrorMessage message={errors[fieldName]?.message} />
+    </View>
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-50" edges={['top']}>
-      <ScrollView
-        className="flex-1 px-6"
-        contentContainerStyle={{ paddingTop: 24, paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View className="items-center mb-6">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={{
-              position: 'absolute',
-              top: 8,
-              left: 0,
-              zIndex: 10,
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingVertical: 8,
-              paddingRight: 12,
-            }}
-            activeOpacity={0.7}
-          >
-            <ChevronLeft size={24} color={THEME.primary} />
-            <Text style={{ color: THEME.primary }} className="text-base font-medium ml-0.5">
-              {t('back')}
-            </Text>
-          </TouchableOpacity>
+    <View>
+      <Text className="text-2xl font-bold text-neutral-900 mb-2">{t('idVerification')}</Text>
+      <Text className="text-sm text-neutral-600 mb-6">{t('idVerificationNote')}</Text>
 
-          <View className="items-center mb-6" style={{ marginTop: 36 }}>
-            <View
-              style={{ backgroundColor: THEME.primaryMuted }}
-              className="w-16 h-16 rounded-full items-center justify-center mb-4"
+      {/* ID Type */}
+      <View className="mb-4">
+        <Text className="text-sm font-medium text-neutral-700 mb-2">{t('idType')} *</Text>
+        <Controller
+          control={control}
+          name="idType"
+          rules={{ required: t('required') }}
+          render={({ field: { value } }) => (
+            <TouchableOpacity
+              onPress={() => setShowIdTypeModal(true)}
+              className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${
+                errors.idType ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+              }`}
+              activeOpacity={0.7}
             >
-              <ShieldCheck size={32} color={THEME.primary} />
-            </View>
-            <Text className="text-2xl font-bold text-neutral-900 mb-2 text-center">
-              {t('googleIdVerification.title')}
-            </Text>
-            <Text className="text-sm text-neutral-600 text-center">
-              {t('googleIdVerification.subtitle')}
-            </Text>
-          </View>
-        </View>
-
-        {!!userData?.email && (
-          <View className="bg-white border border-neutral-200 rounded-xl px-4 py-3 mb-6">
-            <Text className="text-xs text-neutral-500 mb-0.5">
-              {t('googleIdVerification.signedInAs')}
-            </Text>
-            <Text className="text-sm font-medium text-neutral-900">{userData.email}</Text>
-          </View>
-        )}
-
-        {/* ID Type */}
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-neutral-700 mb-2">{t('idType')} *</Text>
-          <TouchableOpacity
-            onPress={() => setShowIdTypeModal(true)}
-            className={`border-2 rounded-xl px-4 py-3.5 flex-row justify-between items-center bg-white ${
-              idTypeError ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-            }`}
-            activeOpacity={0.7}
-          >
-            <CreditCard size={20} color="#6B7280" />
-            <Text className={`flex-1 ml-3 text-base ${idType ? 'text-neutral-900' : 'text-neutral-400'}`}>
-              {idType ? t(idType) : t('selectIdType')}
-            </Text>
-            <ChevronDown size={20} color="#6B7280" />
-          </TouchableOpacity>
-          <ErrorMessage message={idTypeError} />
-        </View>
-
-        {/* ID Type Modal */}
-        <Modal
-          visible={showIdTypeModal}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowIdTypeModal(false)}
-        >
-          <View className="flex-1 justify-end bg-black/50">
-            <View className="bg-white rounded-t-3xl p-6 max-h-[70%]">
-              <Text className="text-xl font-bold text-neutral-900 mb-4">{t('selectIdType')}</Text>
-              <TouchableOpacity
-                onPress={() => setShowIdTypeModal(false)}
-                className="absolute top-6 right-6"
-                activeOpacity={0.7}
-              >
-                <X size={24} color="#6B7280" />
-              </TouchableOpacity>
-              <ScrollView>
-                {ID_TYPES.map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    onPress={() => {
-                      if (idType !== type) {
-                        setIdNumber('');
-                        setIdNumberError(undefined);
-                      }
-                      setIdType(type);
-                      setIdTypeError(undefined);
-                      setShowIdTypeModal(false);
-                    }}
-                    className={`py-4 border-b border-neutral-200 flex-row justify-between items-center ${
-                      idType === type ? 'bg-primary-50' : ''
-                    }`}
-                    activeOpacity={0.7}
-                  >
-                    <Text className="text-base text-neutral-900">{t(type)}</Text>
-                    {idType === type && <Check size={18} color={THEME.primary} />}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
-        {/* ID Number */}
-        <View className="mb-4">
-          <Text className="text-sm font-medium text-neutral-700 mb-2">{t('idNumber')} *</Text>
-          <View
-            className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
-              idNumberError ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-            }`}
-          >
-            <FileText size={20} color="#6B7280" />
-            <TextInput
-              className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
-              onBlur={() => {
-                const err = validateIdNumberByType(idNumber, idType, t);
-                setIdNumberError(err || undefined);
-              }}
-              onChangeText={(text) => {
-                const sanitized = text.replace(/[^a-zA-Z0-9\- ]/g, '').toUpperCase();
-                setIdNumber(sanitized);
-                setIdNumberError(undefined);
-              }}
-              maxLength={30}
-              value={idNumber}
-              placeholder={idPlaceholder}
-              placeholderTextColor="#9CA3AF"
-              autoCapitalize="characters"
-            />
-          </View>
-          {idHint ? <Text className="text-xs text-neutral-500 mt-1">{idHint}</Text> : null}
-          <ErrorMessage message={idNumberError} />
-        </View>
-
-        {/* Image Upload Fields */}
-        <ImageUploadField
-          fieldName="idFrontImage"
-          label={t('uploadIdFront')}
-          required
-          subLabel={t('googleIdVerification.subLabels.front')}
-        />
-        <ImageUploadField
-          fieldName="idBackImage"
-          label={t('uploadIdBack')}
-          required
-          subLabel={t('googleIdVerification.subLabels.back')}
-        />
-        <ImageUploadField
-          fieldName="selfieImage"
-          label={t('uploadSelfie')}
-          required
-          subLabel={t('googleIdVerification.subLabels.selfie')}
-        />
-
-        {/* Image Picker Modal */}
-        <Modal
-          visible={showImagePickerModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => {
-            setShowImagePickerModal(false);
-            setCurrentImageField(null);
-          }}
-        >
-          <View className="flex-1 justify-center items-center bg-black/50 px-6">
-            <View className="bg-white rounded-2xl p-6 w-full">
-              <Text className="text-xl font-bold text-neutral-900 mb-4">
-                {t('googleIdVerification.chooseImageSource')}
+              <CreditCard size={20} color="#6B7280" />
+              <Text className={`flex-1 ml-3 text-base ${value ? 'text-neutral-900' : 'text-neutral-400'}`}>
+                {value ? t(value) : t('selectIdType')}
               </Text>
+              <ChevronDown size={20} color="#6B7280" />
+            </TouchableOpacity>
+          )}
+        />
+        <ErrorMessage message={errors.idType?.message} />
+      </View>
+
+      {/* ID Type Modal */}
+      <Modal
+        visible={showIdTypeModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowIdTypeModal(false)}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-3xl p-6 max-h-[70%]">
+            <Text className="text-xl font-bold text-neutral-900 mb-4">{t('selectIdType')}</Text>
+            <TouchableOpacity
+              onPress={() => setShowIdTypeModal(false)}
+              className="absolute top-6 right-6"
+              activeOpacity={0.7}
+            >
+              <X size={24} color="#6B7280" />
+            </TouchableOpacity>
+            <ScrollView>
+              {ID_TYPES.map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  onPress={() => {
+                    if (selectedIdType !== type) {
+                      setValue('idNumber', '');
+                      clearErrors('idNumber');
+                    }
+                    setSelectedIdType(type);
+                    setValue('idType', type, { shouldDirty: true, shouldValidate: true });
+                    clearErrors('idType');
+                    setShowIdTypeModal(false);
+                    saveFormData();
+                  }}
+                  className={`py-4 border-b border-neutral-200 flex-row justify-between items-center ${
+                    selectedIdType === type ? 'bg-primary-50' : ''
+                  }`}
+                  activeOpacity={0.7}
+                >
+                  <Text className="text-base text-neutral-900">{t(type)}</Text>
+                  {selectedIdType === type && <Check size={18} color={THEME.primary} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ID Number */}
+      <View className="mb-4">
+        <Text className="text-sm font-medium text-neutral-700 mb-2">{t('idNumber')} *</Text>
+        <Controller
+          control={control}
+          name="idNumber"
+          rules={{
+            required: t('required'),
+            validate: (value) => {
+              const err = validateIdNumberByType(value, selectedIdType, t);
+              return err ? err : true;
+            },
+          }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <>
+              <View
+                className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
+                  errors.idNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                }`}
+              >
+                <FileText size={20} color="#6B7280" />
+                <TextInput
+                  className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
+                  onBlur={() => {
+                    onBlur();
+                    const err = validateIdNumberByType(value, selectedIdType, t);
+                    if (err) setError('idNumber', { type: 'manual', message: err });
+                    else clearErrors('idNumber');
+                  }}
+                  onChangeText={(text) => {
+                    const sanitized = text.replace(/[^a-zA-Z0-9\- ]/g, '').toUpperCase();
+                    onChange(sanitized);
+                    clearErrors('idNumber');
+                  }}
+                  maxLength={30}
+                  value={value}
+                  placeholder={idPlaceholder}
+                  placeholderTextColor="#9CA3AF"
+                  autoCapitalize="characters"
+                />
+              </View>
+              {idHint ? (
+                <Text className="text-xs text-neutral-500 mt-1">{idHint}</Text>
+              ) : null}
+            </>
+          )}
+        />
+        <ErrorMessage message={errors.idNumber?.message} />
+      </View>
+
+      {/* Image Upload Fields */}
+      <ImageUploadField
+        fieldName="idFrontImage"
+        label={t('uploadIdFront')}
+        required
+        subLabel="Front side of your ID"
+      />
+      <ImageUploadField
+        fieldName="idBackImage"
+        label={t('uploadIdBack')}
+        subLabel="Back side of your ID"
+      />
+      <ImageUploadField
+        fieldName="selfieImage"
+        label={t('uploadSelfie')}
+        required
+        subLabel="Selfie holding your ID"
+      />
+
+      {/* Image Picker Modal */}
+      <Modal
+        visible={showImagePickerModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowImagePickerModal(false);
+          setCurrentImageField(null);
+        }}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-6">
+          <View className="bg-white rounded-2xl p-6 w-full">
+            <Text className="text-xl font-bold text-neutral-900 mb-4">Choose Image Source</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setShowImagePickerModal(false);
+                setCurrentImageField(null);
+              }}
+              className="absolute top-6 right-6"
+              activeOpacity={0.7}
+            >
+              <X size={24} color="#6B7280" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={pickFromCamera}
+              className="flex-row items-center bg-primary-50 rounded-xl p-4 mb-3"
+              activeOpacity={0.7}
+            >
+              <Camera size={24} color={THEME.primary} />
+              <View className="ml-3 flex-1">
+                <Text className="text-base font-semibold text-neutral-900">Take Photo</Text>
+                <Text className="text-sm text-neutral-600">Use your camera to capture</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={pickFromLibrary}
+              className="flex-row items-center bg-neutral-50 rounded-xl p-4"
+              activeOpacity={0.7}
+            >
+              <ImageIcon size={24} color="#6B7280" />
+              <View className="ml-3 flex-1">
+                <Text className="text-base font-semibold text-neutral-900">Choose from Gallery</Text>
+                <Text className="text-sm text-neutral-600">Select from your photos</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Terms and Conditions */}
+      <View className="mb-4">
+        <Controller
+          control={control}
+          name="agreedToTerms"
+          rules={{ required: t('required') }}
+          render={({ field: { onChange, value } }) => (
+            <>
               <TouchableOpacity
                 onPress={() => {
-                  setShowImagePickerModal(false);
-                  setCurrentImageField(null);
+                  if (value) { onChange(false); } else { setShowTermsModal(true); }
                 }}
-                className="absolute top-6 right-6"
+                className="flex-row items-start mb-2"
                 activeOpacity={0.7}
               >
-                <X size={24} color="#6B7280" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={pickFromCamera}
-                className="flex-row items-center bg-primary-50 rounded-xl p-4 mb-3"
-                activeOpacity={0.7}
-              >
-                <Camera size={24} color={THEME.primary} />
-                <View className="ml-3 flex-1">
-                  <Text className="text-base font-semibold text-neutral-900">
-                    {t('googleIdVerification.takePhoto')}
-                  </Text>
-                  <Text className="text-sm text-neutral-600">
-                    {t('googleIdVerification.takePhotoSubtitle')}
-                  </Text>
+                <View
+                  style={value ? { backgroundColor: THEME.primary, borderColor: THEME.primary } : {}}
+                  className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${
+                    !value ? (errors.agreedToTerms ? 'border-error-500' : 'border-neutral-300') : ''
+                  }`}
+                >
+                  {value && <Check size={14} color="#FFFFFF" />}
                 </View>
+                <Text className="text-sm text-neutral-700 flex-1">{t('agreeTerms')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={pickFromLibrary}
-                className="flex-row items-center bg-neutral-50 rounded-xl p-4"
-                activeOpacity={0.7}
-              >
-                <ImageIcon size={24} color="#6B7280" />
-                <View className="ml-3 flex-1">
-                  <Text className="text-base font-semibold text-neutral-900">
-                    {t('googleIdVerification.chooseFromGallery')}
-                  </Text>
-                  <Text className="text-sm text-neutral-600">
-                    {t('googleIdVerification.chooseFromGallerySubtitle')}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
 
-        {/* Terms and Conditions */}
-        <View className="mb-4">
-          <TouchableOpacity
-            onPress={() => {
-              if (agreedToTerms) {
-                setAgreedToTerms(false);
-              } else {
-                setShowTermsModal(true);
-              }
-            }}
-            className="flex-row items-start mb-2"
-            activeOpacity={0.7}
-          >
-            <View
-              style={agreedToTerms ? { backgroundColor: THEME.primary, borderColor: THEME.primary } : {}}
-              className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${
-                !agreedToTerms ? (termsError ? 'border-error-500' : 'border-neutral-300') : ''
-              }`}
-            >
-              {agreedToTerms && <Check size={14} color="#FFFFFF" />}
-            </View>
-            <Text className="text-sm text-neutral-700 flex-1">{t('agreeTerms')}</Text>
-          </TouchableOpacity>
+              <TermsAndAgreementModal
+                visible={showTermsModal}
+                onAccept={() => {
+                  onChange(true);
+                  clearErrors('agreedToTerms');
+                  setShowTermsModal(false);
+                  saveFormData();
+                }}
+                onDecline={() => setShowTermsModal(false)}
+              />
+            </>
+          )}
+        />
+        <ErrorMessage message={errors.agreedToTerms?.message} />
 
-          <TermsAndAgreementModal
-            visible={showTermsModal}
-            onAccept={() => {
-              setAgreedToTerms(true);
-              setTermsError(undefined);
-              setShowTermsModal(false);
+        {/* reCAPTCHA */}
+        <View className="mb-6 mt-2">
+          <Recaptcha
+            verified={recaptchaVerified}
+            onVerify={() => {
+              setRecaptchaVerified(true);
+              setRecaptchaError(undefined);
             }}
-            onDecline={() => setShowTermsModal(false)}
+            error={recaptchaError}
           />
-
-          <ErrorMessage message={termsError} />
         </View>
 
-        {submitError && (
+        {errors.root?.general && (
           <View className="bg-error-50 border border-error-200 rounded-xl p-4 mb-6">
             <View className="flex-row items-center">
               <AlertCircle size={20} color="#EF4444" />
-              <Text className="text-error-700 font-medium ml-2">{submitError}</Text>
+              <Text className="text-error-700 font-medium ml-2">{errors.root.general.message}</Text>
             </View>
           </View>
         )}
 
-        <TouchableOpacity
-          onPress={handleSubmit}
-          disabled={isLoading || imageLoading}
-          style={{ backgroundColor: THEME.primary }}
-          className="rounded-xl py-4 items-center shadow-sm"
-          activeOpacity={0.85}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text className="text-white font-semibold text-base">{t('submit')}</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-
-      <GeneralToast
-        visible={toastVisible}
-        onHide={() => setToastVisible(false)}
-        message={toastMessage}
-        type={toastType}
-      />
-    </SafeAreaView>
+        <View className="flex-row gap-3">
+          <TouchableOpacity
+            onPress={onBack}
+            className="flex-1 bg-neutral-100 rounded-xl py-4 items-center"
+            activeOpacity={0.7}
+            disabled={isLoading || imageLoading}
+          >
+            <Text className="text-neutral-700 font-semibold text-base">{t('back')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onSubmit}
+            disabled={isLoading || imageLoading}
+            style={{ backgroundColor: THEME.primary }}
+            className="flex-1 rounded-xl py-4 items-center shadow-sm"
+            activeOpacity={0.85}
+          >
+            {isLoading
+              ? <ActivityIndicator color="#FFFFFF" />
+              : <Text className="text-white font-semibold text-base">{t('submit')}</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
   );
-}
+};
+
+export default Step3IdVerification;
