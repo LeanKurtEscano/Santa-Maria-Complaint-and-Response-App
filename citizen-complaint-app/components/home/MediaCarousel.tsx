@@ -13,7 +13,23 @@ export const CARD_INNER_WIDTH = SCREEN_WIDTH - 40 - 32;
 function ImageSlide({ uri, onPress }: { uri: string; onPress: () => void }) {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.92}>
-      <Image source={{ uri }} style={{ width: CARD_INNER_WIDTH, height: 210, borderRadius: 12 }} resizeMode="cover" />
+      <View style={{ width: CARD_INNER_WIDTH, height: 210, borderRadius: 12, overflow: 'hidden', backgroundColor: '#0F172A' }}>
+        {/* Blurred, zoomed backdrop fills the box so there's no dead space */}
+        <Image
+          source={{ uri }}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+          blurRadius={20}
+        />
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.15)' }]} />
+
+        {/* Full image on top — never cropped */}
+        <Image
+          source={{ uri }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="contain"
+        />
+      </View>
     </TouchableOpacity>
   );
 }

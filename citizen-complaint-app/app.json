@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.santamaria.citizencomplaint",
+      "bundleIdentifier": "com.maryapp.user",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload valid identification during registration and attach images to complaints.",
         "NSCameraUsageDescription": "This app needs access to your camera to capture identification documents and take photos for complaints.",
@@ -43,7 +43,7 @@
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.lean_kurt_escano.citizencomplaintapp"
+      "package": "com.maryapp.user"
     },
     "web": {
       "output": "static",
@@ -105,8 +105,8 @@
       "eas": {
         "projectId": "803edf0b-f96a-4f5c-96db-7ac1fe268656"
       },
-    "EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID": "663665418051-n5q7oaveaega3na6c3dmjjlp80qj1rq8.apps.googleusercontent.com",
-  "EXPO_PUBLIC_CLERK_GOOGLE_ANDROID_CLIENT_ID": "663665418051-g1ua5l9mnvuf8okn7c981pm1c7p5sbqq.apps.googleusercontent.com"
+      "EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID": "663665418051-n5q7oaveaega3na6c3dmjjlp80qj1rq8.apps.googleusercontent.com",
+      "EXPO_PUBLIC_CLERK_GOOGLE_ANDROID_CLIENT_ID": "663665418051-iqjf2qptp8b9v920dqo0pgg75pfsjsi5.apps.googleusercontent.com"
     },
     "owner": "lean_kurt_escano"
   }
