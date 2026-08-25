@@ -30,6 +30,8 @@ import { useCurrentUser } from '@/store/useCurrentUserStore';
 import * as SecureStore from 'expo-secure-store';
 import { THEME } from '@/constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Device from 'expo-device';
+import * as Application from 'expo-application';
 
 // Clerk browser OAuth - used for iOS / Expo Go testing
 import { useSSO, useAuth } from '@clerk/expo';
@@ -47,11 +49,96 @@ interface LoginFormData {
     role: string;
 }
 
+// Payload actually sent to the backend. Extends the form
+// with device metadata so the server can identify/verify the device.
+// NOTE: field names here match what the backend reads off `login_data`
+// (login_data.device_id, login_data.model, login_data.brand, etc.)
+interface LoginRequestPayload extends LoginFormData {
+    device_id?: string;
+    model?: string;
+    brand?: string;
+    system_name?: string;
+    system_version?: string;
+    app_version?: string;
+    build_number?: string;
+}
+
+// Payload sent to /login/google. Same device fields as LoginRequestPayload,
+// plus the Clerk token instead of email/password.
+interface GoogleLoginRequestPayload {
+    clerk_token: string;
+    device_id?: string;
+    model?: string;
+    brand?: string;
+    system_name?: string;
+    system_version?: string;
+    app_version?: string;
+    build_number?: string;
+}
+
+// SecureStore keys used across the auth flow.
+const SECURE_STORE_KEYS = {
+    ACCESS_TOKEN: 'complaint_token',
+    REFRESH_TOKEN: 'complaint_refresh_token',
+    PENDING_EMAIL: 'pending_verify_email',
+    PENDING_PASSWORD: 'pending_verify_password',
+};
+
 interface GoogleLoginProps {
     onSuccess: (clerkToken: string) => Promise<void>;
     onError: (error: any) => void;
     googleLoading: boolean;
     setGoogleLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+/**
+ * Collects device metadata to send along with the login request.
+ * Uses expo-device + expo-application (Expo Go compatible, and also
+ * works fine in dev builds / production builds). Wrapped in a single
+ * try/catch so a failure collecting metadata never blocks login.
+ *
+ * Returned keys are named to match the backend's expected field names
+ * directly (device_id, model, brand, system_name, system_version,
+ * app_version, build_number) so callers can spread this straight into
+ * the request payload without remapping keys.
+ */
+async function getDeviceMetadata(): Promise<
+    Pick<
+        LoginRequestPayload,
+        | 'device_id'
+        | 'model'
+        | 'brand'
+        | 'system_name'
+        | 'system_version'
+        | 'app_version'
+        | 'build_number'
+    >
+> {
+    try {
+        let deviceId: string | null = null;
+
+        if (Platform.OS === 'android') {
+            // Synchronous, stable per app install.
+            deviceId = Application.getAndroidId();
+        } else if (Platform.OS === 'ios') {
+            // Async, stable per vendor (resets if all apps from
+            // that vendor are uninstalled).
+            deviceId = await Application.getIosIdForVendorAsync();
+        }
+
+        return {
+            device_id: deviceId ?? undefined,
+            model: Device.modelName ?? undefined,
+            brand: Device.brand ?? undefined,
+            system_name: Device.osName ?? undefined,
+            system_version: Device.osVersion ?? undefined,
+            app_version: Application.nativeApplicationVersion ?? undefined,
+            build_number: Application.nativeBuildVersion ?? undefined,
+        };
+    } catch (error) {
+        console.log('Failed to collect device metadata:', error);
+        return {};
+    }
 }
 
 /**
@@ -247,26 +334,42 @@ export default function LoginScreen({ navigation }: any) {
             );
         }
 
+        const deviceMetadata = await getDeviceMetadata();
+
+        const payload: GoogleLoginRequestPayload = {
+            clerk_token: clerkToken,
+            ...deviceMetadata,
+        };
+
         const { data } = await authApiClient.post(
             '/login/google',
-            {
-                clerk_token: clerkToken,
-            }
+            payload
         );
 
         console.log(
-            'Google login successful:',
-            data.access_token,
-            data.refresh_token
+            'Google login response:',
+            data
         );
 
+        // Device not recognized: backend sent an OTP instead of tokens.
+        // Stash the email (no password for Google login) and send the
+        // user to verify the device.
+        if (data.is_verified === false) {
+            await SecureStore.setItemAsync(
+                SECURE_STORE_KEYS.PENDING_EMAIL,
+                data.email
+            );
+            router.replace('/(auth)/VerifyDeviceScreen');
+            return;
+        }
+
         await SecureStore.setItemAsync(
-            'complaint_token',
+            SECURE_STORE_KEYS.ACCESS_TOKEN,
             data.access_token
         );
 
         await SecureStore.setItemAsync(
-            'complaint_refresh_token',
+            SECURE_STORE_KEYS.REFRESH_TOKEN,
             data.refresh_token
         );
 
@@ -277,7 +380,7 @@ export default function LoginScreen({ navigation }: any) {
             .syncPushToken();
     };
 
-    const loginMutation = useSubmitForm<LoginFormData>({
+    const loginMutation = useSubmitForm<LoginRequestPayload>({
         url: '/login',
         method: 'post',
         client: authApiClient,
@@ -308,13 +411,24 @@ export default function LoginScreen({ navigation }: any) {
             },
         ],
         onSuccess: async (data) => {
+            // Device not recognized: backend sent an OTP instead of tokens.
+            // Stash the email and send the user to verify the device.
+            if (data.is_verified === false) {
+                await SecureStore.setItemAsync(
+                    SECURE_STORE_KEYS.PENDING_EMAIL,
+                    data.email
+                );
+                router.replace('/(auth)/VerifyDeviceScreen');
+                return;
+            }
+
             await SecureStore.setItemAsync(
-                'complaint_token',
+                SECURE_STORE_KEYS.ACCESS_TOKEN,
                 data.access_token
             );
 
             await SecureStore.setItemAsync(
-                'complaint_refresh_token',
+                SECURE_STORE_KEYS.REFRESH_TOKEN,
                 data.refresh_token
             );
 
@@ -337,12 +451,19 @@ export default function LoginScreen({ navigation }: any) {
         i18n.changeLanguage(lang);
     };
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
         AsyncStorage.removeItem(
             'registrationFormData'
         );
 
-        loginMutation.mutate(formData, {
+        const deviceMetadata = await getDeviceMetadata();
+
+        const payload: LoginRequestPayload = {
+            ...formData,
+            ...deviceMetadata,
+        };
+
+        loginMutation.mutate(payload, {
             onError: (error: any) => {
                 if (error?.type === 'validation') {
                     setErrors(error.errors);
@@ -1026,85 +1147,6 @@ export default function LoginScreen({ navigation }: any) {
                                     />
                                 </View>
                             </TouchableOpacity>
-
-                            {/* Register with Phone */}
-                            {/*
-                            <TouchableOpacity
-                                onPress={() =>
-                                    router.push({
-                                        pathname:
-                                            '/(auth)/Register',
-                                        params: {
-                                            apiRoute:
-                                                '/register-phone-number',
-                                        },
-                                    })
-                                }
-                                activeOpacity={0.85}
-                                className="flex-row items-center rounded-2xl overflow-hidden"
-                                style={{
-                                    backgroundColor:
-                                        '#F0F9FF',
-                                    borderWidth: 1.5,
-                                    borderColor:
-                                        '#BAE6FD',
-                                    minHeight: 52,
-                                }}
-                            >
-                                <View
-                                    style={{
-                                        width:
-                                            ICON_STRIP_WIDTH,
-                                        alignSelf:
-                                            'stretch',
-                                        alignItems:
-                                            'center',
-                                        justifyContent:
-                                            'center',
-                                        backgroundColor:
-                                            '#0EA5E9',
-                                    }}
-                                >
-                                    <Smartphone
-                                        size={20}
-                                        color="#fff"
-                                    />
-                                </View>
-
-                                <Text
-                                    style={{
-                                        flex: 1,
-                                        textAlign:
-                                            'center',
-                                        fontSize: 14,
-                                        fontWeight:
-                                            '700',
-                                        color: '#0EA5E9',
-                                        paddingVertical:
-                                            14,
-                                    }}
-                                >
-                                    {t(
-                                        'registerWithPhone'
-                                    ) ||
-                                        'Register with Phone Number'}
-                                </Text>
-
-                                <View
-                                    style={{
-                                        width:
-                                            ICON_STRIP_WIDTH,
-                                        alignItems:
-                                            'center',
-                                    }}
-                                >
-                                    <ChevronRight
-                                        size={16}
-                                        color="#0EA5E9"
-                                    />
-                                </View>
-                            </TouchableOpacity>
-                            */}
                         </View>
 
                         {/* Footer */}
