@@ -65,30 +65,45 @@ interface LoginRequestPayload extends LoginFormData {
 
 // Payload sent to /login/google. Same device fields as LoginRequestPayload,
 // plus the Clerk token instead of email/password.
+// Payload sent to /login/google.
+// Backend expects TWO nested objects in the body: `device_info` and `payload`
+// (not a flat object like /login uses).
 interface GoogleLoginRequestPayload {
-    clerk_token: string;
-    device_id?: string;
-    model?: string;
-    brand?: string;
-    system_name?: string;
-    system_version?: string;
-    app_version?: string;
-    build_number?: string;
+    device_info: {
+        device_id?: string;
+        model?: string;
+        brand?: string;
+        system_name?: string;
+        system_version?: string;
+        app_version?: string;
+        build_number?: string;
+    };
+    payload: {
+        clerk_token: string;
+    };
 }
-
-// SecureStore keys used across the auth flow.
-const SECURE_STORE_KEYS = {
-    ACCESS_TOKEN: 'complaint_token',
-    REFRESH_TOKEN: 'complaint_refresh_token',
-    PENDING_EMAIL: 'pending_verify_email',
-    PENDING_PASSWORD: 'pending_verify_password',
-};
 
 interface GoogleLoginProps {
     onSuccess: (clerkToken: string) => Promise<void>;
     onError: (error: any) => void;
     googleLoading: boolean;
     setGoogleLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+/**
+ * Small wrapper around SecureStore.setItemAsync that guards against
+ * accidentally passing a non-string value (undefined, null, an object,
+ * etc). SecureStore throws a fairly opaque error in that case
+ * ("Invalid value provided to SecureStore..."), so this logs exactly
+ * which key/value pair caused it before re-throwing.
+ */
+async function secureSet(key: string, value: unknown) {
+    if (typeof value !== 'string' || value.length === 0) {
+        console.log(`SecureStore key "${key}" got invalid value:`, value);
+        throw new Error(`Cannot store non-string value for "${key}"`);
+    }
+
+    await SecureStore.setItemAsync(key, value);
 }
 
 /**
@@ -327,58 +342,73 @@ export default function LoginScreen({ navigation }: any) {
      *
      * Then exchanges it for YOUR application's tokens.
      */
-    const exchangeClerkToken = async (clerkToken: string) => {
-        if (!clerkToken) {
-            throw new Error(
-                'Unable to retrieve Clerk authentication token.'
-            );
-        }
+ const exchangeClerkToken = async (clerkToken: string) => {
+    if (!clerkToken) {
+        throw new Error(
+            'Unable to retrieve Clerk authentication token.'
+        );
+    }
 
-        const deviceMetadata = await getDeviceMetadata();
+    const deviceMetadata = await getDeviceMetadata();
 
-        const payload: GoogleLoginRequestPayload = {
+    const requestBody: GoogleLoginRequestPayload = {
+        device_info: {
+            device_id: deviceMetadata.device_id,
+            model: deviceMetadata.model,
+            brand: deviceMetadata.brand,
+            system_name: deviceMetadata.system_name,
+            system_version: deviceMetadata.system_version,
+            app_version: deviceMetadata.app_version,
+            build_number: deviceMetadata.build_number,
+        },
+        payload: {
             clerk_token: clerkToken,
-            ...deviceMetadata,
-        };
+        },
+    };
 
-        const { data } = await authApiClient.post(
-            '/login/google',
-            payload
-        );
+    const { data } = await authApiClient.post(
+        '/login/google',
+        requestBody
+    );
 
-        console.log(
-            'Google login response:',
-            data
-        );
+    console.log(
+        'Google login response:',
+        data
+    );
 
-        // Device not recognized: backend sent an OTP instead of tokens.
-        // Stash the email (no password for Google login) and send the
-        // user to verify the device.
-        if (data.is_verified === false) {
-            await SecureStore.setItemAsync(
-                SECURE_STORE_KEYS.PENDING_EMAIL,
-                data.email
+    // Device not recognized: backend sent an OTP instead of tokens.
+    // Stash the email (no password for Google login) and send the
+    // user to verify the device.
+    if (data.is_verified === false) {
+        // Backend response shape has been inconsistent between
+        // /login and /login/google — check common alternatives
+        // rather than assuming `data.email` is always present.
+        const emailToStore = data.email ?? data.user?.email;
+
+        if (typeof emailToStore !== 'string' || !emailToStore) {
+            console.log(
+                'Google login: no email found in unverified response payload:',
+                data
             );
-            router.replace('/(auth)/VerifyDeviceScreen');
-            return;
+            throw new Error(
+                'Unable to determine account email for device verification.'
+            );
         }
 
-        await SecureStore.setItemAsync(
-            SECURE_STORE_KEYS.ACCESS_TOKEN,
-            data.access_token
-        );
+        await secureSet('pending_verify_email', emailToStore);
+        router.replace('/(auth)/VerifyDeviceScreen');
+        return;
+    }
 
-        await SecureStore.setItemAsync(
-            SECURE_STORE_KEYS.REFRESH_TOKEN,
-            data.refresh_token
-        );
+    await secureSet('complaint_token', data.access_token);
+    await secureSet('complaint_refresh_token', data.refresh_token);
 
-        await fetchCurrentUser();
+    await fetchCurrentUser();
 
-        await useCurrentUser
-            .getState()
-            .syncPushToken();
-    };
+    await useCurrentUser
+        .getState()
+        .syncPushToken();
+};
 
     const loginMutation = useSubmitForm<LoginRequestPayload>({
         url: '/login',
@@ -411,39 +441,39 @@ export default function LoginScreen({ navigation }: any) {
             },
         ],
         onSuccess: async (data) => {
-            // Device not recognized: backend sent an OTP instead of tokens.
-            // Stash the email and send the user to verify the device.
-            if (data.is_verified === false) {
-                await SecureStore.setItemAsync(
-                    SECURE_STORE_KEYS.PENDING_EMAIL,
-                    data.email
+            try {
+                // Device not recognized: backend sent an OTP instead of tokens.
+                // Stash the email and send the user to verify the device.
+                // Use formData.email (what the user typed) rather than
+                // data.email, since the backend does not reliably echo
+                // the email back in this response.
+                if (data.is_verified === false) {
+                    await secureSet('pending_verify_email', formData.email);
+                    router.replace('/(auth)/VerifyDeviceScreen');
+                    return;
+                }
+
+                await secureSet('complaint_token', data.access_token);
+                await secureSet('complaint_refresh_token', data.refresh_token);
+
+                console.log(
+                    'Login successful:',
+                    data
                 );
-                router.replace('/(auth)/VerifyDeviceScreen');
-                return;
+
+                await fetchCurrentUser();
+
+                await useCurrentUser
+                    .getState()
+                    .syncPushToken();
+
+                // router.replace('/(tabs)');
+            } catch (error) {
+                console.log('Login onSuccess handler failed:', error);
+                setErrors({
+                    general: t('loginFailed'),
+                });
             }
-
-            await SecureStore.setItemAsync(
-                SECURE_STORE_KEYS.ACCESS_TOKEN,
-                data.access_token
-            );
-
-            await SecureStore.setItemAsync(
-                SECURE_STORE_KEYS.REFRESH_TOKEN,
-                data.refresh_token
-            );
-
-            console.log(
-                'Login successful:',
-                data
-            );
-
-            await fetchCurrentUser();
-
-            await useCurrentUser
-                .getState()
-                .syncPushToken();
-
-            // router.replace('/(tabs)');
         },
     });
 

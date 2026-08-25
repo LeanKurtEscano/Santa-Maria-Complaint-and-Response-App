@@ -27,14 +27,6 @@ import { authApiClient } from '@/lib/client/user';
 import { THEME } from '@/constants/theme';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
 
-// Keep these keys identical to the ones used in LoginScreen so both
-// screens read/write the same SecureStore entries.
-const SECURE_STORE_KEYS = {
-  ACCESS_TOKEN: 'complaint_token',
-  REFRESH_TOKEN: 'complaint_refresh_token',
-  PENDING_EMAIL: 'pending_verify_email',
-};
-
 // Adjust these to match your actual backend routes.
 const VERIFY_DEVICE_ROUTE = '/verify-device-otp';
 const RESEND_DEVICE_OTP_ROUTE = '/resend-device-otp';
@@ -89,7 +81,7 @@ export default function VerifyDeviceScreen({ navigation }: any) {
   useEffect(() => {
     const loadPendingEmail = async () => {
       try {
-        const storedEmail = await SecureStore.getItemAsync(SECURE_STORE_KEYS.PENDING_EMAIL);
+        const storedEmail = await SecureStore.getItemAsync('pending_verify_email');
 
         if (!storedEmail) {
           // Nothing to verify — bounce back to login.
@@ -142,15 +134,24 @@ export default function VerifyDeviceScreen({ navigation }: any) {
     if (!canResend || !email) return;
     clearErrors();
     try {
-      // Backend's OTP endpoints use Form(...) params, so send as
-      // form-encoded data rather than JSON. Adjust if your
-      // /resend-device-otp route expects a different content type.
-      const formBody = new URLSearchParams();
-      formBody.append('email', email);
+      // Backend's OTP endpoints use Form(...) params, so the body must be
+      // sent as multipart/form-data or x-www-form-urlencoded — never JSON.
+      //
+      // IMPORTANT: we send a real FormData instance here (not a manually
+      // urlencoded string). The shared axios instance (createApi) has a
+      // request interceptor that forces Content-Type to application/json
+      // for anything that isn't `instanceof FormData`. Passing FormData
+      // lets axios set the correct `multipart/form-data; boundary=...`
+      // header itself, and lets the interceptor's json-header override
+      // correctly skip this request. A manually built urlencoded string
+      // was previously getting its Content-Type silently overwritten to
+      // application/json by that interceptor, which caused FastAPI to
+      // fail parsing the Form(...) fields and return 422.
+      const formData = new FormData();
+      formData.append('email', email);
 
-      await authApiClient.post(RESEND_DEVICE_OTP_ROUTE, formBody.toString(), {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      });
+      await authApiClient.post(RESEND_DEVICE_OTP_ROUTE, formData);
+
       setResendTimer(300);
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);
@@ -195,20 +196,24 @@ export default function VerifyDeviceScreen({ navigation }: any) {
     try {
       // Backend route: verify_device_otp_endpoint(email: str = Form(...), otp: str = Form(...))
       // expects form-encoded data, not JSON.
-      const formBody = new URLSearchParams();
-      formBody.append('email', email);
-      formBody.append('otp', otpString);
+      //
+      // Sent as FormData (see comment in handleResendOtp for why) so the
+      // shared axios interceptor doesn't overwrite Content-Type to
+      // application/json and break FastAPI's Form(...) parsing.
+      const formData = new FormData();
+      formData.append('email', email);
+      formData.append('otp', otpString);
 
-      const { data } = await authApiClient.post(VERIFY_DEVICE_ROUTE, formBody.toString(), {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      });
+      const { data } = await authApiClient.post(VERIFY_DEVICE_ROUTE, formData);
 
       // Success: device is now verified — finish logging the user in.
-      await SecureStore.setItemAsync(SECURE_STORE_KEYS.ACCESS_TOKEN, data.access_token);
-      await SecureStore.setItemAsync(SECURE_STORE_KEYS.REFRESH_TOKEN, data.refresh_token);
+      await SecureStore.setItemAsync('complaint_token', data.access_token);
+      if (data.refresh_token) {
+        await SecureStore.setItemAsync('complaint_refresh_token', data.refresh_token);
+      }
 
       // Clear the pending email now that it's done its job.
-      await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.PENDING_EMAIL);
+      await SecureStore.deleteItemAsync('pending_verify_email');
 
       // Pull the authenticated user's data into the store.
       await fetchCurrentUser();
@@ -261,7 +266,7 @@ export default function VerifyDeviceScreen({ navigation }: any) {
 
   const handleBack = async () => {
     // Abandoning device verification — drop the stashed email.
-    await SecureStore.deleteItemAsync(SECURE_STORE_KEYS.PENDING_EMAIL);
+    await SecureStore.deleteItemAsync('pending_verify_email');
 
     if (navigation) navigation.goBack();
     else router.back();
@@ -475,32 +480,7 @@ export default function VerifyDeviceScreen({ navigation }: any) {
               </View>
             </View>
 
-            {/* Info notice */}
-            <View
-              className="rounded-xl p-4 mb-6"
-              style={{ backgroundColor: THEME.primary + '20' }}
-            >
-              <View className="flex-row items-start">
-                <View
-                  className="rounded-full p-1 mr-3 mt-0.5"
-                  style={{ backgroundColor: THEME.primary }}
-                >
-                  <CheckCircle size={16} color="#FFFFFF" />
-                </View>
-                <View className="flex-1">
-                  <Text
-                    className="text-sm font-semibold mb-1"
-                    style={{ color: THEME.primary }}
-                  >
-                    {t('importantNotice')}
-                  </Text>
-                  <Text className="text-sm leading-5" style={{ color: THEME.primary }}>
-                    {t('otpVerificationNotice')}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
+        
             {/* Verify Button */}
             <TouchableOpacity
               onPress={handleVerifyOtp}

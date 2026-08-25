@@ -323,7 +323,7 @@ const resources = {
       continue: 'Continue',
       back: 'Back',
       tapToUpload: 'Tap to upload',
-
+      verifyYourDevice: 'Verify Your Device',
       // Messages
       welcome: 'Welcome',
       welcomeMessage: 'Submit complaints and concerns to your Barangay',
@@ -1247,7 +1247,7 @@ const resources = {
       noAccount: 'Walang account?',
       haveAccount: 'Mayroon nang account?',
       age: 'Edad',
-
+           verifyYourDevice: 'I-Verify ang iyong Device',
       "noAccountEmail": "Hindi pa nakaregister ang email na ito.",
 "incorrectPassword": "Mali ang password. Pakisubukan muli.",
 "networkError": "Hindi makakonekta. Pakisuriin ang iyong koneksyon.",
