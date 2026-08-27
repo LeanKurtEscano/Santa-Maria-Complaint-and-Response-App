@@ -297,6 +297,15 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
    * We also do NOT manually set Content-Type. Axios/fetch sets it automatically
    * with the correct multipart boundary string. Setting it manually strips the
    * boundary and causes a server-side parse failure.
+   *
+   * NOTE: `email` and `phone_number` are ALWAYS both included, regardless of
+   * which OTP flow triggered this (email verification or phone verification).
+   * The backend User model requires both fields together — previously this
+   * function only included one or the other based on `includeEmail`, which
+   * caused phone_number to be silently dropped (and saved as NULL) during the
+   * email-verification flow. The `includeEmail` parameter is now unused for
+   * this purpose but is kept in the signature for backwards compatibility with
+   * callers; consider removing it in a later cleanup pass.
    */
   const buildRegistrationFormData = async (
     registrationData: any,
@@ -337,11 +346,11 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
       otp: otpString,
     };
 
-    if (includeEmail) {
-      dataObject.email = registrationData.email;
-    } else {
-      dataObject.phone_number = registrationData.phoneNumber;
-    }
+    // Always send both email and phone_number — the backend User model
+    // expects both to be populated together, regardless of which OTP flow
+    // (email or phone) triggered this verification.
+    dataObject.email = registrationData.email;
+    dataObject.phone_number = registrationData.phoneNumber;
 
     formData.append('data', JSON.stringify(dataObject));
 
