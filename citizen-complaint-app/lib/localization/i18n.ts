@@ -1419,7 +1419,7 @@ const resources = {
       zone: 'Zone / Purok (Opsyonal)',
 
       // ID Verification
-      idVerification: 'Pagpapatunay ng ID',
+      idVerification: 'Mag Verify Gamit ang ID',
       idType: 'Uri ng Valid ID',
       selectIdType: 'Pumili ng Uri ng ID',
       idNumber: 'Numero ng ID',
