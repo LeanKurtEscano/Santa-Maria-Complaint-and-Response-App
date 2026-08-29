@@ -2,7 +2,7 @@
   "expo": {
     "name": "Mary App",
     "slug": "citizen-complaint-app",
-    "version": "1.0.2",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/santamarialogoapp.jpg",
     "scheme": "citizencomplaintapp",
@@ -105,8 +105,8 @@
       "eas": {
         "projectId": "803edf0b-f96a-4f5c-96db-7ac1fe268656"
       },
-      "EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID": "663665418051-n5q7oaveaega3na6c3dmjjlp80qj1rq8.apps.googleusercontent.com",
-      "EXPO_PUBLIC_CLERK_GOOGLE_ANDROID_CLIENT_ID": "663665418051-iqjf2qptp8b9v920dqo0pgg75pfsjsi5.apps.googleusercontent.com"
+      "EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID": "989967452939-g8st5jqlcbgkab4eei27dff5v612jhfh.apps.googleusercontent.com",
+      "EXPO_PUBLIC_CLERK_GOOGLE_ANDROID_CLIENT_ID": "989967452939-3jkq2nmphaefbic8hk5stt9ukeqp53ip.apps.googleusercontent.com"
     },
     "owner": "lean_kurt_escano"
   }

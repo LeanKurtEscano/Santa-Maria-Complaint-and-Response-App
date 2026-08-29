@@ -15,6 +15,8 @@ import { useForm } from 'react-hook-form';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import * as Device from 'expo-device';
+import * as Application from 'expo-application';
 
 // Clerk browser OAuth - used for iOS / Expo Go testing
 import { useSSO, useAuth } from '@clerk/expo';
@@ -48,6 +50,66 @@ interface GoogleLoginProps {
   onError: (error: any) => void;
   googleLoading: boolean;
   setGoogleLoading: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+// Device metadata shape sent to the backend. Field names match what
+// /login/google expects inside `device_info` (device_id, model, brand,
+// system_name, system_version, app_version, build_number).
+interface DeviceMetadata {
+  device_id?: string;
+  model?: string;
+  brand?: string;
+  system_name?: string;
+  system_version?: string;
+  app_version?: string;
+  build_number?: string;
+}
+
+// Payload sent to /login/google.
+// Backend expects TWO nested objects in the body: `device_info` and `payload`
+// (not a flat { clerk_token } object — that shape returns a 422).
+interface GoogleLoginRequestPayload {
+  device_info: DeviceMetadata;
+  payload: {
+    clerk_token: string;
+  };
+}
+
+/**
+ * Collects device metadata to send along with the Google login request.
+ * Uses expo-device + expo-application (Expo Go compatible, and also works
+ * fine in dev builds / production builds). Wrapped in a single try/catch so
+ * a failure collecting metadata never blocks login.
+ *
+ * NOTE: identical to the one in LoginScreen. Consider extracting this into
+ * a shared `utils/device/getDeviceMetadata.ts` so both screens stay in sync.
+ */
+async function getDeviceMetadata(): Promise<DeviceMetadata> {
+  try {
+    let deviceId: string | null = null;
+
+    if (Platform.OS === 'android') {
+      // Synchronous, stable per app install.
+      deviceId = Application.getAndroidId();
+    } else if (Platform.OS === 'ios') {
+      // Async, stable per vendor (resets if all apps from that vendor are
+      // uninstalled).
+      deviceId = await Application.getIosIdForVendorAsync();
+    }
+
+    return {
+      device_id: deviceId ?? undefined,
+      model: Device.modelName ?? undefined,
+      brand: Device.brand ?? undefined,
+      system_name: Device.osName ?? undefined,
+      system_version: Device.osVersion ?? undefined,
+      app_version: Application.nativeApplicationVersion ?? undefined,
+      build_number: Application.nativeBuildVersion ?? undefined,
+    };
+  } catch (error) {
+    console.log('Failed to collect device metadata:', error);
+    return {};
+  }
 }
 
 /**
@@ -308,15 +370,59 @@ export default function RegisterScreen() {
    * tokens, then logs the user straight in — bypassing the multi-step
    * manual registration form entirely, since Google already verified
    * their identity/email.
+   *
+   * IMPORTANT: the backend expects the body shaped as
+   *   { device_info: {...}, payload: { clerk_token } }
+   * NOT a flat { clerk_token }. Sending the flat shape is what was causing
+   * the 422 — the backend rejects it before it even looks at the token.
    */
   const exchangeClerkToken = async (clerkToken: string) => {
     if (!clerkToken) {
       throw new Error('Unable to retrieve Clerk authentication token.');
     }
 
-    const { data } = await authApiClient.post('/login/google', {
-      clerk_token: clerkToken,
-    });
+    const deviceMetadata = await getDeviceMetadata();
+
+    const requestBody: GoogleLoginRequestPayload = {
+      device_info: {
+        device_id: deviceMetadata.device_id,
+        model: deviceMetadata.model,
+        brand: deviceMetadata.brand,
+        system_name: deviceMetadata.system_name,
+        system_version: deviceMetadata.system_version,
+        app_version: deviceMetadata.app_version,
+        build_number: deviceMetadata.build_number,
+      },
+      payload: {
+        clerk_token: clerkToken,
+      },
+    };
+
+    const { data } = await authApiClient.post('/login/google', requestBody);
+
+    console.log('Google login response:', data);
+
+    // Device not recognized: backend sent an OTP instead of tokens.
+    // Stash the email (no password for Google login) and send the user to
+    // verify the device, same as LoginScreen does for this case.
+    if (data.is_verified === false) {
+      // Backend response shape has been inconsistent between /login and
+      // /login/google — check common alternatives rather than assuming
+      // `data.email` is always present.
+      const emailToStore = data.email ?? data.user?.email;
+
+      if (typeof emailToStore !== 'string' || !emailToStore) {
+        console.log(
+          'Google login: no email found in unverified response payload:',
+          data,
+        );
+        throw new Error('Unable to determine account email for device verification.');
+      }
+
+      await SecureStore.setItemAsync('pending_verify_email', emailToStore);
+      router.replace('/(auth)/VerifyDeviceScreen');
+      return;
+    }
 
     await SecureStore.setItemAsync('complaint_token', data.access_token);
     await SecureStore.setItemAsync('complaint_refresh_token', data.refresh_token);
