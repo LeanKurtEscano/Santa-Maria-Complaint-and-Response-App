@@ -10,85 +10,26 @@ interface GeneralToastProps {
 }
 
 const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, type }) => {
-  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
-  const translateYAnim = useRef(new Animated.Value(-20)).current;
-  const iconScaleAnim = useRef(new Animated.Value(0)).current;
-  const iconRotateAnim = useRef(new Animated.Value(0)).current;
-  const shakeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
-      iconScaleAnim.setValue(0);
-      iconRotateAnim.setValue(0);
-      shakeAnim.setValue(0);
-      translateYAnim.setValue(-20);
+      scaleAnim.setValue(0.9);
+      opacityAnim.setValue(0);
 
       Animated.parallel([
-        Animated.spring(scaleAnim, {
+        Animated.timing(scaleAnim, {
           toValue: 1,
-          tension: 60,
-          friction: 8,
+          duration: 180,
           useNativeDriver: true,
         }),
         Animated.timing(opacityAnim, {
           toValue: 1,
-          duration: 220,
+          duration: 180,
           useNativeDriver: true,
         }),
-        Animated.spring(translateYAnim, {
-          toValue: 0,
-          tension: 60,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        if (type === 'success') {
-          Animated.sequence([
-            Animated.spring(iconScaleAnim, {
-              toValue: 1.3,
-              tension: 120,
-              friction: 3,
-              useNativeDriver: true,
-            }),
-            Animated.spring(iconScaleAnim, {
-              toValue: 1,
-              tension: 120,
-              friction: 5,
-              useNativeDriver: true,
-            }),
-          ]).start();
-
-          Animated.timing(iconRotateAnim, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }).start();
-        } else if (type === 'error') {
-          Animated.sequence([
-            Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-            Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-            Animated.timing(shakeAnim, { toValue: 8, duration: 50, useNativeDriver: true }),
-            Animated.timing(shakeAnim, { toValue: -8, duration: 50, useNativeDriver: true }),
-            Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
-          ]).start();
-
-          Animated.spring(iconScaleAnim, {
-            toValue: 1,
-            tension: 80,
-            friction: 4,
-            useNativeDriver: true,
-          }).start();
-        } else {
-          // info
-          Animated.spring(iconScaleAnim, {
-            toValue: 1,
-            tension: 80,
-            friction: 5,
-            useNativeDriver: true,
-          }).start();
-        }
-      });
+      ]).start();
 
       const duration = type === 'error' ? 3000 : type === 'info' ? 3500 : 2500;
       const timer = setTimeout(() => {
@@ -108,12 +49,7 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
       }),
       Animated.timing(opacityAnim, {
         toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateYAnim, {
-        toValue: -10,
-        duration: 180,
+        duration: 150,
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -170,11 +106,7 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
       >
         <Animated.View
           style={{
-            transform: [
-              { scale: scaleAnim },
-              { translateX: type === 'error' ? shakeAnim : 0 },
-              { translateY: translateYAnim },
-            ],
+            transform: [{ scale: scaleAnim }],
             opacity: opacityAnim,
             backgroundColor: '#ffffff',
             borderRadius: 20,
@@ -205,27 +137,7 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
               marginBottom: 16,
             }}
           >
-            {type === 'success' ? (
-              <Animated.View
-                style={{
-                  transform: [
-                    { scale: iconScaleAnim },
-                    {
-                      rotate: iconRotateAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['-180deg', '0deg'],
-                      }),
-                    },
-                  ],
-                }}
-              >
-                <LucideIcon size={36} color={config.iconBg} strokeWidth={2} />
-              </Animated.View>
-            ) : (
-              <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>
-                <LucideIcon size={36} color={config.iconBg} strokeWidth={2} />
-              </Animated.View>
-            )}
+            <LucideIcon size={36} color={config.iconBg} strokeWidth={2} />
           </View>
 
           {/* Label */}
@@ -256,9 +168,8 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
         </Animated.View>
 
         {/* Dismiss hint — outside the card */}
-        <Animated.Text
+        <Text
           style={{
-            opacity: opacityAnim,
             color: 'rgba(255,255,255,0.55)',
             fontSize: 12,
             textAlign: 'center',
@@ -268,7 +179,7 @@ const GeneralToast: React.FC<GeneralToastProps> = ({ visible, onHide, message, t
           }}
         >
           Tap anywhere to dismiss
-        </Animated.Text>
+        </Text>
       </Pressable>
     </Modal>
   );

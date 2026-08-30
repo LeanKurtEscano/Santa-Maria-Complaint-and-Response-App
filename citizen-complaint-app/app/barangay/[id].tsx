@@ -9,7 +9,6 @@
  *   instructions  →  form  →  location  →  preview (ComplaintLetterPreview)  →  submit
  */
 
-import GeneralToast from '@/components/Toast/GeneralToast';
 import { Alert } from 'react-native';
 import { useState, useCallback } from 'react';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -85,11 +84,6 @@ export default function ComplaintFormScreen() {
     handleRemoveAttachment,
     formatFileSize,
     resetAttachments,
-    showToast,
-    setToastVisible,
-    toastVisible,
-    toastMessage,
-    toastType,
   } = useAttachments();
 
   // ── Refresh user on focus ────────────────────────────────────────────────────
@@ -185,7 +179,7 @@ const handleSubmit = async () => {
 
   try {
     if (!incidentLocation) {
-      showToast('Location unavailable. Please go back and try again.', 'error');
+      showGlobalToast('Location unavailable. Please go back and try again.', 'error');
       return;
     }
 
@@ -193,11 +187,11 @@ const handleSubmit = async () => {
     const parsedBarangayAccountId = barangayAccountId ? parseInt(barangayAccountId, 10) : null;
 
     if (isNaN(parsedBarangayId)) {
-      showToast('Invalid barangay. Please go back and try again.', 'error');
+      showGlobalToast('Invalid barangay. Please go back and try again.', 'error');
       return;
     }
     if (!resolvedCategoryId) {
-      showToast('Please select a complaint category.', 'error');
+      showGlobalToast('Please select a complaint category.', 'error');
       return;
     }
 
@@ -314,7 +308,7 @@ const handleSubmit = async () => {
       return;
     }
 
-    showToast(detail ?? 'Something went wrong. Please try again.', 'error');
+    showGlobalToast(detail ?? 'Something went wrong. Please try again.', 'error');
 
   } finally {
     setIsSubmitting(false);
@@ -357,16 +351,6 @@ const handleSubmit = async () => {
             setStep('location');
           }}
           isSubmitting={isSubmitting}
-          toastVisible={toastVisible}
-          setToastVisible={setToastVisible}
-          toastMessage={toastMessage}
-          toastType={toastType}
-        />
-        <GeneralToast
-          visible={toastVisible}
-          onHide={() => setToastVisible(false)}
-          message={toastMessage}
-          type={toastType}
         />
       </>
     );
@@ -426,12 +410,6 @@ const handleSubmit = async () => {
         formatFileSize={formatFileSize}
         onBack={() => setStep('instructions')}
         onNext={handleFormNext}
-      />
-      <GeneralToast
-        visible={toastVisible}
-        onHide={() => setToastVisible(false)}
-        message={toastMessage}
-        type={toastType}
       />
     </>
   );

@@ -14,6 +14,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ClerkProvider } from "@clerk/expo";
 import * as SecureStore from 'expo-secure-store';
 import { useNotificationSync } from "@/hooks/general/useNotificationSync";
+import GeneralToast from "@/components/Toast/GeneralToast";
+import useToastStore from "@/store/useGlobalModal";
 
 
 Notifications.setNotificationHandler({
@@ -38,6 +40,7 @@ if (Platform.OS === "android") {
 
 function RootLayoutNav() {
   const { userData, loading, checkAuthStatus, isAuthenticated } = useCurrentUser();
+  const { toastVisible, setToastVisible, toastMessage, toastType } = useToastStore();
   useNotificationSync();
   const connectSSE = useSSEStore((s) => s.connect);
   const disconnectSSE = useSSEStore((s) => s.disconnect);
@@ -214,10 +217,18 @@ useEffect(() => {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack>
+      <GeneralToast
+        visible={toastVisible}
+        onHide={() => setToastVisible(false)}
+        message={toastMessage}
+        type={toastType}
+      />
+    </>
   );
 }
 

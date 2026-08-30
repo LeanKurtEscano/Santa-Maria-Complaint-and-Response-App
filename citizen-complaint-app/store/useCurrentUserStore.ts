@@ -23,6 +23,7 @@ interface UserState {
   userData: User | null;
   loading: boolean;
   isAuthenticated: boolean;
+  lastSyncedPushToken: string | null;
   setUserData: (user: User | null) => void;
   setLoading: (loading: boolean) => void;
   clearUser: () => Promise<void>;
@@ -38,6 +39,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
   userData: null,
   loading: true,
   isAuthenticated: false,
+  lastSyncedPushToken: null,
 
   setUserData: (user) =>
     set({ userData: user, isAuthenticated: !!user }),
@@ -57,7 +59,12 @@ export const useCurrentUser = create<UserState>((set, get) => ({
   setLoading: (loading) => set({ loading }),
 
   clearUser: async () => {
-    set({ userData: null, loading: false, isAuthenticated: false });
+    set({
+      userData: null,
+      loading: false,
+      isAuthenticated: false,
+      lastSyncedPushToken: null,
+    });
 
     await Promise.all([
       SecureStore.deleteItemAsync("complaint_token"),
@@ -68,7 +75,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
   logout: async () => {
     await SecureStore.deleteItemAsync("complaint_token");
     await SecureStore.deleteItemAsync("complaint_refresh_token");
-    set({ userData: null, loading: false, isAuthenticated: false });
+    set({ userData: null, loading: false, isAuthenticated: false, lastSyncedPushToken: null });
   },
 
   // ✅ AUTH STATUS
@@ -136,7 +143,7 @@ export const useCurrentUser = create<UserState>((set, get) => ({
       if (isSyncing) return;
       isSyncing = true;
 
-      const { userData } = get();
+      const { userData, lastSyncedPushToken } = get();
 
       if (
         !userData ||
@@ -158,23 +165,29 @@ export const useCurrentUser = create<UserState>((set, get) => ({
         return;
       }
 
-     const { data: token } = await Notifications.getExpoPushTokenAsync({
-  projectId: "803edf0b-f96a-4f5c-96db-7ac1fe268656",
-});
+      const { data: token } = await Notifications.getExpoPushTokenAsync({
+        projectId: "803edf0b-f96a-4f5c-96db-7ac1fe268656",
+      });
 
       if (!token || !token.startsWith("ExponentPushToken")) {
         isSyncing = false;
         return;
       }
 
+      if (lastSyncedPushToken === token) {
+        console.log("✅ Push token already synced, skipping duplicate request");
+        isSyncing = false;
+        return;
+      }
+
       await userApiClient.post("/push-token", { token });
+      set({ lastSyncedPushToken: token });
 
       console.log("✅ Push token synced");
-
-      isSyncing = false;
     } catch {
-      isSyncing = false;
       console.log("⚠️ Push sync failed silently");
+    } finally {
+      isSyncing = false;
     }
   },
 

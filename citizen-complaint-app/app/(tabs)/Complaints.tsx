@@ -11,8 +11,6 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Barangay } from '@/types/general/barangay';
 import { getBarangayCoords, DEFAULT_COORDS } from '@/constants/general/barangay';
 import { THEME } from '@/constants/theme';
-import GeneralToast from '@/components/Toast/GeneralToast';
-import useToastStore from '@/store/useGlobalModal';
 import { useCurrentUser } from "@/store/useCurrentUserStore";
 import AuthGuard from '@/screen/general/AuthGuard';
 import VerifyGuard from '@/screen/general/VerifyGuard';
@@ -42,7 +40,6 @@ export default function ComplaintsScreen() {
   const searchInputRef = useRef<TextInput>(null);
   const flatListRef = useRef<FlatList>(null);
   const bounceAnim = useRef(new Animated.Value(0)).current;
-  const { setToastVisible, toastVisible, toastMessage, toastType, showToast } = useToastStore();
 
   // ── ALL HOOKS MUST RUN BEFORE ANY EARLY RETURN ──────────────────────────
   // Previously the AuthGuard/VerifyGuard `if` checks sat above the
@@ -439,12 +436,6 @@ export default function ComplaintsScreen() {
         </View>
       )}
 
-      <GeneralToast
-        visible={toastVisible}
-        onHide={() => setToastVisible(false)}
-        message={toastMessage}
-        type={toastType}
-      />
     </SafeAreaView>
   );
 }

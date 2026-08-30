@@ -103,11 +103,11 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "803edf0b-f96a-4f5c-96db-7ac1fe268656"
+        "projectId": "7d93d2b8-b751-456a-8037-f808aa7b6586"
       },
       "EXPO_PUBLIC_CLERK_GOOGLE_WEB_CLIENT_ID": "989967452939-g8st5jqlcbgkab4eei27dff5v612jhfh.apps.googleusercontent.com",
       "EXPO_PUBLIC_CLERK_GOOGLE_ANDROID_CLIENT_ID": "989967452939-3jkq2nmphaefbic8hk5stt9ukeqp53ip.apps.googleusercontent.com"
     },
-    "owner": "lean_kurt_escano"
+    "owner": "edrhovic"
   }
 }

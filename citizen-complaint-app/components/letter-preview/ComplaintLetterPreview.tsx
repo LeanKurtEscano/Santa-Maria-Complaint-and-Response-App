@@ -43,10 +43,6 @@ interface ComplaintLetterPreviewProps {
   attachments?: Attachment[];
   onConfirmSubmit: () => void;
   onBack: () => void;
-  toastVisible?: boolean;
-  setToastVisible?: (visible: boolean) => void;
-  toastMessage?: string;
-  toastType?: 'success' | 'error' | 'info';
   isSubmitting?: boolean;
   canSubmitComplaints?: boolean;
 }

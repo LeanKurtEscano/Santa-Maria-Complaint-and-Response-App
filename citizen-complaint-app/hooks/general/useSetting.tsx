@@ -99,7 +99,9 @@ export const useSettingsLogic = () => {
                 }
 
                 const { data: token } = await Notifications.getExpoPushTokenAsync();
-                await userApiClient.post('/push-token', { token });
+                if (token) {
+                  await useCurrentUser.getState().syncPushToken();
+                }
                 await userApiClient.post('/enable-push-notifications', { enabled: true });
                 setPushNotificationsEnabled?.(true);
               } catch {

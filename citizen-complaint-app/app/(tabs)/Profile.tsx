@@ -33,7 +33,6 @@ import {
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import GeneralToast from '@/components/Toast/GeneralToast';
 import { formatName } from '@/utils/general/name';
 import { THEME } from '@/constants/theme';
 import AuthGuard from '@/screen/general/AuthGuard';
@@ -225,10 +224,6 @@ export default function ProfileScreen() {
     handleLocationFromMap,
     handleLogout,
     fetchCurrentUser,
-    toastType,
-    toastMessage,
-    setToastVisible,
-    toastVisible,
     isAuthenticated,
   } = useProfileLogic();
 
@@ -689,12 +684,6 @@ export default function ProfileScreen() {
         onCancel={() => !logoutLoading && setShowLogoutModal(false)}
       />
 
-      <GeneralToast
-        visible={toastVisible}
-        onHide={() => setToastVisible(false)}
-        message={toastMessage}
-        type={toastType}
-      />
     </SafeAreaView>
   );
 }
