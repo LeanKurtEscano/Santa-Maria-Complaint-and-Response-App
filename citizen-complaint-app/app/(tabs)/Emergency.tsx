@@ -453,29 +453,32 @@ export default function EmergencyScreen() {
         {/* ── Barangay dropdown (before the map) ── */}
 
       
-        <TouchableOpacity
-          className="flex-row items-center justify-between bg-white border border-slate-200 rounded-2xl px-4 py-[14px] mb-2"
-          style={{
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.05,
-            shadowRadius: 4,
-            elevation: 1,
-          }}
-          onPress={() => setIsBarangayPickerOpen(true)}
-          activeOpacity={0.75}
-        >
-          <View className="flex-1">
-            <Text className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">
-              {t('emergency.evacuation.barangayLabel', { defaultValue: 'Barangay' })}
-            </Text>
-            <Text className="text-[15px] font-bold text-slate-800">
-              {selectedBarangay?.barangay_name ??
-                t('emergency.evacuation.nearbyDefault', { defaultValue: 'Nearby (Default)' })}
-            </Text>
-          </View>
-          <ChevronDown size={20} color="#64748B" />
-        </TouchableOpacity>
+{/* ── Barangay dropdown (before the map) ── */}
+{isGateOpen && (
+  <TouchableOpacity
+    className="flex-row items-center justify-between bg-white border border-slate-200 rounded-2xl px-4 py-[14px] mb-2"
+    style={{
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 1,
+    }}
+    onPress={() => setIsBarangayPickerOpen(true)}
+    activeOpacity={0.75}
+  >
+    <View className="flex-1">
+      <Text className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">
+        {t('emergency.evacuation.barangayLabel', { defaultValue: 'Barangay' })}
+      </Text>
+      <Text className="text-[15px] font-bold text-slate-800">
+        {selectedBarangay?.barangay_name ??
+          t('emergency.evacuation.nearbyDefault', { defaultValue: 'Nearby (Default)' })}
+      </Text>
+    </View>
+    <ChevronDown size={20} color="#64748B" />
+  </TouchableOpacity>
+)}
 
         {isUsingFallback && (
           <Text className="text-[11px] text-slate-400 mb-3 px-1">
@@ -486,22 +489,21 @@ export default function EmergencyScreen() {
         )}
 
         {!isUsingFallback && <View className="mb-3" />}
+{isGateOpen && isEvacLoading && (
+  <View className="items-center py-6">
+    <ActivityIndicator size="small" color="#059669" />
+  </View>
+)}
 
-        {isEvacLoading && (
-          <View className="items-center py-6">
-            <ActivityIndicator size="small" color="#059669" />
-          </View>
-        )}
-
-        {isEvacError && (
-          <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
-            <Text className="text-[13px] font-medium text-red-700 text-center">
-              {t('emergency.evacuation.loadError', {
-                defaultValue: 'Failed to load evacuation centers. Showing defaults instead.',
-              })}
-            </Text>
-          </View>
-        )}
+      {isGateOpen && isEvacError && (
+  <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
+    <Text className="text-[13px] font-medium text-red-700 text-center">
+      {t('emergency.evacuation.loadError', {
+        defaultValue: 'Failed to load evacuation centers. Showing defaults instead.',
+      })}
+    </Text>
+  </View>
+)}
 
         {/* Guard: evacuationCentersToRender must be an array */}
        {Array.isArray(evacuationCentersToRender) && evacuationCentersToRender.length > 0 && (
