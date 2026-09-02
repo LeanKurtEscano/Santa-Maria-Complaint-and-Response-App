@@ -14,18 +14,7 @@ import { THEME } from '@/constants/theme';
 import { useCurrentUser } from "@/store/useCurrentUserStore";
 import AuthGuard from '@/screen/general/AuthGuard';
 import VerifyGuard from '@/screen/general/VerifyGuard';
-
-interface BarangayPage {
-  data: Barangay[];
-  pagination: {
-    has_next: boolean;
-    has_previous: boolean;
-    page: number;
-    page_size: number;
-    total_items: number;
-    total_pages: number;
-  };
-}
+import { BarangayPage } from '@/types/general/barangay';
 
 const PAGE_SIZE = 20;
 
@@ -251,21 +240,44 @@ export default function ComplaintsScreen() {
       </View>
 
       <View className="px-4 pt-4 pb-2">
-        <TouchableOpacity
-          onPress={() => router.push('/complaints/UserComplaints')}
-          className="py-4 rounded-xl flex-row items-center justify-center"
-          style={{
-            backgroundColor: THEME.primary,
-            shadowColor: THEME.primary,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-            elevation: 4,
-          }}
-        >
-          <FileText size={20} color="white" style={{ marginRight: 8 }} />
-          <Text className="text-white font-semibold text-base">{t('complaintsScreen.buttons.viewMyComplaints')}</Text>
-        </TouchableOpacity>
+<TouchableOpacity
+  onPress={() => router.push('/complaints/UserComplaints')}
+  className="rounded-xl"
+  style={{
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: THEME.primary,
+    shadowColor: THEME.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  }}
+>
+  <View
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexWrap: 'wrap',
+    }}
+  >
+    <FileText size={20} color="white" style={{ marginRight: 8 }} />
+    <Text
+      style={{
+        color: 'white',
+        fontWeight: '600',
+        fontSize: 16,
+        textAlign: 'center',
+      }}
+      numberOfLines={2}
+      adjustsFontSizeToFit
+      minimumFontScale={0.85}
+    >
+      {t('complaintsScreen.buttons.viewMyComplaints')}
+    </Text>
+  </View>
+</TouchableOpacity>
       </View>
 
       <View className="px-4 pt-3 pb-2">
@@ -282,20 +294,32 @@ export default function ComplaintsScreen() {
           }}
         >
           <Search size={22} color={isSearchFocused ? THEME.primary : '#6B7280'} style={{ marginRight: 10 }} />
-          <TextInput
-            ref={searchInputRef}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onFocus={() => setIsSearchFocused(true)}
-            onBlur={() => setIsSearchFocused(false)}
-            placeholder={t('complaintsScreen.search.placeholder', { defaultValue: 'Search barangays…' })}
-            placeholderTextColor="#9CA3AF"
-            returnKeyType="search"
-            clearButtonMode="never"
-            autoCorrect={false}
-            autoCapitalize="words"
-            style={{ flex: 1, paddingVertical: 14, fontSize: 16, color: '#111827' }}
-          />
+        <TextInput
+  ref={searchInputRef}
+  value={searchQuery}
+  onChangeText={setSearchQuery}
+  onFocus={() => setIsSearchFocused(true)}
+  onBlur={() => setIsSearchFocused(false)}
+  placeholder={t('complaintsScreen.search.placeholder', { defaultValue: 'Search barangays' })}
+  placeholderTextColor="#9CA3AF"
+  returnKeyType="search"
+  clearButtonMode="never"
+  autoCorrect={false}
+  autoCapitalize="words"
+  numberOfLines={1}
+  multiline={false}
+  ellipsizeMode="tail"
+  maxFontSizeMultiplier={1.2}
+  style={{
+    flex: 1,
+    height: 48,
+    paddingVertical: 0,
+    fontSize: 16,
+    color: '#111827',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  }}
+/>
           {isSearchFocused && (
             <TouchableOpacity
               onPress={handleClearSearch}

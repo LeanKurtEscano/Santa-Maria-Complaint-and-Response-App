@@ -1,19 +1,23 @@
 /**
  * EvacuationRouteModal
  *
+ * CHANGED: now takes a whole GROUP of evacuation centers instead of one.
  * Fullscreen modal that renders a Leaflet map (via WebView) showing:
  *  - User's current location as a blue pulsing marker
- *  - Evacuation center as a red marker
- *  - Best driving/walking route as a bold red polyline fetched from OSRM
+ *  - EVERY evacuation center in the group as a numbered red marker
+ *  - The best (fastest) center highlighted with a gold ring + star popup
+ *  - The best driving route to that best center, fetched from OSRM, drawn
+ *    as a bold red polyline
  *
- * Algorithm: OSRM (Open Source Routing Machine)
- *  - Runs Contraction Hierarchies (CH) over the OSM road graph
+ * Algorithm:
+ *  - OSRM Table Service: one request, user -> every center, to rank them
+ *    by driving duration and pick the best one ("shortest/best path" target)
+ *  - OSRM Route Service (Contraction Hierarchies): actual road-snapped
+ *    route geometry to that best center
  *  - Free, no API key required
- *  - Returns a GeoJSON LineString of road-snapped waypoints
- *  - We decode it in the WebView and draw it as a Leaflet polyline
  *
- * If no user location is available, only the destination marker is shown
- * with a notice instead of a route.
+ * If no user location is available, all centers are still pinned and fit
+ * to the viewport, with a notice instead of a route.
  */
 
 import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
@@ -30,23 +34,25 @@ import { WebView } from 'react-native-webview';
 import { useTranslation } from 'react-i18next';
 import { X, Building2, WifiOff, RefreshCw } from 'lucide-react-native';
 import { isValidCoordinate } from '@/hooks/general/useReverseGeocode';
+import { EvacuationCenter } from '@/constants/emergency/evacuation';
 import { THEME } from '@/constants/theme';
-
+import { NAME_CORRECTIONS, displayName } from '@/utils/general/barangayNameError';
 interface EvacuationRouteModalProps {
   visible: boolean;
   onClose: () => void;
-  centerName: string;
-  centerLat: number;
-  centerLng: number;
+  /** All evacuation centers to pin — e.g. every center in the chosen barangay. */
+  centers: EvacuationCenter[];
+  /** Label for the group, e.g. the barangay name. Optional. */
+  areaLabel?: string;
   userLat?: number | null;
   userLng?: number | null;
 }
 
+type MapCenter = { id: number; name: string; lat: number; lng: number };
+
 // ── Build the self-contained HTML page ───────────────────────────────────────
 function buildMapHtml(
-  centerName: string,
-  destLat: number,
-  destLng: number,
+  centers: MapCenter[],
   userLat: number | null,
   userLng: number | null,
 ): string {
@@ -55,9 +61,13 @@ function buildMapHtml(
     userLng !== null &&
     isValidCoordinate(userLat!, userLng!);
 
-  const viewLat = hasUser ? (userLat! + destLat) / 2 : destLat;
-  const viewLng = hasUser ? (userLng! + destLng) / 2 : destLng;
-  const zoom = hasUser ? 13 : 15;
+  const firstCenter = centers[0];
+  const viewLat = hasUser ? userLat! : firstCenter.lat;
+  const viewLng = hasUser ? userLng! : firstCenter.lng;
+
+  const centersJson = JSON.stringify(
+    centers.map((c) => ({ id: c.id, name: c.name.replace(/'/g, "\\'"), lat: c.lat, lng: c.lng })),
+  );
 
   const userMarkerJs = hasUser
     ? `
@@ -78,40 +88,81 @@ function buildMapHtml(
   `
     : '';
 
-  const routeJs = hasUser
+  const routingJs = hasUser
     ? `
     const statusEl = document.getElementById('status');
     statusEl.style.display = 'flex';
 
-    const osrmUrl =
-      'https://router.project-osrm.org/route/v1/driving/' +
-      '${userLng},${userLat};' + ${destLng} + ',' + ${destLat} +
-      '?overview=full&geometries=geojson';
+    const tableUrl =
+      'https://router.project-osrm.org/table/v1/driving/' +
+      '${userLng},${userLat};' + centers.map(c => c.lng + ',' + c.lat).join(';') +
+      '?sources=0&annotations=distance,duration';
 
-    fetch(osrmUrl)
+    fetch(tableUrl)
       .then(r => r.json())
-      .then(data => {
-        statusEl.style.display = 'none';
-        if (!data.routes || data.routes.length === 0) { showNoRoute(); return; }
+      .then(tableData => {
+        const durations = tableData.durations && tableData.durations[0]
+          ? tableData.durations[0].slice(1)
+          : null;
+        const distances = tableData.distances && tableData.distances[0]
+          ? tableData.distances[0].slice(1)
+          : null;
 
-        const route = data.routes[0];
-        const coords = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+        let bestIdx = -1, bestVal = Infinity;
+        const scoreArr = durations || distances;
+        if (scoreArr) {
+          scoreArr.forEach((v, i) => {
+            if (v != null && v < bestVal) { bestVal = v; bestIdx = i; }
+          });
+        }
+        if (bestIdx === -1) { statusEl.style.display = 'none'; showNoRoute(); return; }
 
-        const polyline = L.polyline(coords, {
-          color: '#DC2626',
-          weight: 5,
-          opacity: 0.9,
-          lineJoin: 'round',
-          lineCap: 'round',
-        }).addTo(map);
+        const best = centers[bestIdx];
 
-        map.fitBounds(polyline.getBounds(), { padding: [48, 48] });
+        // Re-style the best marker: gold ring + star, and pop it open
+        const bestIcon = L.divIcon({
+          className: '',
+          html: \`<div style="
+            width:26px;height:26px;border-radius:50%;
+            background:#DC2626;border:3px solid #FBBF24;
+            box-shadow:0 2px 10px rgba(220,38,38,0.6);
+            display:flex;align-items:center;justify-content:center;
+            color:#fff;font-size:13px;font-weight:800;
+          ">★</div>\`,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        });
+        destMarkers[best.id].setIcon(bestIcon);
+        destMarkers[best.id].bindPopup('<b>' + best.name + '</b><br>⭐ Best route').openPopup();
 
-        const km = (route.distance / 1000).toFixed(1);
-        const mins = Math.round(route.duration / 60);
-        const chip = document.getElementById('routeChip');
-        chip.textContent = km + ' km · ~' + mins + ' min';
-        chip.style.display = 'block';
+        const routeUrl =
+          'https://router.project-osrm.org/route/v1/driving/' +
+          '${userLng},${userLat};' + best.lng + ',' + best.lat +
+          '?overview=full&geometries=geojson';
+
+        return fetch(routeUrl).then(r => r.json()).then(routeData => {
+          statusEl.style.display = 'none';
+          if (!routeData.routes || routeData.routes.length === 0) { showNoRoute(); return; }
+
+          const route = routeData.routes[0];
+          const coords = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+
+          const polyline = L.polyline(coords, {
+            color: '#DC2626',
+            weight: 5,
+            opacity: 0.9,
+            lineJoin: 'round',
+            lineCap: 'round',
+          }).addTo(map);
+
+          map.fitBounds(polyline.getBounds(), { padding: [56, 56] });
+
+          const km = (route.distance / 1000).toFixed(1);
+          const mins = Math.round(route.duration / 60);
+          const chip = document.getElementById('routeChip');
+          chip.textContent = '★ ' + best.name + ' · ' + km + ' km · ~' + mins + ' min';
+          chip.style.display = 'block';
+        });
       })
       .catch(() => {
         statusEl.style.display = 'none';
@@ -181,6 +232,9 @@ function buildMapHtml(
       display: none;
       box-shadow: 0 2px 12px rgba(220,38,38,0.4);
       white-space: nowrap;
+      max-width: 90vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     #noRoute, #noUser {
@@ -201,39 +255,54 @@ function buildMapHtml(
 
   <div id="status" class="overlay">
     <div class="spinner"></div>
-    <span style="color:#475569;font-weight:600;">Finding best route…</span>
+    <span style="color:#475569;font-weight:600;">Finding best evacuation center…</span>
   </div>
 
   <div id="routeChip" class="overlay"></div>
 
   <div id="noRoute" class="overlay">⚠️ Route unavailable — navigate manually</div>
-  <div id="noUser"  class="overlay">📍 Enable location to see route</div>
+  <div id="noUser"  class="overlay">📍 Enable location to see the best route</div>
 
   <script>
-    const map = L.map('map', { zoomControl: true }).setView([${viewLat}, ${viewLng}], ${zoom});
+    const map = L.map('map', { zoomControl: true }).setView([${viewLat}, ${viewLng}], 13);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 19,
     }).addTo(map);
 
-    const destIcon = L.divIcon({
-      className: '',
-      html: \`<div style="
-        width:22px;height:22px;border-radius:50%;
-        background:#DC2626;border:3px solid #fff;
-        box-shadow:0 2px 8px rgba(220,38,38,0.5);
-      "></div>\`,
-      iconSize: [22, 22],
-      iconAnchor: [11, 11],
+    const centers = ${centersJson};
+    const destMarkers = {};
+    const bounds = [];
+
+    centers.forEach((c, i) => {
+      const icon = L.divIcon({
+        className: '',
+        html: \`<div style="
+          width:22px;height:22px;border-radius:50%;
+          background:#DC2626;border:3px solid #fff;
+          box-shadow:0 2px 8px rgba(220,38,38,0.5);
+          display:flex;align-items:center;justify-content:center;
+          color:#fff;font-size:11px;font-weight:800;
+        ">\${i + 1}</div>\`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+      const marker = L.marker([c.lat, c.lng], { icon })
+        .addTo(map)
+        .bindPopup('<b>' + c.name + '</b>');
+      destMarkers[c.id] = marker;
+      bounds.push([c.lat, c.lng]);
     });
-    L.marker([${destLat}, ${destLng}], { icon: destIcon })
-      .addTo(map)
-      .bindPopup('<b>${centerName.replace(/'/g, "\\'")}</b><br>Evacuation Center')
-      .openPopup();
 
     ${userMarkerJs}
-    ${routeJs}
+
+    if (${hasUser}) { bounds.push([${userLat}, ${userLng}]); }
+    if (bounds.length > 1) {
+      map.fitBounds(bounds, { padding: [56, 56] });
+    }
+
+    ${routingJs}
 
     // Notify RN that the map loaded successfully
     window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
@@ -249,9 +318,8 @@ function buildMapHtml(
 export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
   visible,
   onClose,
-  centerName,
-  centerLat,
-  centerLng,
+  centers,
+  areaLabel,
   userLat,
   userLng,
 }) => {
@@ -262,18 +330,23 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
   const [webViewKey, setWebViewKey] = useState(0);
   const [mapError, setMapError] = useState(false);
   const [mapLoading, setMapLoading] = useState(true);
+const validCenters: MapCenter[] = useMemo(
+  () =>
+    (centers ?? [])
+      .filter((c) => isValidCoordinate(c.latitude, c.longitude))
+      .map((c) => ({ id: c.id, name: displayName(c.name), lat: c.latitude, lng: c.longitude })),
+  [centers],
+);
+
+  const centersKey = validCenters.map((c) => `${c.id}:${c.lat},${c.lng}`).join('|');
 
   const html = useMemo(
     () =>
-      buildMapHtml(
-        centerName,
-        centerLat,
-        centerLng,
-        userLat ?? null,
-        userLng ?? null,
-      ),
+      validCenters.length > 0
+        ? buildMapHtml(validCenters, userLat ?? null, userLng ?? null)
+        : '',
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [centerName, centerLat, centerLng, userLat, userLng, webViewKey],
+    [centersKey, userLat, userLng, webViewKey],
   );
 
   // Reset state whenever the modal opens or is retried
@@ -327,6 +400,13 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
     setWebViewKey((k) => k + 1); // remounts the WebView
   }, []);
 
+  const headerTitle =
+    areaLabel ??
+    t('emergency.evacuation.centersCount', {
+      count: centers?.length ?? 0,
+      defaultValue: `${centers?.length ?? 0} Evacuation Centers`,
+    });
+
   return (
     <Modal
       visible={visible}
@@ -348,8 +428,16 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
 
         <View className="flex-1">
           <Text className="text-[15px] font-bold text-slate-800" numberOfLines={1}>
-            {centerName}
+            {headerTitle}
           </Text>
+          {centers?.length > 1 && (
+            <Text className="text-[11px] text-slate-400" numberOfLines={1}>
+              {t('emergency.evacuation.centersCount', {
+                count: centers.length,
+                defaultValue: `${centers.length} centers pinned`,
+              })}
+            </Text>
+          )}
         </View>
 
         <TouchableOpacity
@@ -363,7 +451,7 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
       </View>
 
       {/* ── Legend strip ── */}
-      <View className="bg-white px-4 py-2 flex-row items-center gap-x-4 border-b border-slate-100">
+      <View className="bg-white px-4 py-2 flex-row items-center gap-x-4 border-b border-slate-100 flex-wrap">
         <View className="flex-row items-center gap-x-1.5">
           <View className="w-3 h-3 rounded-full bg-blue-600" />
           <Text className="text-[11px] text-slate-500 font-medium">
@@ -374,6 +462,15 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
           <View className="w-3 h-3 rounded-full bg-red-600" />
           <Text className="text-[11px] text-slate-500 font-medium">
             {t('emergency.evacuation.routeModal.legendDest')}
+          </Text>
+        </View>
+        <View className="flex-row items-center gap-x-1.5">
+          <View
+            className="w-3 h-3 rounded-full bg-red-600"
+            style={{ borderWidth: 2, borderColor: '#FBBF24' }}
+          />
+          <Text className="text-[11px] text-slate-500 font-medium">
+            {t('emergency.evacuation.routeModal.legendBest', { defaultValue: 'Best route' })}
           </Text>
         </View>
         <View className="flex-row items-center gap-x-1.5">

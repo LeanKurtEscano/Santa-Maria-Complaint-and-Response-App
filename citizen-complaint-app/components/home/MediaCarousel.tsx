@@ -7,9 +7,13 @@ import * as VideoThumbnails from 'expo-video-thumbnails';
 import { ImageViewer, VideoPlayer } from '@/components/media/MediaViewer';
 import { MediaItem } from '@/types/general/home';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-export const CARD_INNER_WIDTH = SCREEN_WIDTH - 40 - 32;
-
+// The carousel lives inside AnnouncementCard, a FIXED-width card
+// (CARD_WIDTH = 320 in AnnouncementCard.tsx) — not a full-screen-width
+// container. Sizing slides off the device screen width made them wider
+// than the card's clipped viewport, pushing/cropping images to the right.
+const ANNOUNCEMENT_CARD_WIDTH = 320; // keep in sync with CARD_WIDTH in AnnouncementCard.tsx
+const CAROUSEL_HORIZONTAL_PADDING = 16 * 2; // paddingHorizontal: 16 on the wrapper below
+export const CARD_INNER_WIDTH = ANNOUNCEMENT_CARD_WIDTH - CAROUSEL_HORIZONTAL_PADDING;
 function ImageSlide({ uri, onPress }: { uri: string; onPress: () => void }) {
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.92}>

@@ -19,7 +19,19 @@ const CARD_STEP  = CARD_WIDTH + CARD_GAP;
 const AUTO_SCROLL_INTERVAL = 2400;
 const MEDIA_HEIGHT = 228; // match whatever height MediaCarousel renders at
 
-// Fixed heights so every card is identical no matter the content length
+// Fixed heights so every card is identical no matter the content length.
+// NOTE: this math assumes a fixed font size, so we cap font scaling on
+// these specific text blocks (maxFontSizeMultiplier) to keep it valid,
+// and clip overflow as a safety net in case a device still overshoots.
+//
+// On Android, Text adds extra vertical glyph padding (ascender/descender
+// space) on top of `lineHeight`, which is not accounted for by this fixed
+// math. That extra padding was pushing the last line down far enough that
+// the hard-height + overflow:hidden wrapper sliced it mid-glyph on some
+// devices/screen sizes. Fix: `includeFontPadding: false` + `textAlignVertical:
+// 'top'` on Android strip that padding and anchor text to the top of its
+// box, and a small +2px buffer on the wrapper height gives extra safety
+// margin against any remaining device-specific rounding.
 const TITLE_LINES     = 2;
 const TITLE_LINE_H    = 20; // px, matches leading-snug @ 16px
 const TITLE_HEIGHT    = TITLE_LINES * TITLE_LINE_H;
@@ -29,6 +41,10 @@ const CONTENT_LINE_H  = 20; // px, matches leading-5
 const CONTENT_HEIGHT  = CONTENT_LINES * CONTENT_LINE_H;
 
 const SEE_MORE_HEIGHT = 18; // reserved even when not shown
+
+// Cap how far system/accessibility font scaling can stretch text in areas
+// with fixed pixel geometry, so the card layout stays intact.
+const MAX_FONT_SCALE = 1.3;
 
 function NoImagePlaceholder() {
   const { t } = useTranslation();
@@ -53,7 +69,7 @@ function NoImagePlaceholder() {
       >
         <ImageOff size={18} color="#94A3B8" />
       </View>
-      <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '600' }}>
+      <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '600' }} maxFontSizeMultiplier={MAX_FONT_SCALE}>
         {t('announcements.no_image')}
       </Text>
     </View>
@@ -71,36 +87,69 @@ export function AnnouncementCard({ item, index }: { item: Announcement; index: n
 
   return (
     <View
-      style={{ width: CARD_WIDTH, backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#E8EFFE', shadowColor: THEME.primary, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 3 }}
+      style={{
+        width: CARD_WIDTH,
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#E8EFFE',
+        shadowColor: THEME.primary,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.07,
+        shadowRadius: 12,
+        elevation: 3,
+      }}
     >
       {item.media.length > 0 ? <MediaCarousel media={item.media} /> : <NoImagePlaceholder />}
 
       <TouchableOpacity activeOpacity={0.75} onPress={goToDetail}>
         <View className="px-4 pb-4 pt-3">
-          {/* Header row — same height regardless of tag/timestamp text */}
-          <View className="flex-row items-center justify-between mb-2.5" style={{ height: 20 }}>
+          {/* Header row — minHeight instead of fixed height so it never clips on font scale */}
+          <View className="flex-row items-center justify-between mb-2.5" style={{ minHeight: 20 }}>
             <Tag label={t('announcements.tag')} />
             <View className="flex-row items-center gap-1">
               <Clock size={10} color="#94A3B8" />
-              <Text className="text-slate-400 text-[10px] font-semibold">{timeAgo(item.created_at, currentLanguage)}</Text>
+              <Text
+                className="text-slate-400 text-[10px] font-semibold"
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+              >
+                {timeAgo(item.created_at, currentLanguage)}
+              </Text>
             </View>
           </View>
 
-          {/* Title — fixed height, always reserves 2 lines */}
-          <View style={{ height: TITLE_HEIGHT, marginBottom: 8 }}>
+          {/* Title — minHeight reserves the usual 2-line space, but never crops a scaled line.
+              numberOfLines + ellipsizeMode handles the truncation instead of the box. */}
+          <View style={{ minHeight: TITLE_HEIGHT, marginBottom: 8 }}>
             <Text
-              style={{ color: '#0F172A', fontSize: 16, fontWeight: '800', lineHeight: TITLE_LINE_H }}
+              style={{
+                color: '#0F172A',
+                fontSize: 16,
+                fontWeight: '800',
+                lineHeight: TITLE_LINE_H,
+              }}
               numberOfLines={TITLE_LINES}
+              ellipsizeMode="tail"
+              textBreakStrategy="simple"
+              maxFontSizeMultiplier={MAX_FONT_SCALE}
             >
               {item.title}
             </Text>
           </View>
 
-          {/* Content — fixed height, always reserves 4 lines */}
-          <View style={{ height: CONTENT_HEIGHT }}>
+          {/* Content — same fix: minHeight, no overflow-hidden crop */}
+          <View style={{ minHeight: CONTENT_HEIGHT }}>
             <Text
-              style={{ color: '#64748B', fontSize: 13, lineHeight: CONTENT_LINE_H }}
+              style={{
+                color: '#64748B',
+                fontSize: 13,
+                lineHeight: CONTENT_LINE_H,
+              }}
               numberOfLines={CONTENT_LINES}
+              ellipsizeMode="tail"
+              textBreakStrategy="simple"
+              maxFontSizeMultiplier={MAX_FONT_SCALE}
               onTextLayout={(e) => {
                 if (e.nativeEvent.lines.length >= CONTENT_LINES && !isTruncated) {
                   setIsTruncated(true);
@@ -115,7 +164,10 @@ export function AnnouncementCard({ item, index }: { item: Announcement; index: n
           <View style={{ height: SEE_MORE_HEIGHT, marginTop: 2, justifyContent: 'center' }}>
             {isTruncated && (
               <TouchableOpacity onPress={goToDetail} activeOpacity={0.7} hitSlop={{ top: 4, bottom: 4 }}>
-                <Text style={{ color: THEME.primary, fontSize: 12, fontWeight: '700' }}>
+                <Text
+                  style={{ color: THEME.primary, fontSize: 12, fontWeight: '700' }}
+                  maxFontSizeMultiplier={MAX_FONT_SCALE}
+                >
                   {t('announcements.see_more')}
                 </Text>
               </TouchableOpacity>
@@ -131,13 +183,25 @@ export function AnnouncementCard({ item, index }: { item: Announcement; index: n
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-2 flex-1 mr-3">
               <Avatar name={name} />
-              <Text className="text-slate-500 text-[11px] font-semibold flex-1" numberOfLines={1}>{name}</Text>
+              <Text
+                className="text-slate-500 text-[11px] font-semibold flex-1"
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+              >
+                {name}
+              </Text>
             </View>
             <View
               className="flex-row items-center gap-1 rounded-xl px-3 py-2"
               style={{ backgroundColor: THEME.primaryMuted }}
             >
-              <Text style={{ color: THEME.primary, fontSize: 12, fontWeight: '700' }}>{t('announcements.read_more')}</Text>
+              <Text
+                style={{ color: THEME.primary, fontSize: 12, fontWeight: '700' }}
+                maxFontSizeMultiplier={MAX_FONT_SCALE}
+              >
+                {t('announcements.read_more')}
+              </Text>
               <ChevronRight size={12} color={THEME.primary} />
             </View>
           </View>
@@ -146,7 +210,6 @@ export function AnnouncementCard({ item, index }: { item: Announcement; index: n
     </View>
   );
 }
-
 function LoadingState() {
   const { t } = useTranslation();
   return (

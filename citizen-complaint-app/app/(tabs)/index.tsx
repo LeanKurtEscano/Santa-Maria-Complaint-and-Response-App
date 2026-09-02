@@ -223,7 +223,7 @@ const {
 
         {/* ── Greeting banner ── */}
         <View className="mt-5">
-          <GreetingBanner />
+          <GreetingBanner firstName={userData?.first_name || 'Resident'} />
         </View>
 
         {/* ── Upcoming events ── */}

@@ -17,6 +17,7 @@ import { LocationCard } from '@/components/location/Locationcard';
 import ErrorScreen from '@/screen/general/ErrorScreen';
 import { handleApiError } from '@/utils/general/errorHandler';
 import { useProfileLogic } from '@/hooks/general/useProfile';
+
 import {
   User,
   MapPin,

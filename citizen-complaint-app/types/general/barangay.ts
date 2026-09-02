@@ -17,3 +17,15 @@ export interface Barangay {
   latitude: number;
   longitude: number;
 }
+
+export interface BarangayPage {
+  data: Barangay[];
+  pagination: {
+    has_next: boolean;
+    has_previous: boolean;
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+  };
+}

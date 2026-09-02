@@ -29,6 +29,27 @@ export default function TabsLayout() {
   const bottomInset = insets.bottom > 0 ? insets.bottom : 8;
   const tabBarHeight = 58 + bottomInset;
 
+  // Shared label renderer — shrinks to fit instead of wrapping or clipping
+  const renderLabel = (label: string, focused: boolean, activeColor?: string) => (
+    <Text
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.85}
+      maxFontSizeMultiplier={1.2}
+      style={{
+        fontSize: 12,
+        fontWeight: '600',
+        letterSpacing: -0.2,
+        color: focused ? (activeColor ?? THEME.primary) : '#9CA3AF',
+        marginBottom: Platform.OS === 'android' ? 4 : 0,
+        textAlign: 'center',
+        includeFontPadding: false,
+      }}
+    >
+      {label}
+    </Text>
+  );
+
   return (
     <View style={{ flex: 1 }}>
       <Tabs
@@ -42,6 +63,9 @@ export default function TabsLayout() {
           headerShown: false,
           tabBarActiveTintColor: THEME.primary,
           tabBarInactiveTintColor: '#9CA3AF',
+          tabBarItemStyle: {
+            paddingHorizontal: 2,
+          },
           tabBarStyle: {
             backgroundColor: '#FFFFFF',
             borderTopWidth: isConnected === false ? 0 : 1,
@@ -76,6 +100,8 @@ export default function TabsLayout() {
                   }}
                 >
                   <Text
+                    numberOfLines={1}
+                    maxFontSizeMultiplier={1.3}
                     style={{
                       color: '#fff',
                       fontSize: 12,
@@ -97,6 +123,7 @@ export default function TabsLayout() {
           name="index"
           options={{
             title: "Home",
+            tabBarLabel: ({ focused }) => renderLabel("Home", focused),
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
             ),
@@ -107,6 +134,7 @@ export default function TabsLayout() {
           name="Complaints"
           options={{
             title: "Complaints",
+            tabBarLabel: ({ focused }) => renderLabel("Complaints", focused),
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? "document-text" : "document-text-outline"} size={24} color={color} />
             ),
@@ -117,6 +145,7 @@ export default function TabsLayout() {
           name="Notifications"
           options={{
             title: "Notif",
+            tabBarLabel: ({ focused }) => renderLabel("Notif", focused),
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? "notifications" : "notifications-outline"} size={24} color={color} />
             ),
@@ -135,18 +164,7 @@ export default function TabsLayout() {
                 color={focused ? '#EF4444' : color}
               />
             ),
-            tabBarLabel: ({ focused }) => (
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: '600',
-                  color: focused ? '#EF4444' : '#9CA3AF',
-                  marginBottom: Platform.OS === 'android' ? 4 : 0,
-                }}
-              >
-                Emergency
-              </Text>
-            ),
+            tabBarLabel: ({ focused }) => renderLabel("Emergency", focused, '#EF4444'),
           }}
         />
 
@@ -154,6 +172,7 @@ export default function TabsLayout() {
           name="Profile"
           options={{
             title: "Profile",
+            tabBarLabel: ({ focused }) => renderLabel("Profile", focused),
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
             ),

@@ -54,7 +54,7 @@ const resources = {
 "notVerified": {
     "title": "Your registration is successful!",
     "message": "Your account has not been verified yet. Please check your email and follow the verification link we sent you.",
-    "goBackButton": "Go Back to Login",
+    "goBackButton": "Go Back?",
     "refreshHint": "Pull down to refresh"
   },
 
@@ -344,6 +344,9 @@ const resources = {
       appTitle: 'Barangay Santa Maria',
       complaintSystem: 'Complaint System',
       age: 'Age',
+      Total: 'Total',
+      Pending: 'Pending',
+      Resolved: 'Resolved',
 
       // OTP Verification
       verifyYourEmail: "Verify Your Email",
@@ -1387,7 +1390,7 @@ const resources = {
    "notVerified": {
     "title": "Ang iyong account registration ay successful!",
     "message": "Hindi pa na-verify ang iyong account. Pakisuri ang iyong email at sundan ang verification link na ipinadala namin sa iyo.",
-    "goBackButton": "Bumalik sa Pag-login",
+    "goBackButton": "Bumalik ",
     "refreshHint": "I-drag pababa para i-refresh"
   },
 
@@ -1427,7 +1430,9 @@ const resources = {
       uploadIdBack: 'I-upload ang ID (Likod)',
       uploadSelfie: 'I-upload ang Selfie kasama ang ID',
       idVerificationNote: 'Mangyaring magbigay ng wastong government-issued ID para sa pagpapatunay',
-
+      Total: 'Kabuuan',
+      Pending:'Nasa Proseso',
+      Resolved:'Naresolba',
       // ID Types
       driversLicense: 'Lisensya sa Pagmamaneho',
       passport: 'Pasaporte',

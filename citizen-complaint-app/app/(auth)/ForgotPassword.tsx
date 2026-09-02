@@ -171,11 +171,12 @@ export default function ForgotPassword() {
           {/* Header */}
           <View className="px-6 pt-4 pb-2">
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() => router.replace('/(auth)')}
               className="flex-row items-center mb-6"
               activeOpacity={0.7}
             >
               <ArrowLeft size={24} color="#1F2937" />
+
               <Text className="text-neutral-800 text-base font-medium ml-2">
                 {t('back')}
               </Text>

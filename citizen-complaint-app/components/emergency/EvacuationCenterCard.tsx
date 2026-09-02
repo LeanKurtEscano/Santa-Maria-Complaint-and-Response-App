@@ -1,12 +1,17 @@
 /**
  * EvacuationCenterCard
  *
- * Distance badge now uses OSRM road distance — the same source as the
- * fullscreen route modal — so the numbers always match.
- * Falls back to Haversine only if the OSRM fetch fails.
+ * CHANGED: now represents a GROUP of evacuation centers (e.g. all centers in
+ * a chosen barangay, or all "nearby" centers) as a single card, instead of
+ * one card per center.
  *
- * Layout is tightened so the building icon and name sit on the same
- * vertical centre line with no misalignment.
+ * - Uses the OSRM Table Service (one request, many destinations) to find the
+ *   best (fastest) center among the group, and previews that one — map
+ *   thumbnail, distance/ETA badge, geocoded address.
+ * - Shows a "+N more" indicator when there's more than one center.
+ * - Tapping the card (or "View All on Map") opens EvacuationRouteModal with
+ *   the FULL list of centers, so all of them get pinned there.
+ * - Falls back to Haversine (over all centers) if the OSRM table call fails.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -20,7 +25,7 @@ import {
 } from '@/hooks/general/useReverseGeocode';
 import { EvacuationCenter } from '@/constants/emergency/evacuation';
 import { EvacuationRouteModal } from './EvacuationRouteModal';
-
+import { NAME_CORRECTIONS, displayName } from '@/utils/general/barangayNameError';
 // ── Haversine (fallback only) ─────────────────────────────────────────────────
 function haversineKm(
   lat1: number, lng1: number,
@@ -49,26 +54,31 @@ function formatMins(secs: number): string {
   return rem > 0 ? `~${h}h ${rem}m` : `~${h}h`;
 }
 
-// ── OSRM road distance hook ───────────────────────────────────────────────────
-interface OsrmResult {
+// ── OSRM "nearest of many" via the Table Service ──────────────────────────────
+interface NearestResult {
+  center: EvacuationCenter;
   distanceKm: number;
   durationSecs: number;
 }
 
-function useOsrmDistance(
+function useOsrmNearest(
   userLat: number | null | undefined,
   userLng: number | null | undefined,
-  destLat: number,
-  destLng: number,
-): { data: OsrmResult | null; loading: boolean } {
-  const [data, setData] = useState<OsrmResult | null>(null);
+  centers: EvacuationCenter[],
+): { data: NearestResult | null; loading: boolean } {
+  const [data, setData] = useState<NearestResult | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const validCenters = centers.filter((c) => isValidCoordinate(c.latitude, c.longitude));
+  // Stable string key so the effect doesn't refire just because a new array
+  // reference was passed in with the same contents.
+  const centersKey = validCenters.map((c) => `${c.id}:${c.latitude},${c.longitude}`).join('|');
 
   const hasUser =
     userLat != null &&
     userLng != null &&
     isValidCoordinate(userLat, userLng) &&
-    isValidCoordinate(destLat, destLng);
+    validCenters.length > 0;
 
   useEffect(() => {
     if (!hasUser) return;
@@ -77,42 +87,62 @@ function useOsrmDistance(
     setLoading(true);
     setData(null);
 
+    const coordsList = [
+      `${userLng},${userLat}`,
+      ...validCenters.map((c) => `${c.longitude},${c.latitude}`),
+    ].join(';');
+    const destIndices = validCenters.map((_, i) => i + 1).join(';');
+
     const url =
-      `https://router.project-osrm.org/route/v1/driving/` +
-      `${userLng},${userLat};${destLng},${destLat}` +
-      `?overview=false`;
+      `https://router.project-osrm.org/table/v1/driving/${coordsList}` +
+      `?sources=0&destinations=${destIndices}&annotations=distance,duration`;
 
     fetch(url)
-      .then(r => r.json())
-      .then(json => {
+      .then((r) => r.json())
+      .then((json) => {
         if (cancelled) return;
-        const route = json?.routes?.[0];
-        if (route) {
-          setData({
-            distanceKm: route.distance / 1000,
-            durationSecs: route.duration,
-          });
-        } else {
-          // OSRM gave no route — fall back to Haversine
-          setData({
-            distanceKm: haversineKm(userLat!, userLng!, destLat, destLng),
-            durationSecs: 0,
-          });
-        }
+
+        const distances: (number | null)[] | undefined = json?.distances?.[0];
+        const durations: (number | null)[] | undefined = json?.durations?.[0];
+
+        if (!Array.isArray(distances)) throw new Error('no table result');
+
+        let bestIdx = -1;
+        let bestDuration = Infinity;
+        (durations ?? distances).forEach((d, i) => {
+          if (d != null && d < bestDuration) {
+            bestDuration = d;
+            bestIdx = i;
+          }
+        });
+
+        if (bestIdx === -1) throw new Error('no reachable center');
+
+        setData({
+          center: validCenters[bestIdx],
+          distanceKm: (distances[bestIdx] ?? 0) / 1000,
+          durationSecs: durations?.[bestIdx] ?? 0,
+        });
       })
       .catch(() => {
-        if (!cancelled) {
-          setData({
-            distanceKm: haversineKm(userLat!, userLng!, destLat, destLng),
-            durationSecs: 0,
-          });
-        }
+        if (cancelled) return;
+        // Fallback: Haversine straight-line distance to every center, pick nearest
+        let best: NearestResult | null = null;
+        validCenters.forEach((c) => {
+          const km = haversineKm(userLat!, userLng!, c.latitude, c.longitude);
+          if (!best || km < best.distanceKm) {
+            best = { center: c, distanceKm: km, durationSecs: 0 };
+          }
+        });
+        setData(best);
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userLat, userLng, destLat, destLng, hasUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userLat, userLng, centersKey, hasUser]);
 
   return { data, loading };
 }
@@ -120,21 +150,41 @@ function useOsrmDistance(
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface EvacuationCenterCardProps {
-  center: EvacuationCenter;
+  /** All evacuation centers belonging to this group (a barangay, or "nearby"). */
+  centers: EvacuationCenter[];
+  /** Label for the group, e.g. the barangay name. Omit for the "nearby" default. */
+  areaLabel?: string;
   userLatitude?: number | null;
   userLongitude?: number | null;
 }
 
 export const EvacuationCenterCard: React.FC<EvacuationCenterCardProps> = ({
-  center,
+  centers,
+  areaLabel,
   userLatitude,
   userLongitude,
 }) => {
   const { t } = useTranslation();
   const [routeOpen, setRouteOpen] = useState(false);
 
-  const lat = center.latitude;
-  const lng = center.longitude;
+  const { data: nearest, loading: nearestLoading } = useOsrmNearest(
+    userLatitude, userLongitude, centers,
+  );
+
+  if (!centers || centers.length === 0) return null;
+
+
+  // Prefer the OSRM-determined best center for the preview; fall back to the
+  // first valid-coordinate center while that lookup is still in flight.
+  const previewCenter =
+    nearest?.center ??
+    centers.find((c) => isValidCoordinate(c.latitude, c.longitude)) ??
+    centers[0];
+
+    console.log('EvacuationCenterCard previewCenter:', previewCenter);
+
+  const lat = previewCenter.latitude;
+  const lng = previewCenter.longitude;
   const valid = isValidCoordinate(lat, lng);
 
   const { geocoded, loading: geocoding } = useReverseGeocode(
@@ -142,10 +192,16 @@ export const EvacuationCenterCard: React.FC<EvacuationCenterCardProps> = ({
     valid ? lng : null,
   );
 
-  // Road distance from OSRM — same source as the route modal
-  const { data: osrm, loading: distLoading } = useOsrmDistance(
-    userLatitude, userLongitude, lat, lng,
-  );
+  const otherCount = Math.max(centers.length - 1, 0);
+
+  const groupTitle = areaLabel
+    ? t('emergency.evacuation.centersInArea', {
+        area: areaLabel,
+        defaultValue: `Evacuation Centers — ${areaLabel}`,
+      })
+    : t('emergency.evacuation.nearbyCenters', {
+        defaultValue: 'Nearby Evacuation Centers',
+      });
 
   return (
     <>
@@ -169,7 +225,7 @@ export const EvacuationCenterCard: React.FC<EvacuationCenterCardProps> = ({
             activeOpacity={0.92}
             accessibilityLabel={t('emergency.evacuation.viewRoute')}
           >
-            <MapDisplay latitude={lat} longitude={lng} zoom={16} height={170} />
+            <MapDisplay latitude={lat} longitude={lng} zoom={15} height={170} />
 
             {/* "View Route" pill — bottom-right of map */}
             <View className="absolute bottom-2.5 right-2.5 bg-black/60 rounded-full px-3 py-1.5 flex-row items-center gap-x-1.5">
@@ -178,6 +234,18 @@ export const EvacuationCenterCard: React.FC<EvacuationCenterCardProps> = ({
                 {t('emergency.evacuation.viewRoute')}
               </Text>
             </View>
+
+            {/* Count pill — top-left of map, only when there's more than one */}
+            {centers.length > 1 && (
+              <View className="absolute top-2.5 left-2.5 bg-emerald-600 rounded-full px-3 py-1.5">
+                <Text className="text-white text-[11px] font-bold">
+                  {t('emergency.evacuation.centersCount', {
+                    count: centers.length,
+                    defaultValue: `${centers.length} centers`,
+                  })}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         ) : (
           <View className="h-40 bg-slate-100 items-center justify-center gap-y-1">
@@ -191,48 +259,55 @@ export const EvacuationCenterCard: React.FC<EvacuationCenterCardProps> = ({
         {/* ── Card body ── */}
         <View className="px-4 pt-4 pb-4 gap-y-3">
 
-          {/* ── Name row ── */}
+          {/* ── Group title row ── */}
           <View className="flex-row items-center gap-x-3">
-            {/* Icon — vertically centred with items-center on the row */}
             <View className="w-9 h-9 rounded-full bg-emerald-100 items-center justify-center shrink-0">
               <Building2 size={18} color="#059669" />
             </View>
 
-            {/* Name — flex-1 so it fills space and wraps if long */}
-            <Text
-              className="flex-1 text-[15px] font-bold text-slate-800 leading-5"
-              numberOfLines={2}
-            >
-              {center.name}
-            </Text>
+            <View className="flex-1">
+              <Text
+                className="text-[15px] font-bold text-slate-800 leading-5"
+                numberOfLines={2}
+              >
+                {groupTitle}
+              </Text>
+              <Text className="text-[12px] text-slate-400 mt-0.5" numberOfLines={1}>
+               {otherCount > 0
+  ? t('emergency.evacuation.nearestPlusOthers', {
+      name: displayName(previewCenter.name),
+      count: otherCount,
+      defaultValue: `Nearest: ${displayName(previewCenter.name)} · +${otherCount} more`,
+    })
+  : displayName(previewCenter.name)}
+              </Text>
+            </View>
           </View>
 
-          {/* ── Distance + ETA row ── */}
-          {(distLoading || osrm) && (
+          {/* ── Distance + ETA row (to the best center) ── */}
+          {(nearestLoading || nearest) && (
             <View className="flex-row items-center gap-x-2 pl-12">
-              {distLoading ? (
+              {nearestLoading ? (
                 <View className="flex-row items-center gap-x-1.5">
                   <ActivityIndicator size="small" color="#059669" />
                   <Text className="text-[11px] text-slate-400">
                     {t('emergency.evacuation.calculatingRoute')}
                   </Text>
                 </View>
-              ) : osrm ? (
+              ) : nearest ? (
                 <>
-                  {/* Road distance badge */}
                   <View className="bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 flex-row items-center gap-x-1">
                     <Navigation size={11} color="#059669" />
                     <Text className="text-[11px] font-bold text-emerald-700">
-                      {formatKm(osrm.distanceKm)} {t('emergency.evacuation.away')}
+                      {formatKm(nearest.distanceKm)} {t('emergency.evacuation.away')}
                     </Text>
                   </View>
 
-                  {/* ETA badge (only if OSRM returned a real duration) */}
-                  {osrm.durationSecs > 0 && (
+                  {nearest.durationSecs > 0 && (
                     <View className="bg-blue-50 border border-blue-200 rounded-full px-2.5 py-1 flex-row items-center gap-x-1">
                       <Clock size={11} color="#2563EB" />
                       <Text className="text-[11px] font-bold text-blue-700">
-                        {formatMins(osrm.durationSecs)}
+                        {formatMins(nearest.durationSecs)}
                       </Text>
                     </View>
                   )}
@@ -244,7 +319,7 @@ export const EvacuationCenterCard: React.FC<EvacuationCenterCardProps> = ({
           {/* Divider */}
           <View className="h-px bg-slate-100" />
 
-          {/* ── Geocoded address ── */}
+          {/* ── Geocoded address (of the best center) ── */}
           <View className="flex-row items-start gap-x-3">
             <View className="w-9 items-center pt-0.5 shrink-0">
               <MapPin size={14} color="#6B7280" />
@@ -269,17 +344,7 @@ export const EvacuationCenterCard: React.FC<EvacuationCenterCardProps> = ({
             </View>
           </View>
 
-          {/* ── Coordinates ── */}
-          <View className="flex-row items-center gap-x-3">
-            <View className="w-9 items-center shrink-0">
-              <Navigation size={13} color="#2563EB" />
-            </View>
-            <Text className="text-[11px] font-semibold text-blue-600 font-mono tracking-tight">
-              {lat.toFixed(5)}, {lng.toFixed(5)}
-            </Text>
-          </View>
-
-          {/* ── Get Route button ── */}
+          {/* ── View all on map / Get Route button ── */}
           {valid && (
             <>
               <View className="h-px bg-slate-100" />
@@ -290,7 +355,9 @@ export const EvacuationCenterCard: React.FC<EvacuationCenterCardProps> = ({
               >
                 <Navigation size={15} color="#fff" />
                 <Text className="text-[14px] font-bold text-white">
-                  {t('emergency.evacuation.getRoute')}
+                  {centers.length > 1
+                    ? t('emergency.evacuation.viewAllOnMap', { defaultValue: 'View All on Map' })
+                    : t('emergency.evacuation.getRoute')}
                 </Text>
               </TouchableOpacity>
             </>
@@ -299,13 +366,12 @@ export const EvacuationCenterCard: React.FC<EvacuationCenterCardProps> = ({
         </View>
       </View>
 
-      {/* ── Fullscreen route modal ── */}
+      {/* ── Fullscreen route modal — gets ALL centers, not just the preview one ── */}
       <EvacuationRouteModal
         visible={routeOpen}
         onClose={() => setRouteOpen(false)}
-        centerName={center.name}
-        centerLat={lat}
-        centerLng={lng}
+        areaLabel={areaLabel}
+        centers={centers}
         userLat={userLatitude}
         userLng={userLongitude}
       />

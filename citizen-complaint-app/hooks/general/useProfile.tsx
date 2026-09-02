@@ -7,11 +7,11 @@ import { userApiClient } from '@/lib/client/user';
 import { handleApiError } from '@/utils/general/errorHandler';
 import { useTranslation } from 'react-i18next';
 import useToast from './useToast';
-
+import { useQueryClient } from '@tanstack/react-query';
 export const useProfileLogic = () => {
   const { t } = useTranslation();
   const { toastType, toastMessage, showToast, setToastVisible, toastVisible } = useToast();
-
+  const queryClient = useQueryClient();
 
 
   const userData = useCurrentUser((s) => s.userData);
@@ -37,6 +37,7 @@ const clearUser = useCurrentUser((s) => s.clearUser);
       console.log('Location update successful, fetching user data...');
       setShowLocationModal(false);
       setShowMapPicker(false);
+      queryClient.invalidateQueries({ queryKey: ['evacuation-centers', 'nearby'] });
       showToast(t('profile.location.success.message'), 'success');
       await fetchCurrentUser(true);
     },
@@ -56,6 +57,8 @@ const clearUser = useCurrentUser((s) => s.clearUser);
         latitude: result.latitude.toString(),
         longitude: result.longitude.toString(),
       });
+
+      queryClient.invalidateQueries({ queryKey: ['evacuation-centers', 'nearby'] });
     } else if (!result.granted) {
       setShowLocationModal(false);
 
@@ -78,6 +81,8 @@ const clearUser = useCurrentUser((s) => s.clearUser);
       latitude: latitude.toString(),
       longitude: longitude.toString(),
     });
+
+ 
   };
 
   // ✅ No Alert here — confirmation is handled by LogoutConfirmModal in the UI

@@ -34,9 +34,10 @@ const ACCENTS = [
   { color: '#6D28D9', dark: '#3B0764', text: '#EDE9FE' }, // Purple
   { color: '#047857', dark: '#064E3B', text: '#D1FAE5' }, // Green
 ];
+
 function EventCard({ event, index, onPress }: { event: EventData; index: number; onPress: () => void }) {
   const accent    = ACCENTS[index % ACCENTS.length];
- 
+
   const { month, day, weekday, time } = formatEventDate(event.date);
   const thumbnail = getThumbnail(event.media);
   const hasMedia  = !!thumbnail;
@@ -57,21 +58,21 @@ function EventCard({ event, index, onPress }: { event: EventData; index: number;
               <Image source={{ uri: thumbnail! }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
               <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, backgroundColor: 'rgba(0,0,0,0.50)' }} />
               <View style={{ position: 'absolute', top: 10, left: 10, backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center', minWidth: 46, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 4 }}>
-                <Text style={{ color: accent.color, fontSize: 20, fontWeight: '900', lineHeight: 22 }}>{day}</Text>
-                <Text style={{ color: accent.color, fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>{month}</Text>
+                <Text style={{ color: accent.color, fontSize: 20, fontWeight: '900', lineHeight: 22 }} maxFontSizeMultiplier={1.2}>{day}</Text>
+                <Text style={{ color: accent.color, fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }} maxFontSizeMultiplier={1.2}>{month}</Text>
               </View>
               <View style={{ position: 'absolute', bottom: 10, right: 10, backgroundColor: accent.color, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
-                <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.6 }}>{weekday}</Text>
+                <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.6 }} maxFontSizeMultiplier={1.2}>{weekday}</Text>
               </View>
             </>
           ) : (
             <View style={{ flex: 1, paddingHorizontal: 16, paddingVertical: 14 }}>
               <View style={{ position: 'absolute', top: 10, left: 10, backgroundColor: accent.color, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center', minWidth: 46 }}>
-                <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900', lineHeight: 22 }}>{day}</Text>
-                <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }}>{month}</Text>
+                <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900', lineHeight: 22 }} maxFontSizeMultiplier={1.2}>{day}</Text>
+                <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 }} maxFontSizeMultiplier={1.2}>{month}</Text>
               </View>
               <View style={{ position: 'absolute', bottom: 10, right: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
-                <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.6 }}>{weekday}</Text>
+                <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 0.6 }} maxFontSizeMultiplier={1.2}>{weekday}</Text>
               </View>
               <View style={{ flex: 1, justifyContent: 'center', paddingLeft: 62, paddingRight: 8, paddingTop: 4, paddingBottom: 4 }}>
                 <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800', lineHeight: 20 }} numberOfLines={3}>
@@ -87,7 +88,7 @@ function EventCard({ event, index, onPress }: { event: EventData; index: number;
           )}
         </View>
 
-        <View style={{ height: 100, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, justifyContent: 'space-between', backgroundColor: '#fff' }}>
+        <View style={{ minHeight: 100, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, justifyContent: 'space-between', backgroundColor: '#fff', gap: 8 }}>
           <Text style={{ color: '#0F172A', fontSize: 13, fontWeight: '700', lineHeight: 18, opacity: hasMedia ? 1 : 0 }} numberOfLines={1}>
             {event.event_name}
           </Text>
@@ -95,18 +96,18 @@ function EventCard({ event, index, onPress }: { event: EventData; index: number;
             {event.location && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <MapPin size={11} color="#475569" />
-                <Text style={{ color: '#475569', fontSize: 11, fontWeight: '500', flex: 1 }} numberOfLines={1}>{event.location}</Text>
+                <Text style={{ color: '#475569', fontSize: 11, fontWeight: '500', flex: 1 }} numberOfLines={1} maxFontSizeMultiplier={1.3}>{event.location}</Text>
               </View>
             )}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Clock size={11} color="#475569" />
-              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '500' }}>{time}</Text>
+              <Text style={{ color: '#475569', fontSize: 11, fontWeight: '500' }} maxFontSizeMultiplier={1.3}>{time}</Text>
             </View>
           </View>
           <View style={{ borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ color: '#94A3B8', fontSize: 10, fontWeight: '600', letterSpacing: 0.5 }}>COMMUNITY</Text>
+            <Text style={{ color: '#94A3B8', fontSize: 10, fontWeight: '600', letterSpacing: 0.5 }} maxFontSizeMultiplier={1.2}>COMMUNITY</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: accent.color, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
-              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>Details</Text>
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }} maxFontSizeMultiplier={1.2}>Details</Text>
               <ArrowRight size={10} color="#fff" />
             </View>
           </View>
@@ -145,7 +146,7 @@ function StripError({ onRetry }: { onRetry: () => void }) {
 export function UpcomingEventsStrip({ data: events = [], isLoading, isError, refetch }: { data?: EventData[]; isLoading: boolean; isError: boolean; refetch: () => void }) {
   const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
-   const {t} = useTranslation();
+  const { t } = useTranslation();
 
   const scrollX      = useRef(new Animated.Value(0)).current;
   const flatListRef  = useRef<any>(null);
@@ -223,7 +224,7 @@ export function UpcomingEventsStrip({ data: events = [], isLoading, isError, ref
             showsHorizontalScrollIndicator={false}
             snapToInterval={CARD_STEP}
             decelerationRate="fast"
-            contentContainerStyle={{ paddingHorizontal: 20, gap: CARD_GAP }}
+            contentContainerStyle={{ marginBottom: 20, paddingHorizontal: 20, gap: CARD_GAP }}
             onScrollBeginDrag={onScrollBeginDrag}
             onMomentumScrollEnd={onMomentumScrollEnd}
             onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}

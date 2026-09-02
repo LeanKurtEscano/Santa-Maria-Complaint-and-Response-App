@@ -72,8 +72,21 @@ function useWeather(latitude: number | null | undefined, longitude: number | nul
 
   return { weatherCode, temperature };
 }
+
+// --- Helpers ---
+// Names longer than this get truncated with an ellipsis so the layout
+// never breaks or pushes the weather badge off-card.
+const MAX_NAME_LENGTH = 18;
+
+function getDisplayName(firstName?: string | null): string {
+  if (!firstName || !firstName.trim()) return '';
+  const trimmed = firstName.trim();
+  if (trimmed.length <= MAX_NAME_LENGTH) return trimmed;
+  return `${trimmed.slice(0, MAX_NAME_LENGTH - 1)}…`;
+}
+
 // --- Component ---
-export function GreetingBanner() {
+export function GreetingBanner({ firstName }: { firstName: string }) {
   const opacity    = useRef(new Animated.Value(0)).current;
   const translateX = useRef(new Animated.Value(-20)).current;
   const { t } = useTranslation();
@@ -92,6 +105,8 @@ export function GreetingBanner() {
 
   const greetingKey = getGreeting();
   const dateStr = new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' });
+  const displayName = getDisplayName(firstName);
+  const greetingName = displayName || t('home.resident');
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateX }] }} className="mx-5 mb-4">
@@ -112,13 +127,18 @@ export function GreetingBanner() {
         ))}
 
         <View className="flex-row items-center justify-between">
-          <View className="flex-1">
+          {/* minWidth: 0 lets this flex child actually shrink instead of forcing the row wider */}
+          <View className="flex-1" style={{ minWidth: 0 }}>
             <View className="flex-row items-center gap-1.5 mb-1">
               <Sun size={13} color="#FCD34D" />
               <Text style={{ color: '#FCD34D', fontSize: 10, fontWeight: '700', letterSpacing: 1 }}>{dateStr.toUpperCase()}</Text>
             </View>
-            <Text style={{ color: 'white', fontSize: 18, fontWeight: '900', letterSpacing: -0.3, marginBottom: 4 }}>
-              {t(greetingKey)}, {t('home.resident')}!
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={{ color: 'white', fontSize: 18, fontWeight: '900', letterSpacing: -0.3, marginBottom: 4 }}
+            >
+              {t(greetingKey)}, {greetingName}!
             </Text>
             <Text style={{ color: THEME.primaryLight, fontSize: 10, fontWeight: '500', marginTop: 3 }}>
               {t('home.stay_updated')}
