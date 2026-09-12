@@ -47,8 +47,8 @@ import {
   RefreshControl,
   Dimensions,
 } from "react-native";
-import { Video, ResizeMode } from "expo-av";
-
+import { VideoView, useVideoPlayer } from "expo-video";
+import { useEvent } from "expo";
 // ─── Local Types for incident_links ──────────────────────────────────────────
 
 interface ResponseAttachment {
@@ -968,8 +968,6 @@ function HearingDateCard({
     </View>
   );
 }
-
-
 function MediaViewer({
   item,
   visible,
@@ -979,17 +977,30 @@ function MediaViewer({
   visible: boolean;
   onClose: () => void;
 }) {
-  const videoRef = React.useRef<Video>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const screenW = Dimensions.get("window").width;
 
+  const videoUri = item?.type === "video" ? item.uri : null;
+
+  const player = useVideoPlayer(videoUri, (p) => {
+    p.loop = true;
+    p.muted = isMuted;
+  });
+
+  // Reactive playing state, per expo-video's recommended pattern.
+  const { isPlaying } = useEvent(player, "playingChange", {
+    isPlaying: player.playing,
+  });
+
   React.useEffect(() => {
     if (!visible) {
-      videoRef.current?.pauseAsync();
-      setIsPlaying(false);
+      player.pause();
     }
-  }, [visible]);
+  }, [visible, player]);
+
+  React.useEffect(() => {
+    player.muted = isMuted;
+  }, [isMuted, player]);
 
   if (!item) return null;
 
@@ -1076,17 +1087,11 @@ function MediaViewer({
         {/* ── Video ── */}
         {item.type === "video" && (
           <View style={{ width: screenW, height: screenW * (9 / 16) }}>
-            <Video
-              ref={videoRef}
-              source={{ uri: item.uri }}
+            <VideoView
+              player={player}
               style={{ width: "100%", height: "100%" }}
-              resizeMode={ResizeMode.CONTAIN}
-              shouldPlay={false}
-              isLooping
-              isMuted={isMuted}
-              onPlaybackStatusUpdate={(status) => {
-                if (status.isLoaded) setIsPlaying(status.isPlaying);
-              }}
+              contentFit="contain"
+              nativeControls={false}
             />
 
             {/* Video controls overlay */}
@@ -1108,9 +1113,9 @@ function MediaViewer({
               <TouchableOpacity
                 onPress={() => {
                   if (isPlaying) {
-                    videoRef.current?.pauseAsync();
+                    player.pause();
                   } else {
-                    videoRef.current?.playAsync();
+                    player.play();
                   }
                 }}
                 style={{
@@ -1174,7 +1179,6 @@ function MediaViewer({
     </Modal>
   );
 }
-
 // ─── Attachment Grid ──────────────────────────────────────────────────────────
 
 function AttachmentGrid({

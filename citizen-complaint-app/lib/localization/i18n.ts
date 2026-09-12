@@ -311,6 +311,7 @@ const resources = {
       driversLicense: "Driver's License",
       passport: 'Passport',
       umid: 'UMID',
+     'PhilSys ID': 'PhilSys ID',
       sss: 'SSS ID',
       philhealth: 'PhilHealth ID',
       votersId: "Voter's ID",
@@ -1434,6 +1435,7 @@ const resources = {
       Pending:'Nasa Proseso',
       Resolved:'Naresolba',
       // ID Types
+      'PhilSys ID': 'PhilSys ID',
       driversLicense: 'Lisensya sa Pagmamaneho',
       passport: 'Pasaporte',
       umid: 'UMID',

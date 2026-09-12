@@ -32,8 +32,8 @@ import {
   Settings,
   ChevronLeft
 } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
+
 import { formatName } from '@/utils/general/name';
 import { THEME } from '@/constants/theme';
 import AuthGuard from '@/screen/general/AuthGuard';
@@ -202,7 +202,7 @@ function LogoutConfirmModal({
 // ---------------------------------------------------------------------------
 export default function ProfileScreen() {
   const { t } = useTranslation();
-  const navigation = useNavigation();
+
   const router = useRouter();
 
   // Local state for the logout modal

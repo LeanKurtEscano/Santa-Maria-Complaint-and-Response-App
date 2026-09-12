@@ -2,7 +2,7 @@
   "expo": {
     "name": "Mary App",
     "slug": "citizen-complaint-app",
-    "version": "1.0.4",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/santamarialogoapp.jpg",
     "scheme": "citizencomplaintapp",
@@ -30,7 +30,7 @@
       },
       "adaptiveIcon": {
         "backgroundColor": "#10B981",
-        "foregroundImage": "./assets/images/santamarialogoapp.png"
+        "foregroundImage": "./assets/images/santamarialogoapp.jpg"
       },
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",

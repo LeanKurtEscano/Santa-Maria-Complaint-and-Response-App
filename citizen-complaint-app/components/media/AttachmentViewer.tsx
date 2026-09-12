@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { X, Share2 } from 'lucide-react-native';
 import * as Sharing from 'expo-sharing';
 import { ViewerState } from '@/hooks/general/useAttachmentViewer';
@@ -126,27 +126,37 @@ function ImageViewer({ uri }: { uri: string }) {
   );
 }
 
-// ─── Video Viewer ─────────────────────────────────────────────────────────────
+// ─── Video Viewer (expo-video, SDK 57) ───────────────────────────────────────
 function VideoViewer({ uri }: { uri: string }) {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = false;
+    p.play();
+  });
 
   return (
     <View style={styles.mediaInner}>
-      {loading && (
+      {loading && !error && (
         <View style={[StyleSheet.absoluteFill, styles.centered]}>
           <ActivityIndicator size="large" color="#ffffff" />
         </View>
       )}
-      <Video
-        source={{ uri }}
-        style={styles.fullMedia}
-        useNativeControls
-        resizeMode={ResizeMode.CONTAIN}
-        isLooping={false}
-        shouldPlay
-        onReadyForDisplay={() => setLoading(false)}
-        onError={() => setLoading(false)}
-      />
+
+      {error ? (
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>Could not load video</Text>
+        </View>
+      ) : (
+        <VideoView
+          player={player}
+          style={styles.fullMedia}
+          contentFit="contain"
+          nativeControls
+          onFirstFrameRender={() => setLoading(false)}
+        />
+      )}
     </View>
   );
 }
@@ -170,7 +180,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    // Push below status bar
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 10 : 54,
     paddingHorizontal: 16,
     paddingBottom: 14,
@@ -194,7 +203,6 @@ const styles = StyleSheet.create({
   },
 
   // ── Media ──
-  // flex:1 → fills everything between header and footer
   mediaArea: {
     flex: 1,
     backgroundColor: '#000000',
@@ -202,7 +210,6 @@ const styles = StyleSheet.create({
   mediaInner: {
     flex: 1,
   },
-  // width = full screen width; flex:1 height = remaining space
   fullMedia: {
     width: SCREEN_W,
     flex: 1,

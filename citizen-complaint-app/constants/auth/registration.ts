@@ -31,6 +31,7 @@ export const BARANGAYS = [
 ];
 
 export const ID_TYPES = [
+    'PhilSys ID',
     'driversLicense',
     'passport',
     'umid',

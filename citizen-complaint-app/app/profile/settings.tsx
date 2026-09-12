@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { useSettingsLogic } from '@/hooks/general/useSetting';
 import {
   ChevronLeft,
@@ -21,7 +21,7 @@ import { useCurrentUser } from '@/store/useCurrentUserStore';
 export default function SettingsScreen() {
   const { userData } = useCurrentUser();
   const { t } = useTranslation();
-  const navigation = useNavigation();
+  const router = useRouter();
   const {
     currentLanguage,
     changeLanguage,
@@ -36,7 +36,7 @@ export default function SettingsScreen() {
       <View style={{ backgroundColor: THEME.primaryDark }} className="px-4 py-4">
         <View className="flex-row items-center">
           <TouchableOpacity
-            onPress={() => navigation.goBack()}
+            onPress={() => router.back()}
             className="mr-3 p-1"
             activeOpacity={0.7}
           >
