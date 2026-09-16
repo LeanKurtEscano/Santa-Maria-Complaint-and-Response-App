@@ -31,14 +31,18 @@ export const BARANGAYS = [
 ];
 
 export const ID_TYPES = [
-    'PhilSys ID',
+    'nationalId',
     'driversLicense',
     'passport',
     'umid',
     'sss',
     'philhealth',
+    'tinId',
     'votersId',
     'postalId',
     'barangayId',
+    'seniorCitizenId',
+    'pwdId',
+    'prcId',
     'studentId',
 ];

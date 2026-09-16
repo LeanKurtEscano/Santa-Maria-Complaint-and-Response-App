@@ -248,7 +248,7 @@ const {
           />
         </View>
 
-        <OrdinanceCard />
+        {/* <OrdinanceCard /> */}
         <FeedbackCard />
 
       </Animated.ScrollView>

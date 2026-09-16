@@ -1,23 +1,32 @@
 /**
  * EvacuationRouteModal
  *
- * CHANGED: now takes a whole GROUP of evacuation centers instead of one.
+ * CHANGED: now takes a whole GROUP of evacuation centers instead of one,
+ * AND lets the user switch which center the route is drawn to (e.g. if the
+ * nearest one is full).
+ *
  * Fullscreen modal that renders a Leaflet map (via WebView) showing:
  *  - User's current location as a blue pulsing marker
  *  - EVERY evacuation center in the group as a numbered red marker
- *  - The best (fastest) center highlighted with a gold ring + star popup
- *  - The best driving route to that best center, fetched from OSRM, drawn
- *    as a bold red polyline
+ *    (greyed out + "Full" ring if isFull is true)
+ *  - The currently SELECTED center highlighted with a gold ring + star popup
+ *    (defaults to the best/fastest non-full center)
+ *  - The driving route to the currently selected center, fetched from OSRM,
+ *    drawn as a bold red polyline
+ *  - A horizontal picker strip (native RN, below the map) listing every
+ *    center ranked by ETA, so the user can tap a different one if the
+ *    default choice is full or otherwise unavailable
  *
  * Algorithm:
  *  - OSRM Table Service: one request, user -> every center, to rank them
- *    by driving duration and pick the best one ("shortest/best path" target)
+ *    by driving duration ("shortest/best path" target)
  *  - OSRM Route Service (Contraction Hierarchies): actual road-snapped
- *    route geometry to that best center
+ *    route geometry to whichever center is currently selected
  *  - Free, no API key required
  *
  * If no user location is available, all centers are still pinned and fit
- * to the viewport, with a notice instead of a route.
+ * to the viewport, with a notice instead of a route, and the picker strip
+ * is hidden (there's nothing to rank without a user location).
  */
 
 import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
@@ -37,6 +46,7 @@ import { isValidCoordinate } from '@/hooks/general/useReverseGeocode';
 import { EvacuationCenter } from '@/constants/emergency/evacuation';
 import { THEME } from '@/constants/theme';
 import { NAME_CORRECTIONS, displayName } from '@/utils/general/barangayNameError';
+
 interface EvacuationRouteModalProps {
   visible: boolean;
   onClose: () => void;
@@ -48,7 +58,16 @@ interface EvacuationRouteModalProps {
   userLng?: number | null;
 }
 
-type MapCenter = { id: number; name: string; lat: number; lng: number };
+type MapCenter = { id: number; name: string; lat: number; lng: number; isFull?: boolean };
+
+/** One row of the ranked-by-ETA list, posted back from the WebView. */
+type RankedCenter = {
+  id: number;
+  name: string;
+  durationSec: number | null;
+  distanceM: number | null;
+  isFull?: boolean;
+};
 
 // ── Build the self-contained HTML page ───────────────────────────────────────
 function buildMapHtml(
@@ -66,7 +85,13 @@ function buildMapHtml(
   const viewLng = hasUser ? userLng! : firstCenter.lng;
 
   const centersJson = JSON.stringify(
-    centers.map((c) => ({ id: c.id, name: c.name.replace(/'/g, "\\'"), lat: c.lat, lng: c.lng })),
+    centers.map((c) => ({
+      id: c.id,
+      name: c.name.replace(/'/g, "\\'"),
+      lat: c.lat,
+      lng: c.lng,
+      isFull: !!c.isFull,
+    })),
   );
 
   const userMarkerJs = hasUser
@@ -93,6 +118,108 @@ function buildMapHtml(
     const statusEl = document.getElementById('status');
     statusEl.style.display = 'flex';
 
+    let currentRouteLine = null;
+    let selectedId = null;
+
+    function normalIcon(i, isFull) {
+      return L.divIcon({
+        className: '',
+        html: \`<div style="
+          width:22px;height:22px;border-radius:50%;
+          background:\${isFull ? '#94A3B8' : '#DC2626'};border:3px solid #fff;
+          box-shadow:0 2px 8px rgba(0,0,0,0.35);
+          display:flex;align-items:center;justify-content:center;
+          color:#fff;font-size:11px;font-weight:800;
+        ">\${i + 1}</div>\`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+    }
+
+    function selectedIcon() {
+      return L.divIcon({
+        className: '',
+        html: \`<div style="
+          width:26px;height:26px;border-radius:50%;
+          background:#DC2626;border:3px solid #FBBF24;
+          box-shadow:0 2px 10px rgba(220,38,38,0.6);
+          display:flex;align-items:center;justify-content:center;
+          color:#fff;font-size:13px;font-weight:800;
+        ">★</div>\`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+      });
+    }
+
+    function showNoRoute() {
+      const el = document.getElementById('noRoute');
+      if (el) el.style.display = 'flex';
+    }
+
+    // Draws/redraws the route to a given center id. Exposed on window so
+    // RN can call it via injectJavaScript when the user taps a different
+    // center in the picker strip.
+    window.selectCenter = function(id) {
+      const center = centers.find(c => c.id === id);
+      if (!center) return;
+      selectedId = id;
+
+      const el = document.getElementById('noRoute');
+      if (el) el.style.display = 'none';
+
+      // Re-style all markers: normal for everyone, gold star for selected
+      centers.forEach((c, i) => {
+        destMarkers[c.id].setIcon(c.id === id ? selectedIcon() : normalIcon(i, c.isFull));
+      });
+      destMarkers[id].bindPopup(
+        '<b>' + center.name + '</b>' + (center.isFull ? '<br>⚠️ Reported full' : '<br>⭐ Selected route')
+      ).openPopup();
+
+      // Let RN know the selection changed (so the picker strip below the
+      // map highlights the same center), whether the tap came from a
+      // marker on the map or from the native strip itself.
+      window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
+        JSON.stringify({ type: 'selected', id: id })
+      );
+
+      if (currentRouteLine) { map.removeLayer(currentRouteLine); currentRouteLine = null; }
+
+      const chip = document.getElementById('routeChip');
+      chip.style.display = 'none';
+      statusEl.style.display = 'flex';
+
+      const routeUrl =
+        'https://router.project-osrm.org/route/v1/driving/' +
+        '${userLng},${userLat};' + center.lng + ',' + center.lat +
+        '?overview=full&geometries=geojson';
+
+      return fetch(routeUrl).then(r => r.json()).then(routeData => {
+        statusEl.style.display = 'none';
+        if (!routeData.routes || routeData.routes.length === 0) { showNoRoute(); return; }
+
+        const route = routeData.routes[0];
+        const coords = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+
+        currentRouteLine = L.polyline(coords, {
+          color: '#DC2626',
+          weight: 5,
+          opacity: 0.9,
+          lineJoin: 'round',
+          lineCap: 'round',
+        }).addTo(map);
+
+        map.fitBounds(currentRouteLine.getBounds(), { padding: [56, 56] });
+
+        const km = (route.distance / 1000).toFixed(1);
+        const mins = Math.round(route.duration / 60);
+        chip.textContent = (center.isFull ? '⚠️ ' : '★ ') + center.name + ' · ' + km + ' km · ~' + mins + ' min';
+        chip.style.display = 'block';
+      }).catch(() => {
+        statusEl.style.display = 'none';
+        showNoRoute();
+      });
+    };
+
     const tableUrl =
       'https://router.project-osrm.org/table/v1/driving/' +
       '${userLng},${userLat};' + centers.map(c => c.lng + ',' + c.lat).join(';') +
@@ -107,72 +234,46 @@ function buildMapHtml(
         const distances = tableData.distances && tableData.distances[0]
           ? tableData.distances[0].slice(1)
           : null;
-
-        let bestIdx = -1, bestVal = Infinity;
         const scoreArr = durations || distances;
-        if (scoreArr) {
+
+        // Build full ranked list and send it back to RN so it can render
+        // the native picker strip.
+        const ranked = centers
+          .map((c, i) => ({
+            id: c.id,
+            name: c.name,
+            durationSec: durations ? durations[i] : null,
+            distanceM: distances ? distances[i] : null,
+            isFull: c.isFull,
+          }))
+          .filter(r => r.durationSec != null || r.distanceM != null)
+          .sort((a, b) => (a.durationSec ?? a.distanceM) - (b.durationSec ?? b.distanceM));
+
+        window.ReactNativeWebView && window.ReactNativeWebView.postMessage(
+          JSON.stringify({ type: 'ranked', ranked })
+        );
+
+        if (!scoreArr) { statusEl.style.display = 'none'; showNoRoute(); return; }
+
+        // Default selection: best center that ISN'T reported full, falling
+        // back to the overall best if every center is full.
+        let bestIdx = -1, bestVal = Infinity;
+        scoreArr.forEach((v, i) => {
+          if (v != null && !centers[i].isFull && v < bestVal) { bestVal = v; bestIdx = i; }
+        });
+        if (bestIdx === -1) {
           scoreArr.forEach((v, i) => {
             if (v != null && v < bestVal) { bestVal = v; bestIdx = i; }
           });
         }
         if (bestIdx === -1) { statusEl.style.display = 'none'; showNoRoute(); return; }
 
-        const best = centers[bestIdx];
-
-        // Re-style the best marker: gold ring + star, and pop it open
-        const bestIcon = L.divIcon({
-          className: '',
-          html: \`<div style="
-            width:26px;height:26px;border-radius:50%;
-            background:#DC2626;border:3px solid #FBBF24;
-            box-shadow:0 2px 10px rgba(220,38,38,0.6);
-            display:flex;align-items:center;justify-content:center;
-            color:#fff;font-size:13px;font-weight:800;
-          ">★</div>\`,
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
-        });
-        destMarkers[best.id].setIcon(bestIcon);
-        destMarkers[best.id].bindPopup('<b>' + best.name + '</b><br>⭐ Best route').openPopup();
-
-        const routeUrl =
-          'https://router.project-osrm.org/route/v1/driving/' +
-          '${userLng},${userLat};' + best.lng + ',' + best.lat +
-          '?overview=full&geometries=geojson';
-
-        return fetch(routeUrl).then(r => r.json()).then(routeData => {
-          statusEl.style.display = 'none';
-          if (!routeData.routes || routeData.routes.length === 0) { showNoRoute(); return; }
-
-          const route = routeData.routes[0];
-          const coords = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
-
-          const polyline = L.polyline(coords, {
-            color: '#DC2626',
-            weight: 5,
-            opacity: 0.9,
-            lineJoin: 'round',
-            lineCap: 'round',
-          }).addTo(map);
-
-          map.fitBounds(polyline.getBounds(), { padding: [56, 56] });
-
-          const km = (route.distance / 1000).toFixed(1);
-          const mins = Math.round(route.duration / 60);
-          const chip = document.getElementById('routeChip');
-          chip.textContent = '★ ' + best.name + ' · ' + km + ' km · ~' + mins + ' min';
-          chip.style.display = 'block';
-        });
+        window.selectCenter(centers[bestIdx].id);
       })
       .catch(() => {
         statusEl.style.display = 'none';
         showNoRoute();
       });
-
-    function showNoRoute() {
-      const el = document.getElementById('noRoute');
-      if (el) el.style.display = 'flex';
-    }
   `
     : `
     const el = document.getElementById('noUser');
@@ -280,8 +381,8 @@ function buildMapHtml(
         className: '',
         html: \`<div style="
           width:22px;height:22px;border-radius:50%;
-          background:#DC2626;border:3px solid #fff;
-          box-shadow:0 2px 8px rgba(220,38,38,0.5);
+          background:\${c.isFull ? '#94A3B8' : '#DC2626'};border:3px solid #fff;
+          box-shadow:0 2px 8px rgba(0,0,0,0.35);
           display:flex;align-items:center;justify-content:center;
           color:#fff;font-size:11px;font-weight:800;
         ">\${i + 1}</div>\`,
@@ -290,7 +391,13 @@ function buildMapHtml(
       });
       const marker = L.marker([c.lat, c.lng], { icon })
         .addTo(map)
-        .bindPopup('<b>' + c.name + '</b>');
+        .bindPopup('<b>' + c.name + '</b>' + (c.isFull ? '<br>⚠️ Reported full' : ''));
+
+      // Tapping the circle itself reroutes to that center (same effect as
+      // tapping its chip in the native picker strip below the map).
+      marker.on('click', () => {
+        if (window.selectCenter) window.selectCenter(c.id);
+      });
       destMarkers[c.id] = marker;
       bounds.push([c.lat, c.lng]);
     });
@@ -330,15 +437,26 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
   const [webViewKey, setWebViewKey] = useState(0);
   const [mapError, setMapError] = useState(false);
   const [mapLoading, setMapLoading] = useState(true);
-const validCenters: MapCenter[] = useMemo(
-  () =>
-    (centers ?? [])
-      .filter((c) => isValidCoordinate(c.latitude, c.longitude))
-      .map((c) => ({ id: c.id, name: displayName(c.name), lat: c.latitude, lng: c.longitude })),
-  [centers],
-);
+  const [ranked, setRanked] = useState<RankedCenter[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const centersKey = validCenters.map((c) => `${c.id}:${c.lat},${c.lng}`).join('|');
+  const validCenters: MapCenter[] = useMemo(
+    () =>
+      (centers ?? [])
+        .filter((c) => isValidCoordinate(c.latitude, c.longitude))
+        .map((c) => ({
+          id: c.id,
+          name: displayName(c.name),
+          lat: c.latitude,
+          lng: c.longitude,
+          // Adjust this to whatever field your EvacuationCenter type actually
+          // exposes for occupancy, e.g. c.status === 'full' or a capacity check.
+          isFull: (c as any).isFull ?? false,
+        })),
+    [centers],
+  );
+
+  const centersKey = validCenters.map((c) => `${c.id}:${c.lat},${c.lng}:${c.isFull ? 1 : 0}`).join('|');
 
   const html = useMemo(
     () =>
@@ -354,6 +472,8 @@ const validCenters: MapCenter[] = useMemo(
     if (visible) {
       setMapError(false);
       setMapLoading(true);
+      setRanked([]);
+      setSelectedId(null);
     }
     return () => {
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
@@ -381,6 +501,21 @@ const validCenters: MapCenter[] = useMemo(
       if (data.type === 'mapLoaded') {
         setMapLoading(false);
         setMapError(false);
+      }
+      if (data.type === 'ranked' && Array.isArray(data.ranked)) {
+        setRanked(data.ranked);
+        // The WebView picks its own default (best non-full center) and
+        // calls selectCenter internally — mirror that choice here so the
+        // native picker strip highlights the right chip. Fall back to the
+        // first ranked entry if something's off.
+        const firstNonFull = data.ranked.find((r: RankedCenter) => !r.isFull);
+        setSelectedId((firstNonFull ?? data.ranked[0])?.id ?? null);
+      }
+      if (data.type === 'selected' && typeof data.id === 'number') {
+        // Fired whenever the WebView's selection changes — including a tap
+        // on a marker circle on the map itself — so the native picker
+        // strip's highlighted chip stays in sync.
+        setSelectedId(data.id);
       }
     } catch (_) {}
   }, []);
@@ -470,7 +605,13 @@ const validCenters: MapCenter[] = useMemo(
             style={{ borderWidth: 2, borderColor: '#FBBF24' }}
           />
           <Text className="text-[11px] text-slate-500 font-medium">
-            {t('emergency.evacuation.routeModal.legendBest', { defaultValue: 'Best route' })}
+            {t('emergency.evacuation.routeModal.legendBest', { defaultValue: 'Selected route' })}
+          </Text>
+        </View>
+        <View className="flex-row items-center gap-x-1.5">
+          <View className="w-3 h-3 rounded-full bg-slate-400" />
+          <Text className="text-[11px] text-slate-500 font-medium">
+            {t('emergency.evacuation.routeModal.legendFull', { defaultValue: 'Reported full' })}
           </Text>
         </View>
         <View className="flex-row items-center gap-x-1.5">
@@ -532,6 +673,7 @@ const validCenters: MapCenter[] = useMemo(
 };
 
 const styles = StyleSheet.create({
+
   mapArea: {
     flex: 1,
     position: 'relative',

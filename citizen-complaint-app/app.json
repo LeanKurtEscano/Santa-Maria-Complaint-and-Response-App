@@ -2,12 +2,11 @@
   "expo": {
     "name": "Mary App",
     "slug": "citizen-complaint-app",
-    "version": "1.0.6",
+    "version": "1.0.8",
     "orientation": "portrait",
-    "icon": "./assets/images/santamarialogoapp.jpg",
+    "icon": "./assets/images/santamarialogoapp.png",
     "scheme": "citizencomplaintapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.maryapp.user",
@@ -23,14 +22,9 @@
       "googleServicesFile": "./google-services.json",
       "versionCode": 3,
       "softwareKeyboardLayoutMode": "resize",
-      "notification": {
-        "icon": "./assets/images/santamarialogoapp.jpg",
-        "color": "#346739",
-        "androidMode": "default"
-      },
       "adaptiveIcon": {
         "backgroundColor": "#10B981",
-        "foregroundImage": "./assets/images/santamarialogoapp.jpg"
+        "foregroundImage": "./assets/images/santamarialogoapp.png"
       },
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -41,7 +35,6 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS"
       ],
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.maryapp.user"
     },
@@ -55,7 +48,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/santamarialogoapp.jpg",
+          "icon": "./assets/images/santamarialogoapp.png",
           "color": "#346739",
           "sounds": []
         }
@@ -64,7 +57,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/santamarialogoapp.jpg",
+          "image": "./assets/images/santamarialogoapp.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#346739",

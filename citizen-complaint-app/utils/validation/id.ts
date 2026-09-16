@@ -3,13 +3,18 @@
  *
  * Formats based on official Philippine government ID number standards:
  * - Driver's License: LTO format A00-00-000000 (1 letter + 2d + 2d + 6d)
+ * - National ID (PhilSys): 12-digit PhilSys number
  * - Passport: DFA format A0000000 (old) or AA0000000 (ePassport)
  * - UMID: SSS/GSIS CRN format ####-#######-# (12 digits)
  * - SSS: ##-#######-# (10 digits)
  * - PhilHealth: 12-digit PIN (############)
+ * - TIN ID: usually 9–12 digits or formatted with hyphens
  * - Voter's ID: COMELEC precinct-based, loose alphanumeric (7–13 chars)
  * - Postal ID: PhilPost alphanumeric, varies by region (10–15 chars)
  * - Barangay ID: No national standard, free-form (3–30 chars)
+ * - Senior Citizen ID: government-issued, usually 10–20 alphanumeric chars
+ * - PWD ID: government-issued, usually 8–20 alphanumeric chars
+ * - PRC ID: professional license ID, usually 6–20 alphanumeric chars
  * - Student ID: Institution-specific, free-form (3–30 chars)
  */
 
@@ -23,6 +28,11 @@ interface IdValidationRule {
 }
 
 const ID_RULES: Record<string, IdValidationRule> = {
+  nationalId: {
+    // PhilSys national ID: usually 12 digits
+    regex: /^\d{12}$/,
+    format: '12 digits (e.g. 123456789012)',
+  },
   driversLicense: {
     // Format: A00-00-000000 (e.g. D01-23-456789)
     regex: /^[A-Z]\d{2}-\d{2}-\d{6}$/,
@@ -49,6 +59,11 @@ const ID_RULES: Record<string, IdValidationRule> = {
     regex: /^\d{12}$/,
     format: '############  (e.g. 012345678901)',
   },
+  tinId: {
+    // TIN commonly appears as 9 or 12 digits, sometimes with hyphen separators
+    regex: /^(?:\d{9}|\d{12}|\d{3}-\d{3}-\d{3}-\d{3}|\d{3}-\d{3}-\d{3})$/,
+    format: '9 or 12 digits, or a hyphenated format (e.g. 123-456-789 or 123-456-789-000)',
+  },
   votersId: {
     // COMELEC precinct-based, no strict national standard
     // Alphanumeric, typically 7–13 characters
@@ -65,6 +80,21 @@ const ID_RULES: Record<string, IdValidationRule> = {
     minLength: 3,
     maxLength: 30,
     format: '3–30 characters',
+  },
+  seniorCitizenId: {
+    minLength: 5,
+    maxLength: 30,
+    format: '5–30 characters',
+  },
+  pwdId: {
+    minLength: 5,
+    maxLength: 30,
+    format: '5–30 characters',
+  },
+  prcId: {
+    minLength: 6,
+    maxLength: 30,
+    format: '6–30 characters',
   },
   studentId: {
     // Institution-specific, just reasonable length
@@ -126,14 +156,19 @@ export const validateIdNumberByType = (
  */
 export const getIdNumberPlaceholder = (idType: string): string => {
   const placeholders: Record<string, string> = {
+    nationalId: '123456789012',
     driversLicense: 'D01-23-456789',
     passport: 'P1234567 or EC1234567',
     umid: '0012-3456789-0',
     sss: '01-2345678-9',
     philhealth: '012345678901',
+    tinId: '123-456-789 or 123-456-789-000',
     votersId: '1234567 or ABC-1234567',
     postalId: 'PH1234567890',
     barangayId: 'e.g. BRG-2024-001',
+    seniorCitizenId: 'e.g. 1234567890',
+    pwdId: 'e.g. PWD-2024-001',
+    prcId: 'e.g. 1234567',
     studentId: 'e.g. 2024-00001',
   };
   return placeholders[idType] || 'Enter your ID number';
@@ -145,14 +180,19 @@ export const getIdNumberPlaceholder = (idType: string): string => {
  */
 export const getIdNumberHint = (idType: string): string => {
   const hints: Record<string, string> = {
+    nationalId: 'Enter your 12-digit PhilSys National ID number',
     driversLicense: 'Format: A00-00-000000 (e.g. D01-23-456789)',
     passport: 'Format: A0000000 (old) or AA0000000 (ePassport)',
     umid: 'Format: ####-#######-# (12-digit CRN on your UMID card)',
     sss: 'Format: ##-#######-# (10-digit SSS number)',
     philhealth: 'Enter your 12-digit PhilHealth Identification Number (PIN)',
+    tinId: 'Enter your TIN ID number (9 or 12 digits, with or without hyphens)',
     votersId: 'Enter your COMELEC Voter ID number (7–13 characters)',
     postalId: 'Enter your PhilPost Postal ID number (10–15 characters)',
     barangayId: 'Enter the ID number as printed on your Barangay ID',
+    seniorCitizenId: 'Enter the ID number printed on your Senior Citizen ID',
+    pwdId: 'Enter the ID number printed on your PWD ID',
+    prcId: 'Enter the ID number printed on your PRC ID',
     studentId: 'Enter the ID number as printed on your School ID',
   };
   return hints[idType] || '';

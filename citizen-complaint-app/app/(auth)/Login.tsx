@@ -32,6 +32,10 @@ import { THEME } from '@/constants/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import * as Application from 'expo-application';
+import {
+    logGoogleSignInError,
+    logGoogleSignInEvent,
+} from '@/utils/general/googleSignInDiagnostics';
 
 // Clerk browser OAuth - used for iOS / Expo Go testing
 import { useSSO, useAuth } from '@clerk/expo';
@@ -177,15 +181,24 @@ function AndroidGoogleSignIn({
         let createdSessionId: string | undefined;
 
         try {
+            logGoogleSignInEvent('flow_started');
+
             // Clean up any stale Clerk session.
             try {
                 await signOut();
+                logGoogleSignInEvent('stale_session_cleared');
             } catch {
                 // No existing Clerk session.
+                logGoogleSignInEvent('no_stale_session');
             }
 
             // Native Android Google authentication.
+            logGoogleSignInEvent('credential_manager_started');
             const result = await startGoogleAuthenticationFlow();
+            logGoogleSignInEvent('credential_manager_completed', {
+                hasCreatedSessionId: Boolean(result.createdSessionId),
+                hasSetActive: Boolean(result.setActive),
+            });
 
             createdSessionId = result.createdSessionId;
 
@@ -199,9 +212,13 @@ function AndroidGoogleSignIn({
             await setActive({
                 session: createdSessionId,
             });
+            logGoogleSignInEvent('clerk_session_activated');
 
             // Get Clerk JWT.
             const clerkToken = await getToken();
+            logGoogleSignInEvent('clerk_token_requested', {
+                hasClerkToken: Boolean(clerkToken),
+            });
 
             if (!clerkToken) {
                 throw new Error(
@@ -214,12 +231,11 @@ function AndroidGoogleSignIn({
             );
 
             // Send Clerk token to your backend.
+            logGoogleSignInEvent('backend_login_started');
             await onSuccess(clerkToken);
+            logGoogleSignInEvent('flow_completed');
         } catch (error: any) {
-            console.log(
-                'Android native Google login error:',
-                error
-            );
+            logGoogleSignInError('flow_failed', error);
 
             // Native Google cancellation.
             if (

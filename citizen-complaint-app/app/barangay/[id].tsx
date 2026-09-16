@@ -278,9 +278,10 @@ const handleSubmit = async () => {
                 showGlobalToast('Permission denied for notifications.', 'error');
                 return;
               }
-              await userApiClient.post('/push-token', { token });
+              // Let syncPushToken() handle posting the token to avoid duplicates
+              await useCurrentUser.getState().syncPushToken();
               await userApiClient.post('/enable-push-notifications', { enabled: true });
-              fetchCurrentUser(true);
+              await fetchCurrentUser(true);
               showGlobalToast('Notifications enabled!', 'success');
             } catch (err) {
               showGlobalToast('Failed to enable notifications.', 'error');
