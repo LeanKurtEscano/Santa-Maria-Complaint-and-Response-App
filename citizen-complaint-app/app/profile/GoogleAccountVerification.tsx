@@ -33,6 +33,7 @@ import {
   validateIdNumberByType,
   getIdNumberPlaceholder,
   getIdNumberHint,
+  formatNationalId,
 } from '@/utils/validation/id';
 import ErrorMessage from '@/components/register/ErrorMessage';
 import useToastStore from '@/store/useGlobalModal';
@@ -476,12 +477,14 @@ export default function GoogleAccountVerification() {
                       else clearErrors('idNumber');
                     }}
                     onChangeText={(text) => {
-                      const sanitized = text.replace(/[^a-zA-Z0-9\- ]/g, '').toUpperCase();
+                      const sanitized = selectedIdType === 'nationalId'
+                        ? text.replace(/\D/g, '').slice(0, 16)
+                        : text.replace(/[^a-zA-Z0-9\- ]/g, '').toUpperCase();
                       onChange(sanitized);
                       clearErrors('idNumber');
                     }}
-                    maxLength={30}
-                    value={value}
+                    maxLength={selectedIdType === 'nationalId' ? 19 : 30}
+                    value={selectedIdType === 'nationalId' ? formatNationalId(value) : value}
                     placeholder={idPlaceholder}
                     placeholderTextColor="#9CA3AF"
                     autoCapitalize="characters"

@@ -160,6 +160,15 @@ const resources = {
     "error_no_internet": "No internet connection. Please check your network and try again.",
     "error_generic": "An unexpected error occurred. Please try again."
   },
+  "userGuide": {
+    "badge": "App Guide",
+    "title": "User's Guide",
+    "subtitle": "Watch the video guide to learn how to use the app.",
+    "cta": "Watch User's Guide",
+    "promptTitle": "Watch the User's Guide First",
+    "promptMessage": "Learn how to use the app before registering your account.",
+    "continue": "Continue to Registration"
+  },
 
   "ordinance": {
   "badge": "Official Records",
@@ -951,8 +960,8 @@ const resources = {
       "quick": {
         "heading": "Quick Access",
         "services": "My\nServices",
-        "complaints": "My\nComplaints",
-        "events": "My\nEvents",
+        "complaints": "My Complaints",
+        "events": "Events",
         "hotlines": "Hotlines"
       },
       "announcements": {
@@ -2331,6 +2340,15 @@ const resources = {
   "error_server": "May nagkaroon ng problema sa server. Subukan ulit mamaya.",
   "error_no_internet": "Walang internet connection. Pakisuri ang inyong network at subukan ulit.",
   "error_generic": "May naganap na hindi inaasahang error. Subukan ulit."
+  },
+  "userGuide": {
+    "badge": "Gabay sa App",
+    "title": "Gabay ng User",
+    "subtitle": "Panoorin ang video guide para malaman kung paano gamitin ang app.",
+    "cta": "Panoorin ang Gabay",
+    "promptTitle": "Panoorin Muna ang Gabay ng User",
+    "promptMessage": "Alamin kung paano gamitin ang app bago magrehistro ng account.",
+    "continue": "Magpatuloy sa Pagrehistro"
   },
 
 "hearingDate": {

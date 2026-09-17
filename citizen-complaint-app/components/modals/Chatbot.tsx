@@ -1013,7 +1013,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   // status bar is already baked into the layout via paddingTop on the header;
   // adding StatusBar.currentHeight here double-counts it and causes the input
   // bar to over-shoot upward on Android.
-  const kavBehavior = Platform.OS === 'ios' ? 'padding' : 'height';
+  const kavBehavior = 'padding';
   const kavOffset = Platform.OS === 'ios' ? insets.top : 0;
 
   return (
@@ -1043,7 +1043,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
             {/* ── Header ── */}
             <View
               style={{
-                paddingTop: insets.top,
+                paddingTop: Platform.OS === 'android' ? 4 : insets.top,
                 backgroundColor: '#FFFFFF',
                 borderBottomWidth: 1,
                 borderBottomColor: '#F1F5F9',
@@ -1173,7 +1173,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
                         onTextUpdate={(id, text) => {
                           if (id === currentBotIdRef.current) {
                             displayedTextRef.current = text;
-                            scrollToBottomIfNear();
+                            scrollToBottom(false);
                           }
                         }}
                       />

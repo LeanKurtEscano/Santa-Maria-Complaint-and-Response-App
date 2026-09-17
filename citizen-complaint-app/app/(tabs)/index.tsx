@@ -1,10 +1,11 @@
-import { View, Text, Animated, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, Animated, TouchableOpacity, RefreshControl, Modal, Linking, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
-  FileText, Phone, ClipboardList, CalendarDays, Megaphone,
+  FileText, Phone, ClipboardList, CalendarDays, Megaphone, BookOpen, PlayCircle,
 } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSettingsLogic } from '@/hooks/general/useSetting';
@@ -20,6 +21,7 @@ import { SectionHeader } from '@/components/home/ui';
 import ChatbotFAB from '@/components/buttons/Chatbotfab';
 import ChatbotModal from '@/components/modals/Chatbot';
 import { FeedbackCard } from '@/components/home/FeedbackCard';
+import { UserGuideCard } from '@/components/home/UserGuideCard';
 import { complaintApiClient } from '@/lib/client/complaint';
 import { MyStats } from '@/types/general/home';
 import { eventApiClient } from '@/lib/client/event';
@@ -30,14 +32,43 @@ import { ActivityIndicator } from 'react-native';
 import { OrdinanceCard } from '@/components/home/OrdinanceCard';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
 const HEADER_SCROLL_DISTANCE = 80;
+const USER_GUIDE_URL = 'http://cfms-stamaria.com/users-guide';
 
 export default function HomeScreen() {
   const router = useRouter();
   const { changeLanguage, currentLanguage } = useSettingsLogic();
   const { t } = useTranslation();
   const [chatOpen, setChatOpen] = useState(false);
+  const [showFirstHomeGuide, setShowFirstHomeGuide] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
   const { isAuthenticated, userData, loading: authLoading } = useCurrentUser();
+
+  useEffect(() => {
+    let mounted = true;
+
+    const showGuideOnFirstHomeVisit = async () => {
+      const [onboardingSeen, guidePromptSeen] = await Promise.all([
+        AsyncStorage.getItem('hasSeenOnboarding'),
+        AsyncStorage.getItem('hasSeenUserGuidePrompt'),
+      ]);
+
+      if (mounted && onboardingSeen === 'true' && guidePromptSeen !== 'true') {
+        await AsyncStorage.setItem('hasSeenUserGuidePrompt', 'true');
+        setShowFirstHomeGuide(true);
+      }
+    };
+
+    showGuideOnFirstHomeVisit().catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const closeFirstHomeGuide = () => setShowFirstHomeGuide(false);
+  const openFirstHomeGuide = async () => {
+    closeFirstHomeGuide();
+    await Linking.openURL(USER_GUIDE_URL);
+  };
   // ── Queries ──────────────────────────────────────────────────────────────
 const {
   data: announcements = [],
@@ -226,12 +257,12 @@ const {
           <GreetingBanner firstName={userData?.first_name || 'Resident'} />
         </View>
 
+
         {/* ── Upcoming events ── */}
         <UpcomingEventsStrip data={events} isLoading={false} isError={false} refetch={refetchEvents} />
-
+        
         {/* ── Featured complaint services ── */}
         <FeaturedServicesGrid />
-
         {/* ── Announcements ── */}
         <View className="px-5 mt-2">
           <SectionHeader
@@ -247,14 +278,80 @@ const {
             onRetry={refetch}
           />
         </View>
-
         {/* <OrdinanceCard /> */}
         <FeedbackCard />
+        <UserGuideCard />
 
       </Animated.ScrollView>
 
       <ChatbotFAB onPress={() => setChatOpen(true)} />
       <ChatbotModal visible={chatOpen} onClose={() => setChatOpen(false)} />
+
+      <Modal
+        visible={showFirstHomeGuide}
+        transparent
+        animationType="fade"
+        onRequestClose={closeFirstHomeGuide}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 24,
+          }}
+          onPress={closeFirstHomeGuide}
+        >
+          <Pressable
+            style={{
+              width: '100%',
+              backgroundColor: '#FFFFFF',
+              borderRadius: 24,
+              padding: 24,
+              alignItems: 'center',
+            }}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 32,
+                backgroundColor: '#DCFCE7',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 16,
+              }}
+            >
+              <BookOpen size={28} color="#166534" />
+            </View>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: '#0F172A', textAlign: 'center', marginBottom: 8 }}>
+              {t('userGuide.promptTitle')}
+            </Text>
+            <Text style={{ fontSize: 14, lineHeight: 21, color: '#64748B', textAlign: 'center', marginBottom: 20 }}>
+              {t('userGuide.promptMessage')}
+            </Text>
+            <TouchableOpacity
+              onPress={openFirstHomeGuide}
+              activeOpacity={0.85}
+              style={{ width: '100%', backgroundColor: '#16A34A', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginBottom: 10 }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <PlayCircle size={18} color="#FFFFFF" />
+                <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '700' }}>
+                  {t('userGuide.cta')}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={closeFirstHomeGuide} activeOpacity={0.75} style={{ paddingVertical: 12 }}>
+              <Text style={{ color: '#166534', fontSize: 14, fontWeight: '700' }}>
+                {t('userGuide.continue')}
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <BottomCTA
         onPress={() => router.push('/(tabs)/Complaints')}

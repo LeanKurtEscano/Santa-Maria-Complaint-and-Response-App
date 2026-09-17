@@ -3,7 +3,7 @@
  *
  * Formats based on official Philippine government ID number standards:
  * - Driver's License: LTO format A00-00-000000 (1 letter + 2d + 2d + 6d)
- * - National ID (PhilSys): 12-digit PhilSys number
+ * - National ID (PhilSys): 16-digit PhilSys number
  * - Passport: DFA format A0000000 (old) or AA0000000 (ePassport)
  * - UMID: SSS/GSIS CRN format ####-#######-# (12 digits)
  * - SSS: ##-#######-# (10 digits)
@@ -29,9 +29,9 @@ interface IdValidationRule {
 
 const ID_RULES: Record<string, IdValidationRule> = {
   nationalId: {
-    // PhilSys national ID: usually 12 digits
-    regex: /^\d{12}$/,
-    format: '12 digits (e.g. 123456789012)',
+    // PhilSys national ID: 16 digits
+    regex: /^\d{16}$/,
+    format: '16 digits (e.g. 1233-1233-1322-1312)',
   },
   driversLicense: {
     // Format: A00-00-000000 (e.g. D01-23-456789)
@@ -114,6 +114,7 @@ export const validateIdNumberByType = (
   }
 
   const trimmed = idNumber.trim().toUpperCase();
+  const normalized = trimmed.replace(/[\s-]/g, '');
   const rule = ID_RULES[idType];
 
   // If no rule found for this ID type, just do a basic length check
@@ -124,7 +125,7 @@ export const validateIdNumberByType = (
 
   // Regex-based validation
   if (rule.regex) {
-    if (!rule.regex.test(trimmed)) {
+    if (!rule.regex.test(idType === 'nationalId' ? normalized : trimmed)) {
       return (
         t('invalidIdFormat', { format: rule.format }) ||
         `Invalid formaat. Expected: ${rule.format}`
@@ -156,7 +157,7 @@ export const validateIdNumberByType = (
  */
 export const getIdNumberPlaceholder = (idType: string): string => {
   const placeholders: Record<string, string> = {
-    nationalId: '123456789012',
+    nationalId: '1233-1233-1322-1312',
     driversLicense: 'D01-23-456789',
     passport: 'P1234567 or EC1234567',
     umid: '0012-3456789-0',
@@ -180,7 +181,7 @@ export const getIdNumberPlaceholder = (idType: string): string => {
  */
 export const getIdNumberHint = (idType: string): string => {
   const hints: Record<string, string> = {
-    nationalId: 'Enter your 12-digit PhilSys National ID number',
+    nationalId: 'Enter your 16-digit PhilSys National ID number',
     driversLicense: 'Format: A00-00-000000 (e.g. D01-23-456789)',
     passport: 'Format: A0000000 (old) or AA0000000 (ePassport)',
     umid: 'Format: ####-#######-# (12-digit CRN on your UMID card)',
@@ -196,4 +197,10 @@ export const getIdNumberHint = (idType: string): string => {
     studentId: 'Enter the ID number as printed on your School ID',
   };
   return hints[idType] || '';
+};
+
+/** Formats the PhilSys number for display without changing the stored digits. */
+export const formatNationalId = (value: string): string => {
+  const digits = value.replace(/\D/g, '').slice(0, 16);
+  return digits.replace(/(\d{4})(?=\d)/g, '$1-');
 };

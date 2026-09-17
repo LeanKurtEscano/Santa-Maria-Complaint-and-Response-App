@@ -24,6 +24,7 @@ import {
 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+import { File } from 'expo-file-system';
 
 import { authApiClient } from '@/lib/client/user';
 import { THEME } from '@/constants/theme';
@@ -240,10 +241,11 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
   const safeParseRegistrationData = async (): Promise<any | null> => {
     try {
       const raw = await AsyncStorage.getItem('registrationData');
-         console.log('RAW registrationData:', raw);
+      console.log('REGISTRATION DATA READ:', { present: Boolean(raw), length: raw?.length ?? 0 });
       if (!raw) return null;
       return JSON.parse(raw);
     } catch {
+      console.error('REGISTRATION DATA PARSE ERROR');
       return null;
     }
   };
@@ -260,28 +262,54 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     path: string,
     formData: FormData,
   ): Promise<{ status: number; data: any }> => {
-   // Set your API base URL here
     const url = `${IP_URL}/api/v1/auth${path}`;
-    console.log('Sending multipart to:', url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      console.log('FETCH TIMEOUT - aborting after 30 seconds');
+      controller.abort();
+    }, 30000);
 
     // Do NOT set Content-Type — fetch sets it with the correct boundary automatically
-    const response = await fetch(url, { method: 'POST', body: formData });
+    console.log('BEFORE FETCH:', { url, method: 'POST', bodyType: 'multipart/form-data' });
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      });
+      console.log('AFTER FETCH:', response.status);
+      console.log('MULTIPART RESPONSE HEADERS:', JSON.stringify([...response.headers.entries()]));
 
-    let data: any = null;
-    const ct = response.headers.get('content-type') || '';
-    if (ct.includes('application/json')) {
-      data = await response.json();
-    } else {
-      data = await response.text();
-    }
-    console.log('Multipart response:', response.status, JSON.stringify(data));
+      let data: any = null;
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        data = await response.text();
+      }
+      console.log('MULTIPART RESPONSE BODY:', {
+        status: response.status,
+        contentType,
+        bodyType: typeof data,
+        bodyLength: typeof data === 'string' ? data.length : JSON.stringify(data)?.length ?? 0,
+      });
 
-    if (!response.ok) {
-      const error: any = new Error(`Request failed with status ${response.status}`);
-      error.response = { status: response.status, data };
+      if (!response.ok) {
+        const error: any = new Error(`Request failed with status ${response.status}`);
+        error.response = { status: response.status, data };
+        throw error;
+      }
+      return { status: response.status, data };
+    } catch (error: any) {
+      console.error('FETCH ERROR:', {
+        name: error?.name,
+        message: error?.message,
+        isAbort: error?.name === 'AbortError',
+      });
       throw error;
+    } finally {
+      clearTimeout(timeout);
     }
-    return { status: response.status, data };
   };
 
   /**
@@ -312,6 +340,8 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     otpString: string,
     includeEmail: boolean,
   ): Promise<{ formData: FormData; tempFiles: (string | null)[] }> => {
+    console.log('FORMDATA BUILD START');
+
     // Write base64 images to temp files in parallel
     const [frontPath, backPath, selfiePath] = await Promise.all([
       registrationData.idFrontImage
@@ -324,8 +354,17 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
         ? base64ToTempFile(registrationData.selfieImage, 'selfie_with_id.jpg')
         : Promise.resolve(null),
     ]);
+    const tempFileInfo = await Promise.all(
+      [frontPath, backPath, selfiePath].map(async (path) => {
+        if (!path) return { present: false };
+        const info = await FileSystem.getInfoAsync(path);
+        return { present: info.exists, size: info.exists ? info.size : 0 };
+      }),
+    );
+    console.log('TEMP FILES CREATED:', tempFileInfo);
 
     const formData = new FormData();
+    console.log('FORMDATA CREATED');
 
     const dataObject: any = {
       password: registrationData.password,
@@ -353,35 +392,30 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
     dataObject.phone_number = registrationData.phoneNumber;
 
     formData.append('data', JSON.stringify(dataObject));
+    console.log('JSON DATA APPENDED:', { otpLength: otpString.length, dataHasOtp: Boolean(dataObject.otp) });
 
-    // Append images using the stable temp file:// paths
     if (frontPath) {
-      formData.append('front_id', {
-        uri: frontPath,
-        type: 'image/jpeg',
-        name: 'front_id.jpg',
-      } as any);
+      formData.append('front_id', new File(frontPath), 'front_id.jpg');
+      console.log('FRONT IMAGE APPENDED');
+      console.log('FRONT IMAGE SIZE:', tempFileInfo[0].size, 'bytes');
     }
     if (backPath) {
-      formData.append('back_id', {
-        uri: backPath,
-        type: 'image/jpeg',
-        name: 'back_id.jpg',
-      } as any);
+      formData.append('back_id', new File(backPath), 'back_id.jpg');
+      console.log('BACK IMAGE APPENDED');
     }
     if (selfiePath) {
-      formData.append('selfie_with_id', {
-        uri: selfiePath,
-        type: 'image/jpeg',
-        name: 'selfie_with_id.jpg',
-      } as any);
+      formData.append('selfie_with_id', new File(selfiePath), 'selfie_with_id.jpg');
+      console.log('SELFIE APPENDED');
     }
+
+    console.log('IMAGE MULTIPART REQUEST READY');
 
     return { formData, tempFiles: [frontPath, backPath, selfiePath] };
   };
 
   // ── Verify OTP ──────────────────────────────────────────────────────────
   const handleVerifyOtp = async () => {
+    console.log('🔥🔥🔥 NEW OTP CODE RUNNING - TEST 123 🔥🔥🔥');
     const otpString = otp.join('');
     if (otpString.length !== 6) {
       setErrorMessage(t('otpEnterAllDigits'));
@@ -467,6 +501,12 @@ export default function OTPVerificationScreen({ navigation, route }: OTPVerifica
         }
       }
     } catch (err: any) {
+      console.error('OTP VERIFY ERROR:', {
+        name: err?.name,
+        message: err?.message,
+        status: err?.response?.status,
+        isAbort: err?.name === 'AbortError',
+      });
       const status = err?.response?.status;
 
       if (status === 400) {

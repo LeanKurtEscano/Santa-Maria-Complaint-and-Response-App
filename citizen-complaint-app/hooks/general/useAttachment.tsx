@@ -107,13 +107,6 @@ export const useAttachments = (): UseAttachmentsReturn => {
     if (!checkAttachmentLimit() || !checkIfPickingInProgress()) return;
     setIsPickingFile(true);
 
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      setIsPickingFile(false);
-      showToast('Camera roll permission is required to attach photos', 'error');
-      return;
-    }
-
     try {
       const remaining = getRemainingSlots();
 
@@ -157,13 +150,6 @@ export const useAttachments = (): UseAttachmentsReturn => {
   const handlePickVideo = async () => {
     if (!checkAttachmentLimit() || !checkIfPickingInProgress()) return;
     setIsPickingFile(true);
-
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      setIsPickingFile(false);
-      showToast('Camera roll permission is required to attach videos', 'error');
-      return;
-    }
 
     try {
       const remaining = getRemainingSlots();

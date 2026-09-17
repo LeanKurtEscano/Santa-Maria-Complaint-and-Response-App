@@ -42,6 +42,25 @@ const clearUser = useCurrentUser((s) => s.clearUser);
       await fetchCurrentUser(true);
     },
     onError: (error) => {
+      const httpStatus = (error as any)?.response?.status;
+      const detail = (error as any)?.response?.data?.detail;
+
+      if (
+        httpStatus === 400 &&
+        typeof detail === 'string' &&
+        (detail.includes('Location of the complaint must be within Santa Maria, Laguna.') ||
+          detail.includes('Coordinates do not match the provided barangay name.'))
+      ) {
+        Alert.alert(
+          'Location not supported',
+          'You must be a resident of Santa Maria, Laguna to use this app.',
+          [{ text: 'OK' }],
+        );
+        setShowMapPicker(false);
+        setShowLocationModal(false);
+        return;
+      }
+
       const appError = handleApiError(error);
       showToast(appError.message, 'error');
       setShowMapPicker(false);

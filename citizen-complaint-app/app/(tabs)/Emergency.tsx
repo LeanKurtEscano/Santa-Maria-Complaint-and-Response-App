@@ -104,13 +104,12 @@ export default function EmergencyScreen() {
   const { t } = useTranslation();
   const [pendingContact, setPendingContact] = useState<PendingContact | null>(null);
 
-  const { isAuthenticated, userData: currentUser, fetchCurrentUser } = useCurrentUser();
+  const { isAuthenticated } = useCurrentUser();
 
-  const { userData } = useProfileLogic();
+  const { userData, hasLocation } = useProfileLogic();
+  const locationEnabled = Boolean(hasLocation);
   const userLat = userData?.latitude ? parseFloat(userData.latitude) : null;
   const userLng = userData?.longitude ? parseFloat(userData.longitude) : null;
-
-  const isGateOpen = isAuthenticated && !!currentUser?.is_verified;
 
   // ── Barangay list (for the dropdown) ────────────────────────────────────────
   const {
@@ -133,7 +132,7 @@ export default function EmergencyScreen() {
       return lastPage.pagination.has_next ? lastPage.pagination.page + 1 : undefined;
     },
     initialPageParam: 1,
-    enabled: isGateOpen,
+    enabled: isAuthenticated && locationEnabled,
   });
 
   const barangays: Barangay[] = data?.pages.flatMap((page) => page.data) ?? [];
@@ -157,7 +156,7 @@ export default function EmergencyScreen() {
       const response = await evacuationApiClient.get('/nearby');
       return Array.isArray(response.data) ? response.data : [];
     },
-    enabled: isGateOpen,
+    enabled: isAuthenticated && locationEnabled,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -173,7 +172,7 @@ export default function EmergencyScreen() {
       const response = await evacuationApiClient.get(`/barangay/${selectedBarangayId}`);
       return Array.isArray(response.data) ? response.data : [];
     },
-    enabled: isGateOpen && isBarangayMode,
+    enabled: isAuthenticated && locationEnabled && isBarangayMode,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -454,7 +453,7 @@ export default function EmergencyScreen() {
 
       
 {/* ── Barangay dropdown (before the map) ── */}
-{isGateOpen && (
+{isAuthenticated && locationEnabled && (
   <TouchableOpacity
     className="flex-row items-center justify-between bg-white border border-slate-200 rounded-2xl px-4 py-[14px] mb-2"
     style={{
@@ -489,13 +488,13 @@ export default function EmergencyScreen() {
         )}
 
         {!isUsingFallback && <View className="mb-3" />}
-{isGateOpen && isEvacLoading && (
+{isAuthenticated && locationEnabled && isEvacLoading && (
   <View className="items-center py-6">
     <ActivityIndicator size="small" color="#059669" />
   </View>
 )}
 
-      {isGateOpen && isEvacError && (
+      {isAuthenticated && locationEnabled && isEvacError && (
   <View className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-4">
     <Text className="text-[13px] font-medium text-red-700 text-center">
       {t('emergency.evacuation.loadError', {
