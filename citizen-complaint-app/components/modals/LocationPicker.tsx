@@ -24,6 +24,13 @@ interface LocationPickerProps {
 
 const GPS_COOLDOWN_SECONDS = 30;
 
+// Default center (Manila) when no initial coords are supplied.
+const DEFAULT_CENTER = { latitude: 14.5995, longitude: 120.9842 };
+
+// Flip to false in production. While true, every message coming out of the
+// WebView (mapLoaded, tile errors, JS exceptions) is printed to the RN console.
+const DEBUG_MAP = true;
+
 type GpsErrorType = 'permission_denied' | 'position_unavailable' | 'timeout' | 'unknown';
 
 function getGpsErrorMessage(type: GpsErrorType): string {
@@ -76,9 +83,19 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState({
-    latitude: initialLatitude ? parseFloat(initialLatitude.toString()) : 14.5995,
-    longitude: initialLongitude ? parseFloat(initialLongitude.toString()) : 120.9842,
+    latitude: initialLatitude ?? DEFAULT_CENTER.latitude,
+    longitude: initialLongitude ?? DEFAULT_CENTER.longitude,
   });
+
+  // The map HTML is built from this ref, NOT from `selectedLocation`. Keeping
+  // the initial centre frozen means dragging the pin or hitting GPS never
+  // rewrites the HTML string, so the WebView can't silently remount and jump.
+  const initialCenterRef = useRef({
+    latitude: initialLatitude ?? DEFAULT_CENTER.latitude,
+    longitude: initialLongitude ?? DEFAULT_CENTER.longitude,
+  });
+
+  const mapboxToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '';
 
   // ── Cleanup on unmount ──
   useEffect(() => {
@@ -87,48 +104,6 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
       if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
     };
   }, []);
-
-  // ── Reset state when modal opens ──
-  useEffect(() => {
-    if (visible) {
-      setConfirming(false);
-      setMapError(false);
-      setLoading(true);
-      setGpsError(null);
-      setIsSatellite(false);
-
-      if (initialLatitude && initialLongitude) {
-        setSelectedLocation({
-          latitude: parseFloat(initialLatitude.toString()),
-          longitude: parseFloat(initialLongitude.toString()),
-        });
-      } else {
-        getCurrentLocation();
-      }
-    }
-  }, [visible, initialLatitude, initialLongitude]);
-
-  // ── Load timeout ──
-  useEffect(() => {
-    if (loading && !mapError) {
-      loadTimeoutRef.current = setTimeout(() => {
-        setLoading(false);
-        setMapError(true);
-      }, 10_000);
-    } else {
-      if (loadTimeoutRef.current) {
-        clearTimeout(loadTimeoutRef.current);
-        loadTimeoutRef.current = null;
-      }
-    }
-  }, [loading, mapError]);
-
-  // ── Sync satellite toggle to map ──
-  useEffect(() => {
-    if (!loading && !mapError) {
-      webViewRef.current?.injectJavaScript(`setTileLayer(${isSatellite}); true;`);
-    }
-  }, [isSatellite, loading, mapError]);
 
   const startCooldown = useCallback(() => {
     setCooldownRemaining(GPS_COOLDOWN_SECONDS);
@@ -143,22 +118,8 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     }, 1000);
   }, []);
 
-  const handleRetry = useCallback(() => {
-    setMapError(false);
-    setLoading(true);
-    setWebViewKey((k) => k + 1);
-  }, []);
-
-  const handleWebViewError = useCallback(() => {
-    if (loadTimeoutRef.current) {
-      clearTimeout(loadTimeoutRef.current);
-      loadTimeoutRef.current = null;
-    }
-    setLoading(false);
-    setMapError(true);
-  }, []);
-
-  const getCurrentLocation = async () => {
+  // Defined before the effects that call it so the reference is never stale.
+  const getCurrentLocation = useCallback(async () => {
     if (cooldownRemaining > 0 || gettingLocation) return;
 
     setGpsError(null);
@@ -195,11 +156,97 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     } finally {
       setGettingLocation(false);
     }
-  };
+  }, [cooldownRemaining, gettingLocation, startCooldown]);
+
+  // ── Reset state when the modal opens ──
+  useEffect(() => {
+    if (!visible) return;
+
+    setConfirming(false);
+    setMapError(false);
+    setLoading(true);
+    setGpsError(null);
+    setIsSatellite(false);
+
+    const hasInitial =
+      typeof initialLatitude === 'number' &&
+      typeof initialLongitude === 'number' &&
+      !Number.isNaN(initialLatitude) &&
+      !Number.isNaN(initialLongitude);
+
+    const center = hasInitial
+      ? { latitude: initialLatitude as number, longitude: initialLongitude as number }
+      : DEFAULT_CENTER;
+
+    initialCenterRef.current = center;
+    setSelectedLocation(center);
+
+    // Remount the WebView so it boots with the correct centre baked in.
+    setWebViewKey((k) => k + 1);
+
+    if (!hasInitial) getCurrentLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, initialLatitude, initialLongitude]);
+
+  // ── Load timeout ──
+  useEffect(() => {
+    if (loading && !mapError) {
+      loadTimeoutRef.current = setTimeout(() => {
+        if (DEBUG_MAP) {
+          // eslint-disable-next-line no-console
+          console.log('[LocationPicker] 10s load timeout — no mapLoaded message received.');
+        }
+        setLoading(false);
+        setMapError(true);
+      }, 10_000);
+    } else if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+
+    return () => {
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
+    };
+  }, [loading, mapError, webViewKey]);
+
+  // ── Sync satellite toggle to map ──
+  useEffect(() => {
+    if (!loading && !mapError) {
+      webViewRef.current?.injectJavaScript(`setTileLayer(${isSatellite}); true;`);
+    }
+  }, [isSatellite, loading, mapError]);
+
+  const handleRetry = useCallback(() => {
+    setMapError(false);
+    setLoading(true);
+    setWebViewKey((k) => k + 1);
+  }, []);
+
+  const handleWebViewError = useCallback((syntheticEvent: any) => {
+    if (DEBUG_MAP) {
+      // eslint-disable-next-line no-console
+      console.log('[LocationPicker] onError/onHttpError:', syntheticEvent?.nativeEvent);
+    }
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+    setLoading(false);
+    setMapError(true);
+  }, []);
 
   const handleMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
+
+      if (DEBUG_MAP && data.type !== 'locationSelected') {
+        // eslint-disable-next-line no-console
+        console.log('[LocationPicker]', data);
+      }
+
       if (data.type === 'locationSelected') {
         setSelectedLocation({
           latitude: parseFloat(data.latitude),
@@ -208,6 +255,9 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
       } else if (data.type === 'mapLoaded') {
         setLoading(false);
         setMapError(false);
+      } else if (data.type === 'jsError') {
+        // eslint-disable-next-line no-console
+        console.warn('[LocationPicker][JS ERROR]', data.message);
       }
     } catch (_) {}
   };
@@ -219,6 +269,8 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
   const isGpsDisabled = gettingLocation || cooldownRemaining > 0;
   const pinColor = THEME.primary;
+  const centerLat = initialCenterRef.current.latitude;
+  const centerLng = initialCenterRef.current.longitude;
 
   const mapHTML = `
     <!DOCTYPE html>
@@ -231,7 +283,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
           * { margin: 0; padding: 0; box-sizing: border-box; }
           html, body { height: 100%; width: 100%; overflow: hidden; }
           #map { height: 100%; width: 100%; }
-          .custom-marker { background: none !important; border: none !important; }
+          .custom-marker { background: none !important; border: none !important; overflow: visible; }
 
           /* Attribution — required by ToS but styled to be minimal */
           .leaflet-control-attribution {
@@ -247,23 +299,44 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
       <body>
         <div id="map"></div>
         <script>
+          // ---------- debug helpers ----------
+          function debugLog(msg) {
+            try {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'debug', message: String(msg) }));
+            } catch (e) {}
+          }
+          window.onerror = function (message, source, lineno, colno) {
+            try {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'jsError',
+                message: message + ' (line ' + lineno + ':' + colno + ')'
+              }));
+            } catch (e) {}
+          };
+
           // minZoom 10 = broad view; maxZoom 18 = avoids "Map data not available"
           const map = L.map('map', {
             zoomControl: true,
             minZoom: 10,
             maxZoom: 18,
-          }).setView([${selectedLocation.latitude}, ${selectedLocation.longitude}], 15);
+          }).setView([${centerLat}, ${centerLng}], 15);
 
-          // ── Satellite tile: ESRI World Imagery ──
+          const MAPBOX_TOKEN = '${mapboxToken}';
+
+          if (!MAPBOX_TOKEN) {
+            debugLog('WARNING: EXPO_PUBLIC_MAPBOX_TOKEN is empty — satellite toggle will stay on OSM tiles');
+          }
+
+          // ── Satellite: Mapbox satellite-streets (imagery + roads + labels baked in) ──
+          // tileSize 512 / zoomOffset -1 is required for Mapbox's 512px tiles.
           const satelliteTile = L.tileLayer(
-            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-            { attribution: '© Esri, Maxar, Earthstar Geographics', maxZoom: 18 }
-          );
-
-          // ── Satellite labels overlay ──
-          const labelsOverlay = L.tileLayer(
-            'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-            { maxZoom: 18, opacity: 0.9 }
+            'https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN,
+            {
+              attribution: '© <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+              maxZoom: 18,
+              tileSize: 512,
+              zoomOffset: -1,
+            }
           );
 
           // ── Standard OSM ──
@@ -272,18 +345,27 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
             { attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>', maxZoom: 18 }
           );
 
+          // If Mapbox tiles fail (bad token, quota, offline), fall back to OSM
+          // so the user is never left staring at an empty grey grid.
+          satelliteTile.on('tileerror', function (e) {
+            debugLog('mapbox tileerror — falling back to standard tiles');
+            if (map.hasLayer(satelliteTile)) {
+              map.removeLayer(satelliteTile);
+              if (!map.hasLayer(standardTile)) standardTile.addTo(map);
+            }
+          });
+
           // Start with standard
           standardTile.addTo(map);
 
           function setTileLayer(useSatellite) {
-            if (useSatellite) {
-              map.removeLayer(standardTile);
-              satelliteTile.addTo(map);
-              labelsOverlay.addTo(map);
+            debugLog('setTileLayer(' + useSatellite + ')');
+            if (useSatellite && MAPBOX_TOKEN) {
+              if (map.hasLayer(standardTile)) map.removeLayer(standardTile);
+              if (!map.hasLayer(satelliteTile)) satelliteTile.addTo(map);
             } else {
-              map.removeLayer(satelliteTile);
-              map.removeLayer(labelsOverlay);
-              standardTile.addTo(map);
+              if (map.hasLayer(satelliteTile)) map.removeLayer(satelliteTile);
+              if (!map.hasLayer(standardTile)) standardTile.addTo(map);
             }
           }
 
@@ -302,7 +384,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
             iconAnchor: [20, 50],
           });
 
-          let marker = L.marker([${selectedLocation.latitude}, ${selectedLocation.longitude}], {
+          let marker = L.marker([${centerLat}, ${centerLng}], {
             draggable: true,
             icon: customIcon,
           }).addTo(map);
@@ -332,7 +414,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
           }
 
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapLoaded' }));
-          sendLocationToApp(${selectedLocation.latitude}, ${selectedLocation.longitude});
+          sendLocationToApp(${centerLat}, ${centerLng});
         </script>
       </body>
     </html>
