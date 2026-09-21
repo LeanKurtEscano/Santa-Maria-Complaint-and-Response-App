@@ -6,7 +6,7 @@ import { handleApiError } from '@/utils/general/errorHandler';
 import { ErrorScreen } from '@/screen/general/ErrorScreen';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { ChevronRight, FileText, Search, X } from 'lucide-react-native';
+import { ChevronRight,ChevronUp, FileText, Search, X } from 'lucide-react-native';
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Barangay } from '@/types/general/barangay';
 import { getBarangayCoords, DEFAULT_COORDS } from '@/constants/general/barangay';
@@ -428,35 +428,47 @@ export default function ComplaintsScreen() {
             alignItems: 'center',
           }}
         >
-          <TouchableOpacity
-            onPress={scrollToTop}
-            activeOpacity={0.82}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              backgroundColor: THEME.primary,
-              paddingHorizontal: 22,
-              paddingVertical: 12,
-              borderRadius: 99,
-              shadowColor: THEME.primary,
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.4,
-              shadowRadius: 14,
-              elevation: 10,
-            }}
-          >
-            <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
-              <ChevronRight
-                size={18}
-                color="white"
-                style={{ transform: [{ rotate: '-90deg' }] }}
-              />
-            </Animated.View>
-            <Text style={{ color: 'white', fontSize: 14, fontWeight: '600', letterSpacing: 0.3 }}>
-              Back to top
-            </Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+  onPress={scrollToTop}
+  activeOpacity={0.82}
+  style={{
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: THEME.primary,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 99,
+    shadowColor: THEME.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 10,
+  }}
+>
+  <Animated.View
+    style={{
+      transform: [{ translateY: bounceAnim }],
+    }}
+  >
+    <ChevronUp
+      size={18}
+      color="#FFFFFF"
+      strokeWidth={3}
+    />
+  </Animated.View>
+
+  <Text
+    style={{
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+      letterSpacing: 0.3,
+    }}
+  >
+    Back to top
+  </Text>
+</TouchableOpacity>
         </View>
       )}
 

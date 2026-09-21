@@ -22,6 +22,11 @@ interface LocationStepProps {
 
 const GPS_COOLDOWN_SECONDS = 30;
 
+// Flip to false once you've confirmed the map loads reliably. While true,
+// every message coming out of the WebView (mapReady, tile errors, drawBoundary
+// calls, JS exceptions, etc.) gets printed to the RN console with a [MapWebView] tag.
+const DEBUG_MAP = true;
+
 type GpsErrorType = 'permission_denied' | 'position_unavailable' | 'timeout' | 'unknown';
 
 function getGpsErrorMessage(type: GpsErrorType): string {
@@ -110,6 +115,11 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
 
   const boundaryRings = extractRings(locationDetails?.geometry ?? null);
 
+  if (DEBUG_MAP) {
+    // eslint-disable-next-line no-console
+    console.log('[MapWebView][RN] locationDetails geometry present:', !!locationDetails?.geometry, 'rings:', boundaryRings.length);
+  }
+
   // ── Re-check boundary whenever userData location or geometry changes ──
   useEffect(() => {
     if (!userData?.latitude || !userData?.longitude) return;
@@ -145,13 +155,19 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         const { latitude, longitude } = loc.coords;
 
         // Silently update backend location
-        await userApiClient.put('/update-current-location', {   latitude: String(latitude),
-  longitude: String(longitude),});
+        await userApiClient.put('/update-current-location', {
+          latitude: String(latitude),
+          longitude: String(longitude),
+        });
 
         // Refresh userData so boundary check uses fresh coords
         await fetchCurrentUser(true);
 
-      } catch {
+      } catch (err) {
+        if (DEBUG_MAP) {
+          // eslint-disable-next-line no-console
+          console.log('[MapWebView][RN] silent GPS sync failed:', err);
+        }
         // Silent failure — never surface this error to the user
       } finally {
         if (!cancelled) setSyncingLocation(false);
@@ -165,6 +181,10 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   useEffect(() => {
     if (mapReady && locationDetails?.geometry) {
       const geoJson = JSON.stringify(locationDetails.geometry);
+      if (DEBUG_MAP) {
+        // eslint-disable-next-line no-console
+        console.log('[MapWebView][RN] injecting drawBoundary, geometry type:', locationDetails.geometry?.type);
+      }
       webViewRef.current?.injectJavaScript(`drawBoundary(${geoJson}); true;`);
     }
   }, [mapReady, locationDetails?.geometry]);
@@ -172,7 +192,13 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   // ── Load timeout ──
   useEffect(() => {
     if (!mapReady && !mapError) {
-      loadTimeoutRef.current = setTimeout(() => setMapError(true), 10_000);
+      loadTimeoutRef.current = setTimeout(() => {
+        if (DEBUG_MAP) {
+          // eslint-disable-next-line no-console
+          console.log('[MapWebView][RN] 10s load timeout fired — no mapReady message was ever received from the WebView.');
+        }
+        setMapError(true);
+      }, 10_000);
     } else {
       if (loadTimeoutRef.current) { clearTimeout(loadTimeoutRef.current); loadTimeoutRef.current = null; }
     }
@@ -205,7 +231,11 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
     setWebViewKey((k) => k + 1);
   }, []);
 
-  const handleWebViewError = useCallback(() => {
+  const handleWebViewError = useCallback((syntheticEvent: any) => {
+    if (DEBUG_MAP) {
+      // eslint-disable-next-line no-console
+      console.log('[MapWebView][RN] onError/onHttpError fired:', syntheticEvent?.nativeEvent);
+    }
     if (loadTimeoutRef.current) { clearTimeout(loadTimeoutRef.current); loadTimeoutRef.current = null; }
     setMapError(true);
   }, []);
@@ -245,9 +275,16 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
 
       // Also silently update backend + refresh userData (updates boundary check too)
       try {
-        await userApiClient.put('/update-current-location', { latitude, longitude });
+        await userApiClient.put('/update-current-location', {
+          latitude: String(latitude),
+          longitude: String(longitude),
+        });
         await fetchCurrentUser(true);
-      } catch {
+      } catch (err) {
+        if (DEBUG_MAP) {
+          // eslint-disable-next-line no-console
+          console.log('[MapWebView][RN] backend location sync failed after GPS button:', err);
+        }
         // Silent — don't block the GPS pin update if sync fails
       }
 
@@ -263,6 +300,12 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   const handleMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
+
+      if (DEBUG_MAP && data.type !== 'debug') {
+        // eslint-disable-next-line no-console
+        console.log('[MapWebView][RN] message:', data);
+      }
+
       if (data.type === 'mapReady') {
         setMapReady(true);
         setMapError(false);
@@ -275,77 +318,231 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         setBoundaryError(t('location_step.outside_boundary_error'));
         setPinned({ lat: barangayLat, lng: barangayLng });
         setLocationMode('barangay');
+      } else if (data.type === 'debug') {
+        if (DEBUG_MAP) {
+          // eslint-disable-next-line no-console
+          console.log('[MapWebView]', data.message);
+        }
+      } else if (data.type === 'jsError') {
+        // eslint-disable-next-line no-console
+        console.warn('[MapWebView][JS ERROR]', data.message);
       }
-    } catch {}
-  };
+    } catch (err) {
+      if (DEBUG_MAP) {
+        // eslint-disable-next-line no-console
+        console.log('[MapWebView][RN] failed to parse message:', event?.nativeEvent?.data, err);
+      }
+    }
+  }
 
   // ── Confirm disabled when: map error | still syncing | user outside boundary ──
   const isConfirmDisabled = mapError || syncingLocation || userOutsideBoundary;
- // const isConfirmDisabled = mapError || syncingLocation 
   const isGpsDisabled = gettingGps || cooldownRemaining > 0;
-  const pinColor = THEME.primary;
+  const pinColor =  '#16A34A';
 
   const mapHTML = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          html, body { height: 100%; width: 100%; overflow: hidden; }
-          #map { height: 100%; width: 100%; }
-          .pin-icon { background: none !important; border: none !important; overflow: visible; }
-          .leaflet-control-attribution { font-size: 8px !important; background: rgba(255,255,255,0.55) !important; padding: 1px 4px !important; line-height: 1.2 !important; backdrop-filter: blur(2px); }
-          .leaflet-control-attribution a { color: #666 !important; }
-        </style>
-      </head>
-      <body>
-        <div id="map"></div>
-        <script>
-          const map = L.map('map', { zoomControl: true, minZoom: 13, maxZoom: 18 })
-            .setView([${barangayLat}, ${barangayLng}], 16);
-          const satelliteTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri, Maxar, Earthstar Geographics', maxZoom: 18 });
-          const labelsOverlay = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18, opacity: 0.9 });
-          const standardTile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>', maxZoom: 18 });
-          satelliteTile.addTo(map); labelsOverlay.addTo(map);
-          function setTileLayer(useSatellite) {
-            if (useSatellite) { map.removeLayer(standardTile); satelliteTile.addTo(map); labelsOverlay.addTo(map); }
-            else { map.removeLayer(satelliteTile); map.removeLayer(labelsOverlay); standardTile.addTo(map); }
-          }
-          const pinIconHtml = \`<div style="position:relative;display:flex;align-items:center;justify-content:center;"><svg width="36" height="44" viewBox="0 0 36 44" xmlns="http://www.w3.org/2000/svg" style="position:relative;z-index:1;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.3))"><ellipse cx="18" cy="42" rx="7" ry="2.5" fill="rgba(0,0,0,0.18)"/><path d="M18 0C10.268 0 4 6.268 4 14c0 7.732 14 30 14 30S32 21.732 32 14C32 6.268 25.732 0 18 0z" fill="${pinColor}" stroke="white" stroke-width="1.5"/><circle cx="18" cy="14" r="5.5" fill="white"/><circle cx="18" cy="14" r="2.8" fill="${pinColor}"/></svg></div>\`;
-          const pinIcon = L.divIcon({ className: 'pin-icon', html: pinIconHtml, iconSize: [36, 44], iconAnchor: [18, 44] });
-          let boundaryLayer = null, boundaryPolygon = null;
-          function drawBoundary(geoJson) {
-            if (boundaryLayer) map.removeLayer(boundaryLayer);
-            boundaryLayer = L.geoJSON(geoJson, { style: { color: '#DC2626', weight: 2.5, opacity: 0.85, fillColor: '#DC2626', fillOpacity: 0.07, dashArray: '6 4' } }).addTo(map);
-            if (geoJson.type === 'Polygon') boundaryPolygon = geoJson.coordinates[0];
-            else if (geoJson.type === 'MultiPolygon') boundaryPolygon = geoJson.coordinates[0][0];
-            else if (geoJson.type === 'Feature') { const g = geoJson.geometry; if (g.type === 'Polygon') boundaryPolygon = g.coordinates[0]; else if (g.type === 'MultiPolygon') boundaryPolygon = g.coordinates[0][0]; }
-          }
-          function isInsideBoundary(lat, lng) {
-            if (!boundaryPolygon) return true;
-            let inside = false; const x = lng, y = lat;
-            for (let i = 0, j = boundaryPolygon.length - 1; i < boundaryPolygon.length; j = i++) {
-              const xi = boundaryPolygon[i][0], yi = boundaryPolygon[i][1], xj = boundaryPolygon[j][0], yj = boundaryPolygon[j][1];
-              if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
-            }
-            return inside;
-          }
-          function sendPin(lat, lng) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pinMoved', lat, lng })); }
-          function sendOutOfBounds(prevLat, prevLng) { marker.setLatLng([prevLat, prevLng]); window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pinOutOfBounds' })); }
-          let lastValidLat = ${barangayLat}, lastValidLng = ${barangayLng};
-          let marker = L.marker([${barangayLat}, ${barangayLng}], { draggable: true, icon: pinIcon }).addTo(map);
-          marker.on('dragend', function() { const p = marker.getLatLng(); if (isInsideBoundary(p.lat, p.lng)) { lastValidLat = p.lat; lastValidLng = p.lng; sendPin(p.lat, p.lng); } else sendOutOfBounds(lastValidLat, lastValidLng); });
-          map.on('click', function(e) { if (isInsideBoundary(e.latlng.lat, e.latlng.lng)) { marker.setLatLng(e.latlng); lastValidLat = e.latlng.lat; lastValidLng = e.latlng.lng; sendPin(e.latlng.lat, e.latlng.lng); } else sendOutOfBounds(lastValidLat, lastValidLng); });
-          function movePin(lat, lng, recenter) { if (isInsideBoundary(lat, lng)) { marker.setLatLng([lat, lng]); lastValidLat = lat; lastValidLng = lng; if (recenter) map.setView([lat, lng], 17, { animate: true }); sendPin(lat, lng); } else sendOutOfBounds(lastValidLat, lastValidLng); }
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapReady' }));
-        </script>
-      </body>
-    </html>
-  `;
+  <!DOCTYPE html>
+  <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; width: 100%; overflow: hidden; }
+        #map { height: 100%; width: 100%; }
+        .pin-icon { background: none !important; border: none !important; overflow: visible; }
+        .leaflet-control-attribution { font-size: 8px !important; background: rgba(255,255,255,0.55) !important; padding: 1px 4px !important; line-height: 1.2 !important; backdrop-filter: blur(2px); }
+        .leaflet-control-attribution a { color: #666 !important; }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script>
+        // ---------- debug helpers ----------
+        function debugLog(msg) {
+          try {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'debug', message: String(msg) }));
+          } catch (e) { /* no-op if bridge not ready yet */ }
+        }
+        window.onerror = function (message, source, lineno, colno) {
+          try {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'jsError',
+              message: message + ' (line ' + lineno + ':' + colno + ')'
+            }));
+          } catch (e) {}
+        };
 
+        debugLog('script start');
+
+        // ---------- map + tiles ----------
+        const map = L.map('map', { zoomControl: true, minZoom: 13, maxZoom: 18 })
+          .setView([${barangayLat}, ${barangayLng}], 16);
+
+        const MAPBOX_TOKEN = '${process.env.EXPO_PUBLIC_MAPBOX_TOKEN || ''}';
+
+        if (!MAPBOX_TOKEN) {
+          debugLog('WARNING: EXPO_PUBLIC_MAPBOX_TOKEN is empty/undefined — satellite tiles will fail, using OSM standard tiles instead');
+        }
+
+        const satelliteTile = L.tileLayer(
+          'https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN,
+          { attribution: '© Mapbox © OpenStreetMap', maxZoom: 18, tileSize: 512, zoomOffset: -1 }
+        );
+        const standardTile = L.tileLayer(
+          'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          { attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>', maxZoom: 18 }
+        );
+
+        let readySent = false;
+        function sendMapReady(reason) {
+          if (readySent) return;
+          readySent = true;
+          debugLog('mapReady (' + reason + ')');
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapReady' }));
+        }
+
+        satelliteTile.on('load', function () { sendMapReady('satellite tiles loaded'); });
+        standardTile.on('load', function () { sendMapReady('standard tiles loaded'); });
+
+        satelliteTile.on('tileerror', function (e) {
+          debugLog('satellite tileerror: ' + (e && e.error ? e.error.message : 'unknown') + ' — falling back to standard tiles');
+          if (!readySent && map.hasLayer(satelliteTile)) {
+            map.removeLayer(satelliteTile);
+            if (!map.hasLayer(standardTile)) standardTile.addTo(map);
+          }
+        });
+        standardTile.on('tileerror', function (e) {
+          debugLog('standard tileerror: ' + (e && e.error ? e.error.message : 'unknown'));
+        });
+
+        if (MAPBOX_TOKEN) {
+          satelliteTile.addTo(map);
+        } else {
+          standardTile.addTo(map);
+        }
+
+        // Fallback: never let the WebView hang forever even if a 'load' event never fires
+        setTimeout(function () { sendMapReady('fallback timeout, 6s'); }, 6000);
+
+        function setTileLayer(useSatellite) {
+          debugLog('setTileLayer(' + useSatellite + ')');
+          if (useSatellite && MAPBOX_TOKEN) {
+            if (map.hasLayer(standardTile)) map.removeLayer(standardTile);
+            if (!map.hasLayer(satelliteTile)) satelliteTile.addTo(map);
+          } else {
+            if (map.hasLayer(satelliteTile)) map.removeLayer(satelliteTile);
+            if (!map.hasLayer(standardTile)) standardTile.addTo(map);
+          }
+        }
+
+        // ---------- pin marker ----------
+        function pinIconHtml(color) {
+          return '<svg width="36" height="48" viewBox="0 0 36 48" xmlns="http://www.w3.org/2000/svg">' +
+            '<path d="M18 0C8 0 0 8 0 18c0 13 18 30 18 30s18-17 18-30C36 8 28 0 18 0z" fill="' + color + '"/>' +
+            '<circle cx="18" cy="18" r="7" fill="#ffffff"/>' +
+            '</svg>';
+        }
+
+        const pinDivIcon = L.divIcon({
+          className: 'pin-icon',
+          html: pinIconHtml('${pinColor}'),
+          iconSize: [36, 48],
+          iconAnchor: [18, 48],
+        });
+
+        const marker = L.marker([${barangayLat}, ${barangayLng}], { icon: pinDivIcon, draggable: true }).addTo(map);
+
+        // ---------- boundary ----------
+        let boundaryRings = []; // array of rings, each ring = array of [lng, lat] (GeoJSON order)
+        let boundaryLayer = null;
+
+        function extractRingsJS(geometry) {
+          if (!geometry) return [];
+          const g = geometry.type === 'Feature' ? geometry.geometry : geometry;
+          if (!g) return [];
+          if (g.type === 'Polygon') return [g.coordinates[0]];
+          if (g.type === 'MultiPolygon') return g.coordinates.map(function (p) { return p[0]; });
+          return [];
+        }
+
+        function isPointInPolygonJS(lat, lng, ring) {
+          let inside = false;
+          const x = lng, y = lat;
+          for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+            const xi = ring[i][0], yi = ring[i][1];
+            const xj = ring[j][0], yj = ring[j][1];
+            if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+          }
+          return inside;
+        }
+
+        function isInsideBoundary(lat, lng) {
+          if (boundaryRings.length === 0) return true; // not loaded yet — don't block
+          return boundaryRings.some(function (ring) { return isPointInPolygonJS(lat, lng, ring); });
+        }
+
+        function drawBoundary(geometry) {
+          try {
+            debugLog('drawBoundary called, type=' + (geometry && geometry.type));
+            if (boundaryLayer) {
+              map.removeLayer(boundaryLayer);
+              boundaryLayer = null;
+            }
+            boundaryRings = extractRingsJS(geometry);
+            boundaryLayer = L.geoJSON(geometry, {
+              style: {  color: '#EF4444',
+  weight: 2.5,
+   fillColor: '#EF4444',
+  fillOpacity: 0.08 }
+            }).addTo(map);
+            debugLog('boundary drawn OK, rings=' + boundaryRings.length);
+          } catch (e) {
+            debugLog('drawBoundary ERROR: ' + e.message);
+          }
+        }
+
+        // ---------- pin movement / interaction ----------
+        function sendPinMoved(lat, lng) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pinMoved', lat: lat, lng: lng }));
+        }
+        function sendPinOutOfBounds() {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pinOutOfBounds' }));
+        }
+
+        marker.on('dragend', function (e) {
+          const pos = e.target.getLatLng();
+          if (!isInsideBoundary(pos.lat, pos.lng)) {
+            debugLog('drag ended OUTSIDE boundary at ' + pos.lat + ',' + pos.lng + ' — snapping back');
+            marker.setLatLng([${barangayLat}, ${barangayLng}]);
+            sendPinOutOfBounds();
+          } else {
+            sendPinMoved(pos.lat, pos.lng);
+          }
+        });
+
+        map.on('click', function (e) {
+          const lat = e.latlng.lat, lng = e.latlng.lng;
+          if (!isInsideBoundary(lat, lng)) {
+            debugLog('map click OUTSIDE boundary at ' + lat + ',' + lng);
+            sendPinOutOfBounds();
+            return;
+          }
+          marker.setLatLng([lat, lng]);
+          sendPinMoved(lat, lng);
+        });
+
+        function movePin(lat, lng, recenter) {
+          marker.setLatLng([lat, lng]);
+          if (recenter) map.setView([lat, lng], map.getZoom());
+        }
+
+        debugLog('script end, map + marker initialized');
+      </script>
+    </body>
+  </html>
+`;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
 
