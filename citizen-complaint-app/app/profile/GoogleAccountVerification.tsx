@@ -36,18 +36,20 @@ import {
   formatNationalId,
 } from '@/utils/validation/id';
 import ErrorMessage from '@/components/register/ErrorMessage';
+import Recaptcha from '@/components/register/Recaptcha';
+import TermsAndAgreementModal from '@/components/modals/TermsAndAgreement';
 import useToastStore from '@/store/useGlobalModal';
 import { authApiClient } from '@/lib/client/user';
 // ── Local form shape ─────────────────────────────────────────────────────────
-// This screen only needs the ID fields — no terms/recaptcha, since the user
-// already agreed to those at signup. Kept separate from RegistrationFormData
-// on purpose so this screen doesn't depend on the registration wizard's type.
+// Kept separate from RegistrationFormData on purpose so this screen doesn't
+// depend on the registration wizard's type.
 interface IdVerificationFormData {
   idType: string;
   idNumber: string;
   idFrontImage: string;
   idBackImage: string;
   selfieImage: string;
+  agreedToTerms: boolean;
 }
 
 type ImageField = 'idFrontImage' | 'idBackImage' | 'selfieImage';
@@ -165,6 +167,7 @@ export default function GoogleAccountVerification() {
       idFrontImage: '',
       idBackImage: '',
       selfieImage: '',
+      agreedToTerms: false,
     },
   });
 
@@ -175,6 +178,9 @@ export default function GoogleAccountVerification() {
   const [imageLoading, setImageLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | undefined>();
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [recaptchaVerified, setRecaptchaVerified] = useState(false);
+  const [recaptchaError, setRecaptchaError] = useState<string | undefined>();
 
   const idPlaceholder = selectedIdType ? getIdNumberPlaceholder(selectedIdType) : 'Select an ID type first';
   const idHint = getIdNumberHint(selectedIdType);
@@ -246,6 +252,17 @@ export default function GoogleAccountVerification() {
 
   const onSubmit = async (data: IdVerificationFormData) => {
     setSubmitError(undefined);
+
+    if (!data.agreedToTerms) {
+      setError('agreedToTerms', { type: 'manual', message: t('required') });
+      return;
+    }
+
+    if (!recaptchaVerified) {
+      setRecaptchaError('Please complete the reCAPTCHA verification.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Backend endpoint (PATCH /id-verification) declares its params as
@@ -565,6 +582,59 @@ export default function GoogleAccountVerification() {
             </View>
           </View>
         </Modal>
+
+        {/* Terms and Conditions */}
+        <View className="mb-4">
+          <Controller
+            control={control}
+            name="agreedToTerms"
+            rules={{ required: t('required') }}
+            render={({ field: { onChange, value } }) => (
+              <>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (value) onChange(false);
+                    else setShowTermsModal(true);
+                  }}
+                  className="flex-row items-start mb-2"
+                  activeOpacity={0.7}
+                >
+                  <View
+                    style={value ? { backgroundColor: THEME.primary, borderColor: THEME.primary } : {}}
+                    className={`w-5 h-5 border-2 rounded mr-3 items-center justify-center ${
+                      !value ? (errors.agreedToTerms ? 'border-error-500' : 'border-neutral-300') : ''
+                    }`}
+                  >
+                    {value && <Check size={14} color="#FFFFFF" />}
+                  </View>
+                  <Text className="text-sm text-neutral-700 flex-1">{t('agreeTerms')}</Text>
+                </TouchableOpacity>
+
+                <TermsAndAgreementModal
+                  visible={showTermsModal}
+                  onAccept={() => {
+                    onChange(true);
+                    clearErrors('agreedToTerms');
+                    setShowTermsModal(false);
+                  }}
+                  onDecline={() => setShowTermsModal(false)}
+                />
+              </>
+            )}
+          />
+          <ErrorMessage message={errors.agreedToTerms?.message} />
+        </View>
+
+        <View className="mb-4">
+          <Recaptcha
+            verified={recaptchaVerified}
+            onVerify={() => {
+              setRecaptchaVerified(true);
+              setRecaptchaError(undefined);
+            }}
+            error={recaptchaError}
+          />
+        </View>
 
         {submitError && (
           <View className="bg-error-50 border border-error-200 rounded-xl p-4 mb-6">

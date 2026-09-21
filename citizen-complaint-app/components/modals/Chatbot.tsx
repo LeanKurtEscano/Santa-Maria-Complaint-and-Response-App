@@ -1043,7 +1043,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
             {/* ── Header ── */}
             <View
               style={{
-                paddingTop: Platform.OS === 'android' ? 4 : insets.top,
+                paddingTop: insets.top,
                 backgroundColor: '#FFFFFF',
                 borderBottomWidth: 1,
                 borderBottomColor: '#F1F5F9',
