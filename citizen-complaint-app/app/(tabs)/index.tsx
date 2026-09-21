@@ -31,6 +31,7 @@ import { handleApiError } from '@/utils/general/errorHandler';
 import { ActivityIndicator } from 'react-native';
 import { OrdinanceCard } from '@/components/home/OrdinanceCard';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
+import { THEME } from '@/constants/theme';
 const HEADER_SCROLL_DISTANCE = 80;
 const USER_GUIDE_URL = 'http://cfms-stamaria.com/users-guide';
 
@@ -222,12 +223,16 @@ const {
           className="bg-white mx-5 rounded-3xl p-5"
           style={{
             marginTop: cardMarginTop,
-            borderWidth: 1, borderColor: '#E2E8F0',
+          
             shadowColor: '#2563EB', shadowOffset: { width: 0, height: 8 },
+            
             shadowOpacity: 0.10, shadowRadius: 20, elevation: 8,
+            borderRightColor: THEME.primary, borderRightWidth: 4,
+            borderLeftColor: THEME.primary, borderLeftWidth: 4,
+           
           }}
         >
-          <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">
+          <Text className="text-[10px] font-bold text-black uppercase tracking-widest mb-4">
             {t('quick.heading')}
           </Text>
           <View className="flex-row justify-between">

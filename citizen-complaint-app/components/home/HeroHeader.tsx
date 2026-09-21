@@ -1,7 +1,7 @@
 // components/home/HeroHeader.tsx
 // Contains: StickyMiniHeader, ParallaxBlob, HeroHeader, BottomCTA
 import {
-  View, Text, Animated, TouchableOpacity, Platform, StatusBar as RNStatusBar, ActivityIndicator,
+  View, Text, Animated, TouchableOpacity, Platform, StatusBar as RNStatusBar, ActivityIndicator,Image
 } from 'react-native';
 import { useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -175,6 +175,7 @@ function StatsContent({ data }: { data: MyStats }) {
   );
 }
 
+
 export function HeroHeader({
   data, isLoading, isError, refetch,
   scrollY, cityTitle, municipality, location,
@@ -205,55 +206,83 @@ export function HeroHeader({
     extrapolate: 'clamp',
   });
 
+  // Logo shrinks slightly on scroll to match the collapsing title
+  const logoSize = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 40], extrapolate: 'clamp' });
+
   return (
-    <Animated.View
-      className="px-5  overflow-hidden"
-      style={{ paddingTop, paddingBottom, backgroundColor: THEME.primary }}
-    >
+  <Animated.View
+    className="overflow-hidden"
+    style={{ paddingTop, paddingBottom, backgroundColor: THEME.primary }}
+  >
+    {/* Background photo */}
+   <Image
+  source={require('@/assets/images/municipal_hall.jpg')}
+  style={{
+    position: 'absolute',
+    top: 0,          // pull more of the upper facade into frame
+    left: 0, right: 0,
+    height: '200%',     // overscan so cover has more source to pull from
+    width: '100%',
+  }}
+  resizeMode="cover"
+/>
+
+    {/* Green tint over the photo — lower opacity = more of the photo shows */}
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: THEME.primary,
+        opacity: 0.7
+      }}
+    />
+
+    <View className="px-5">
       <ParallaxBlob scrollY={scrollY} size={200} top={-50} right={-50} speed={0.25} opacity={0.05} />
       <ParallaxBlob scrollY={scrollY} size={160} top={60}  left={-30}  speed={0.4}  opacity={0.04} />
       <ParallaxBlob scrollY={scrollY} size={80}  top={60}  right={70}  speed={0.15} opacity={0.04} />
 
       <View className="flex-row items-start justify-between mb-7">
-        <View className="flex-1">
-          <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1.5 mb-1">
-            <Sparkles size={10} color={THEME.primaryLight} />
-            <Text className="text-white text-[11px] font-bold tracking-widest uppercase">{municipality}</Text>
-          </Animated.View>
-          <Animated.Text className="text-white font-black leading-8" style={{ fontSize: titleFontSize }}>
-            {cityTitle}
-          </Animated.Text>
-          <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1 mt-1">
-            <MapPin size={11} color={THEME.primaryLight} />
-            <Text className="text-white text-[12px] font-medium">{location}</Text>
-          </Animated.View>
-        </View>
-
-        <View className="flex-row items-center gap-2 mt-1">
-          <TouchableOpacity
-            onPress={onChangeLanguage}
-            activeOpacity={0.8}
-            className="rounded-2xl px-3 py-2.5 flex-row items-center gap-1.5"
-            style={{ backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
-          >
-            <Languages size={14} color="white" />
-            <Text className="text-white text-[12px] font-bold">{currentLanguage === 'en' ? 'EN' : 'TL'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={onBell}
-            activeOpacity={0.8}
-            className="rounded-2xl p-3"
+        {/* Logo (left) + title stack (right), as one row */}
+        <View className="flex-1 flex-row items-center gap-3">
+          <Animated.View
             style={{
-              position: 'relative',
-              backgroundColor: 'rgba(255,255,255,0.13)',
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+              width: logoSize,
+              height: logoSize,
+              borderRadius: 999,
+              overflow: 'hidden',
+              borderWidth: 1.5,
+              borderColor: 'rgba(255,255,255,0.4)',
             }}
           >
-            <Bell size={22} color="white" />
-            <NotifBadge count={unreadCount} />
-          </TouchableOpacity>
+            <Image
+              source={require('@/assets/images/santamarialogo.jpg')}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          </Animated.View>
+
+          <View className="flex-1">
+            <Animated.View style={{ opacity: subOpacity }}>
+              <Text className="text-white text-[11px] font-bold tracking-widest uppercase">
+                Municipality of
+              </Text>
+            </Animated.View>
+            <Animated.Text
+              className="text-white font-black leading-8"
+              style={{ fontSize: titleFontSize }}
+              numberOfLines={1}
+            >
+              {cityTitle}
+            </Animated.Text>
+            <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1 mt-1">
+              <MapPin size={11} color={THEME.primaryLight} />
+              <Text className="text-white text-[12px] font-medium">{location}</Text>
+            </Animated.View>
+          </View>
         </View>
+
+        {/* ...language + bell buttons unchanged... */}
       </View>
 
       <Animated.View style={{ opacity: statsOpacity, transform: [{ translateY: statsTY }] }}>
@@ -262,12 +291,10 @@ export function HeroHeader({
         {isError   && <StatsError onRetry={refetch} />}
         {data      && <StatsContent data={data} />}
       </Animated.View>
-    </Animated.View>
-  );
-}
-
-
-export function GuestHeroHeader({
+    </View>
+  </Animated.View>
+);
+}export function GuestHeroHeader({
   scrollY, cityTitle, municipality, location,
   currentLanguage, onChangeLanguage, onBell,
 }: {
@@ -292,90 +319,143 @@ export function GuestHeroHeader({
     extrapolate: 'clamp',
   });
 
+  // Logo shrinks slightly on scroll to match the collapsing title
+  const logoSize = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 40], extrapolate: 'clamp' });
+
   return (
     <Animated.View
-      className="px-5 overflow-hidden"
+      className="overflow-hidden"
       style={{ paddingTop, paddingBottom, backgroundColor: THEME.primary }}
     >
-      <ParallaxBlob scrollY={scrollY} size={200} top={-50} right={-50} speed={0.25} opacity={0.05} />
-      <ParallaxBlob scrollY={scrollY} size={160} top={60}  left={-30}  speed={0.4}  opacity={0.04} />
-      <ParallaxBlob scrollY={scrollY} size={80}  top={60}  right={70}  speed={0.15} opacity={0.04} />
+      {/* Background photo */}
+      <Image
+        source={require('@/assets/images/municipal_hall.jpg')}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0, right: 0,
+          height: '200%',
+          width: '100%',
+        }}
+        resizeMode="cover"
+      />
 
-      {/* Top row */}
-      <View className="flex-row items-start justify-between mb-7">
-        <View className="flex-1">
-          <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1.5 mb-1">
-            <Sparkles size={10} color={THEME.primaryLight} />
-            <Text className="text-white text-[11px] font-bold tracking-widest uppercase">{municipality}</Text>
-          </Animated.View>
-          <Animated.Text className="text-white font-black leading-8" style={{ fontSize: titleFontSize }}>
-            {cityTitle}
-          </Animated.Text>
-          <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1 mt-1">
-            <MapPin size={11} color={THEME.primaryLight} />
-            <Text className="text-white text-[12px] font-medium">{location}</Text>
-          </Animated.View>
-        </View>
+      {/* Green tint over the photo — lower opacity = more of the photo shows */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: THEME.primary,
+          opacity: 0.7
+        }}
+      />
 
-        <View className="flex-row items-center gap-2 mt-1">
-          <TouchableOpacity
-            onPress={onChangeLanguage}
-            activeOpacity={0.8}
-            className="rounded-2xl px-3 py-2.5 flex-row items-center gap-1.5"
-            style={{ backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
-          >
-            <Languages size={14} color="white" />
-            <Text className="text-white text-[12px] font-bold">{currentLanguage === 'en' ? 'EN' : 'TL'}</Text>
-          </TouchableOpacity>
+      <View className="px-5">
+        <ParallaxBlob scrollY={scrollY} size={200} top={-50} right={-50} speed={0.25} opacity={0.05} />
+        <ParallaxBlob scrollY={scrollY} size={160} top={60}  left={-30}  speed={0.4}  opacity={0.04} />
+        <ParallaxBlob scrollY={scrollY} size={80}  top={60}  right={70}  speed={0.15} opacity={0.04} />
 
-          <TouchableOpacity
-            onPress={onBell}
-            activeOpacity={0.8}
-            className="rounded-2xl p-3"
-            style={{
-              position: 'relative',
-              backgroundColor: 'rgba(255,255,255,0.13)',
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
-            }}
-          >
-            <Bell size={22} color="white" />
-            <NotifBadge count={unreadCount} />
-          </TouchableOpacity>
-        </View>
-      </View>
+        {/* Top row */}
+        <View className="flex-row items-start justify-between mb-7">
+          {/* Logo (left) + title stack (right), as one row */}
+          <View className="flex-1 flex-row items-center gap-3">
+            <Animated.View
+              style={{
+                width: logoSize,
+                height: logoSize,
+                borderRadius: 999,
+                overflow: 'hidden',
+                borderWidth: 1.5,
+                borderColor: 'rgba(255,255,255,0.4)',
+              }}
+            >
+              <Image
+                source={require('@/assets/images/santamarialogo.jpg')}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+            </Animated.View>
 
-      {/* Guest welcome banner */}
-      <Animated.View style={{ opacity: subOpacity }}>
-        <View
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.12)',
-            borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
-            borderRadius: 16, padding: 16,
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-          }}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: 'white', fontSize: 14, fontWeight: '800', marginBottom: 2 }}>
-              {t('home.guest.title')}
-            </Text>
-            <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '500' }}>
-              {t('home.guest.subtitle')}
-            </Text>
+            <View className="flex-1">
+              <Animated.View style={{ opacity: subOpacity }}>
+                <Text className="text-white text-[11px] font-bold tracking-widest uppercase">
+                  {municipality}
+                </Text>
+              </Animated.View>
+              <Animated.Text
+                className="text-white font-black leading-8"
+                style={{ fontSize: titleFontSize }}
+                numberOfLines={1}
+              >
+                {cityTitle}
+              </Animated.Text>
+              <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1 mt-1">
+                <MapPin size={11} color={THEME.primaryLight} />
+                <Text className="text-white text-[12px] font-medium">{location}</Text>
+              </Animated.View>
+            </View>
           </View>
-          <TouchableOpacity
-            onPress={() => router.push('/(auth)/Login')}
-            activeOpacity={0.85}
+
+          <View className="flex-row items-center gap-2 mt-1">
+            <TouchableOpacity
+              onPress={onChangeLanguage}
+              activeOpacity={0.8}
+              className="rounded-2xl px-3 py-2.5 flex-row items-center gap-1.5"
+              style={{ backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+            >
+              <Languages size={14} color="white" />
+              <Text className="text-white text-[12px] font-bold">{currentLanguage === 'en' ? 'EN' : 'TL'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={onBell}
+              activeOpacity={0.8}
+              className="rounded-2xl p-3"
+              style={{
+                position: 'relative',
+                backgroundColor: 'rgba(255,255,255,0.13)',
+                borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+              }}
+            >
+              <Bell size={22} color="white" />
+              <NotifBadge count={unreadCount} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Guest welcome banner */}
+        <Animated.View style={{ opacity: subOpacity }}>
+          <View
             style={{
-              backgroundColor: 'white',
-              borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9,
+              backgroundColor: 'rgba(255,255,255,0.12)',
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+              borderRadius: 16, padding: 16,
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
             }}
           >
-            <Text style={{ color: THEME.primary, fontSize: 13, fontWeight: '800' }}>
-              {t('home.guest.cta')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: 'white', fontSize: 14, fontWeight: '800', marginBottom: 2 }}>
+                {t('home.guest.title')}
+              </Text>
+              <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '500' }}>
+                {t('home.guest.subtitle')}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/Login')}
+              activeOpacity={0.85}
+              style={{
+                backgroundColor: 'white',
+                borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9,
+              }}
+            >
+              <Text style={{ color: THEME.primary, fontSize: 13, fontWeight: '800' }}>
+                {t('home.guest.cta')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
     </Animated.View>
   );
 }

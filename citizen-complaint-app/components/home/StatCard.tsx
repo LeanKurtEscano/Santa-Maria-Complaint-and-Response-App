@@ -25,7 +25,7 @@ export function StatCard({ label, value, Icon, dot }: Props) {
       >
         <Icon size={26} color="#ffffff" />
         <Text className="text-white text-2xl font-black mt-1.5">{value}</Text>
-        <Text className="text-blue-200 text-[10px] font-semibold text-center mt-0.5 leading-[14px]">{t(label)}</Text>
+        <Text className="text-white text-[10px] font-semibold text-center mt-0.5 leading-[14px]">{t(label)}</Text>
       </View>
     </Animated.View>
   );
