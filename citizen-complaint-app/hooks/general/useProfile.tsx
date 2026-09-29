@@ -110,13 +110,18 @@ const handleAllowLocation = async () => {
   };
 
 
-const handleLogout = () => {
-  
-  authApiClient.post('/logout-resident').catch((error) => {
-    console.error('Server logout failed:', error);
-  });
+// Throws on failure so the screen can show the error inside the logout modal.
+const handleLogout = async (): Promise<void> => {
+  try {
+    // Fail after 10s instead of hanging forever on a slow connection
+    await authApiClient.post('/logout-resident', undefined, { timeout: 10000 });
+  } catch (error: any) {
+    // Session already expired on the server, so treat as logged out
+    if (error?.response?.status !== 401) {
+      throw error;
+    }
+  }
 
- 
   clearUser();
 
   queryClient.invalidateQueries({

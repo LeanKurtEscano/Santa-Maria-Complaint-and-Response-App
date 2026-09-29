@@ -1,20 +1,35 @@
 // components/home/HeroHeader.tsx
-// Contains: StickyMiniHeader, ParallaxBlob, HeroHeader, BottomCTA
+// Contains: HeaderActions, StickyMiniHeader, ParallaxBlob, HeroHeader, GuestHeroHeader, BottomCTA
 import {
-  View, Text, Animated, TouchableOpacity, Platform, StatusBar as RNStatusBar, ActivityIndicator,Image
+  View, Text, Animated, TouchableOpacity, ActivityIndicator, Image,
 } from 'react-native';
 import { useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Bell, MapPin, Sparkles, Languages, MessageSquarePlus, RefreshCw } from 'lucide-react-native';
+import { Bell, MapPin, Languages, MessageSquarePlus, RefreshCw } from 'lucide-react-native';
 import { StatCard } from './StatCard';
 import { STAT_ITEMS } from '@/constants/home/home';
 import { useNotificationStore } from '@/store/useNotificationStore';
-import { complaintApiClient } from '@/lib/client/complaint';
 import { MyStats } from '@/types/general/home';
 import { THEME } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router'; 
+import { useRouter } from 'expo-router';
+
+/* -------------------------------------------------------------------------- */
+/*  Shared header actions (language + bell) — same size, used by all headers   */
+/* -------------------------------------------------------------------------- */
+
+const ACTION_SIZE = 36;
+
+const actionBase = {
+  height: ACTION_SIZE,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  backgroundColor: 'rgba(255,255,255,0.13)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.2)',
+  borderRadius: 12,
+};
+
 function NotifBadge({ count }: { count: number }) {
   if (count === 0) return null;
   return (
@@ -42,6 +57,44 @@ function NotifBadge({ count }: { count: number }) {
   );
 }
 
+function HeaderActions({
+  currentLanguage, onChangeLanguage, onBell,
+}: {
+  currentLanguage: string;
+  onChangeLanguage: () => void;
+  onBell: () => void;
+}) {
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <TouchableOpacity
+        onPress={onChangeLanguage}
+        activeOpacity={0.8}
+        style={[actionBase, { flexDirection: 'row', gap: 5, paddingHorizontal: 12 }]}
+      >
+        <Languages size={14} color="white" />
+        <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>
+          {currentLanguage === 'en' ? 'EN' : 'TL'}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={onBell}
+        activeOpacity={0.8}
+        style={[actionBase, { width: ACTION_SIZE, position: 'relative' }]}
+      >
+        <Bell size={18} color="white" />
+        <NotifBadge count={unreadCount} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Sticky mini header                                                         */
+/* -------------------------------------------------------------------------- */
+
 export function StickyMiniHeader({
   scrollY, title, currentLanguage, onChangeLanguage, onBell,
 }: {
@@ -51,7 +104,6 @@ export function StickyMiniHeader({
   onChangeLanguage: () => void;
   onBell: () => void;
 }) {
-  const { unreadCount } = useNotificationStore();
   const insets = useSafeAreaInsets();
 
   const opacity    = scrollY.interpolate({ inputRange: [120, 180], outputRange: [0, 1], extrapolate: 'clamp' });
@@ -72,40 +124,18 @@ export function StickyMiniHeader({
     >
       <Text style={{ color: 'white', fontSize: 17, fontWeight: '800' }}>{title}</Text>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <TouchableOpacity
-          onPress={onChangeLanguage}
-          activeOpacity={0.8}
-          style={{
-            flexDirection: 'row', alignItems: 'center', gap: 5,
-            backgroundColor: 'rgba(255,255,255,0.13)',
-            borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
-            borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6,
-          }}
-        >
-          <Languages size={13} color="white" />
-          <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>
-            {currentLanguage === 'en' ? 'EN' : 'TL'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={onBell}
-          activeOpacity={0.8}
-          style={{
-            position: 'relative',
-            backgroundColor: 'rgba(255,255,255,0.13)',
-            borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
-            borderRadius: 12, padding: 7,
-          }}
-        >
-          <Bell size={18} color="white" />
-          <NotifBadge count={unreadCount} />
-        </TouchableOpacity>
-      </View>
+      <HeaderActions
+        currentLanguage={currentLanguage}
+        onChangeLanguage={onChangeLanguage}
+        onBell={onBell}
+      />
     </Animated.View>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Parallax blob                                                              */
+/* -------------------------------------------------------------------------- */
 
 export function ParallaxBlob({ scrollY, size, top, right, left, speed = 0.3, opacity = 0.05 }: {
   scrollY: Animated.Value; size: number; top: number; right?: number; left?: number; speed?: number; opacity?: number;
@@ -123,6 +153,10 @@ export function ParallaxBlob({ scrollY, size, top, right, left, speed = 0.3, opa
     />
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Stats states                                                               */
+/* -------------------------------------------------------------------------- */
 
 function StatsLoading() {
   return (
@@ -161,7 +195,6 @@ function StatsError({ onRetry }: { onRetry: () => void }) {
 function StatsContent({ data }: { data: MyStats }) {
   const statItems = [
     { ...STAT_ITEMS[0], tKey: 'Total',    value: data.total_complaints    },
- 
     { ...STAT_ITEMS[1], tKey: 'Pending',  value: data.pending_complaints  },
     { ...STAT_ITEMS[2], tKey: 'Resolved', value: data.resolved_complaints },
   ];
@@ -175,13 +208,16 @@ function StatsContent({ data }: { data: MyStats }) {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Hero header (logged in)                                                    */
+/* -------------------------------------------------------------------------- */
 
 export function HeroHeader({
   data, isLoading, isError, refetch,
   scrollY, cityTitle, municipality, location,
   currentLanguage, onChangeLanguage, onBell,
 }: {
-  data: MyStats,
+  data?: MyStats;
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;
@@ -191,7 +227,6 @@ export function HeroHeader({
   onChangeLanguage: () => void;
   onBell: () => void;
 }) {
-  const { unreadCount } = useNotificationStore();
   const insets = useSafeAreaInsets();
 
   const DIST = 80;
@@ -200,119 +235,6 @@ export function HeroHeader({
   const subOpacity    = scrollY.interpolate({ inputRange: [0, 60],   outputRange: [1, 0],   extrapolate: 'clamp' });
   const statsOpacity  = scrollY.interpolate({ inputRange: [40, 100], outputRange: [1, 0],   extrapolate: 'clamp' });
   const statsTY       = scrollY.interpolate({ inputRange: [0, 100],  outputRange: [0, -20], extrapolate: 'clamp' });
-  const paddingTop    = scrollY.interpolate({
-    inputRange: [0, DIST],
-    outputRange: [20 + insets.top, 10 + insets.top],
-    extrapolate: 'clamp',
-  });
-
-  // Logo shrinks slightly on scroll to match the collapsing title
-  const logoSize = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 40], extrapolate: 'clamp' });
-
-  return (
-  <Animated.View
-    className="overflow-hidden"
-    style={{ paddingTop, paddingBottom, backgroundColor: THEME.primary }}
-  >
-    {/* Background photo */}
-   <Image
-  source={require('@/assets/images/municipal_hall.jpg')}
-  style={{
-    position: 'absolute',
-    top: 0,          // pull more of the upper facade into frame
-    left: 0, right: 0,
-    height: '200%',     // overscan so cover has more source to pull from
-    width: '100%',
-  }}
-  resizeMode="cover"
-/>
-
-    {/* Green tint over the photo — lower opacity = more of the photo shows */}
-    <View
-      pointerEvents="none"
-      style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: THEME.primary,
-        opacity: 0.7
-      }}
-    />
-
-    <View className="px-5">
-      <ParallaxBlob scrollY={scrollY} size={200} top={-50} right={-50} speed={0.25} opacity={0.05} />
-      <ParallaxBlob scrollY={scrollY} size={160} top={60}  left={-30}  speed={0.4}  opacity={0.04} />
-      <ParallaxBlob scrollY={scrollY} size={80}  top={60}  right={70}  speed={0.15} opacity={0.04} />
-
-      <View className="flex-row items-start justify-between mb-7">
-        {/* Logo (left) + title stack (right), as one row */}
-        <View className="flex-1 flex-row items-center gap-3">
-          <Animated.View
-            style={{
-              width: logoSize,
-              height: logoSize,
-              borderRadius: 999,
-              overflow: 'hidden',
-              borderWidth: 1.5,
-              borderColor: 'rgba(255,255,255,0.4)',
-            }}
-          >
-            <Image
-              source={require('@/assets/images/santamarialogo.jpg')}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-            />
-          </Animated.View>
-
-          <View className="flex-1">
-            <Animated.View style={{ opacity: subOpacity }}>
-              <Text className="text-white text-[11px] font-bold tracking-widest uppercase">
-                Municipality of
-              </Text>
-            </Animated.View>
-            <Animated.Text
-              className="text-white font-black leading-8"
-              style={{ fontSize: titleFontSize }}
-              numberOfLines={1}
-            >
-              {cityTitle}
-            </Animated.Text>
-            <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1 mt-1">
-              <MapPin size={11} color={THEME.primaryLight} />
-              <Text className="text-white text-[12px] font-medium">{location}</Text>
-            </Animated.View>
-          </View>
-        </View>
-
-        {/* ...language + bell buttons unchanged... */}
-      </View>
-
-      <Animated.View style={{ opacity: statsOpacity, transform: [{ translateY: statsTY }] }}>
-        <Text className="text-white text-[10px] font-bold uppercase tracking-widest mb-3">My Complaint Stats</Text>
-        {isLoading && <StatsLoading />}
-        {isError   && <StatsError onRetry={refetch} />}
-        {data      && <StatsContent data={data} />}
-      </Animated.View>
-    </View>
-  </Animated.View>
-);
-}export function GuestHeroHeader({
-  scrollY, cityTitle, municipality, location,
-  currentLanguage, onChangeLanguage, onBell,
-}: {
-  scrollY: Animated.Value;
-  cityTitle: string; municipality: string; location: string;
-  currentLanguage: string;
-  onChangeLanguage: () => void;
-  onBell: () => void;
-}) {
-  const { t } = useTranslation();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { unreadCount } = useNotificationStore();
-
-  const DIST = 80;
-  const paddingBottom = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 28], extrapolate: 'clamp' });
-  const titleFontSize = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [30, 22], extrapolate: 'clamp' });
-  const subOpacity    = scrollY.interpolate({ inputRange: [0, 60],   outputRange: [1, 0],   extrapolate: 'clamp' });
   const paddingTop    = scrollY.interpolate({
     inputRange: [0, DIST],
     outputRange: [20 + insets.top, 10 + insets.top],
@@ -346,7 +268,7 @@ export function HeroHeader({
         style={{
           position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: THEME.primary,
-          opacity: 0.7
+          opacity: 0.7,
         }}
       />
 
@@ -356,7 +278,7 @@ export function HeroHeader({
         <ParallaxBlob scrollY={scrollY} size={80}  top={60}  right={70}  speed={0.15} opacity={0.04} />
 
         {/* Top row */}
-        <View className="flex-row items-start justify-between mb-7">
+        <View className="flex-row items-center justify-between mb-7">
           {/* Logo (left) + title stack (right), as one row */}
           <View className="flex-1 flex-row items-center gap-3">
             <Animated.View
@@ -396,30 +318,142 @@ export function HeroHeader({
             </View>
           </View>
 
-          <View className="flex-row items-center gap-2 mt-1">
-            <TouchableOpacity
-              onPress={onChangeLanguage}
-              activeOpacity={0.8}
-              className="rounded-2xl px-3 py-2.5 flex-row items-center gap-1.5"
-              style={{ backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
-            >
-              <Languages size={14} color="white" />
-              <Text className="text-white text-[12px] font-bold">{currentLanguage === 'en' ? 'EN' : 'TL'}</Text>
-            </TouchableOpacity>
+          {/* Language + bell, top right */}
+          <View style={{ marginLeft: 12 }}>
+            <HeaderActions
+              currentLanguage={currentLanguage}
+              onChangeLanguage={onChangeLanguage}
+              onBell={onBell}
+            />
+          </View>
+        </View>
 
-            <TouchableOpacity
-              onPress={onBell}
-              activeOpacity={0.8}
-              className="rounded-2xl p-3"
+        {/* Stats */}
+        <Animated.View style={{ opacity: statsOpacity, transform: [{ translateY: statsTY }] }}>
+          <Text className="text-white text-[10px] font-bold uppercase tracking-widest mb-3">
+            My Complaint Stats
+          </Text>
+          {isLoading && <StatsLoading />}
+          {isError   && <StatsError onRetry={refetch} />}
+          {data      && <StatsContent data={data} />}
+        </Animated.View>
+      </View>
+    </Animated.View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Guest hero header                                                          */
+/* -------------------------------------------------------------------------- */
+
+export function GuestHeroHeader({
+  scrollY, cityTitle, municipality, location,
+  currentLanguage, onChangeLanguage, onBell,
+}: {
+  scrollY: Animated.Value;
+  cityTitle: string; municipality: string; location: string;
+  currentLanguage: string;
+  onChangeLanguage: () => void;
+  onBell: () => void;
+}) {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  const DIST = 80;
+  const paddingBottom = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 28], extrapolate: 'clamp' });
+  const titleFontSize = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [30, 22], extrapolate: 'clamp' });
+  const subOpacity    = scrollY.interpolate({ inputRange: [0, 60],   outputRange: [1, 0],   extrapolate: 'clamp' });
+  const paddingTop    = scrollY.interpolate({
+    inputRange: [0, DIST],
+    outputRange: [20 + insets.top, 10 + insets.top],
+    extrapolate: 'clamp',
+  });
+
+  // Logo shrinks slightly on scroll to match the collapsing title
+  const logoSize = scrollY.interpolate({ inputRange: [0, DIST], outputRange: [56, 40], extrapolate: 'clamp' });
+
+  return (
+    <Animated.View
+      className="overflow-hidden"
+      style={{ paddingTop, paddingBottom, backgroundColor: THEME.primary }}
+    >
+      {/* Background photo */}
+      <Image
+        source={require('@/assets/images/municipal_hall.jpg')}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0, right: 0,
+          height: '200%',
+          width: '100%',
+        }}
+        resizeMode="cover"
+      />
+
+      {/* Green tint over the photo */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: THEME.primary,
+          opacity: 0.7,
+        }}
+      />
+
+      <View className="px-5">
+        <ParallaxBlob scrollY={scrollY} size={200} top={-50} right={-50} speed={0.25} opacity={0.05} />
+        <ParallaxBlob scrollY={scrollY} size={160} top={60}  left={-30}  speed={0.4}  opacity={0.04} />
+        <ParallaxBlob scrollY={scrollY} size={80}  top={60}  right={70}  speed={0.15} opacity={0.04} />
+
+        {/* Top row */}
+        <View className="flex-row items-center justify-between mb-7">
+          {/* Logo (left) + title stack (right), as one row */}
+          <View className="flex-1 flex-row items-center gap-3">
+            <Animated.View
               style={{
-                position: 'relative',
-                backgroundColor: 'rgba(255,255,255,0.13)',
-                borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
+                width: logoSize,
+                height: logoSize,
+                borderRadius: 999,
+                overflow: 'hidden',
+                borderWidth: 1.5,
+                borderColor: 'rgba(255,255,255,0.4)',
               }}
             >
-              <Bell size={22} color="white" />
-              <NotifBadge count={unreadCount} />
-            </TouchableOpacity>
+              <Image
+                source={require('@/assets/images/santamarialogo.jpg')}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="cover"
+              />
+            </Animated.View>
+
+            <View className="flex-1">
+              <Animated.View style={{ opacity: subOpacity }}>
+                <Text className="text-white text-[11px] font-bold tracking-widest uppercase">
+                  {municipality}
+                </Text>
+              </Animated.View>
+              <Animated.Text
+                className="text-white font-black leading-8"
+                style={{ fontSize: titleFontSize }}
+                numberOfLines={1}
+              >
+                {cityTitle}
+              </Animated.Text>
+              <Animated.View style={{ opacity: subOpacity }} className="flex-row items-center gap-1 mt-1">
+                <MapPin size={11} color={THEME.primaryLight} />
+                <Text className="text-white text-[12px] font-medium">{location}</Text>
+              </Animated.View>
+            </View>
+          </View>
+
+          {/* Language + bell, top right */}
+          <View style={{ marginLeft: 12 }}>
+            <HeaderActions
+              currentLanguage={currentLanguage}
+              onChangeLanguage={onChangeLanguage}
+              onBell={onBell}
+            />
           </View>
         </View>
 
@@ -459,6 +493,10 @@ export function HeroHeader({
     </Animated.View>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Bottom CTA                                                                 */
+/* -------------------------------------------------------------------------- */
 
 export function BottomCTA({ onPress, label }: { onPress: () => void; label: string }) {
   const mountY     = useRef(new Animated.Value(80)).current;

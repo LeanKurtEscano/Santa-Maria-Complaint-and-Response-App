@@ -39,11 +39,12 @@ import { THEME } from '@/constants/theme';
 import AuthGuard from '@/screen/general/AuthGuard';
 
 // ---------------------------------------------------------------------------
-// LogoutConfirmModal  (unchanged)
+// LogoutConfirmModal
 // ---------------------------------------------------------------------------
 interface LogoutConfirmModalProps {
   visible: boolean;
   loading?: boolean;
+  error?: string | null;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -51,6 +52,7 @@ interface LogoutConfirmModalProps {
 function LogoutConfirmModal({
   visible,
   loading = false,
+  error = null,
   onConfirm,
   onCancel,
 }: LogoutConfirmModalProps) {
@@ -138,6 +140,30 @@ function LogoutConfirmModal({
             </Text>
           </View>
 
+          {/* Error message (failed logout / slow connection) */}
+          {!!error && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                marginHorizontal: 24,
+                marginTop: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                backgroundColor: '#FEF2F2',
+                borderWidth: 1,
+                borderColor: '#FECACA',
+                borderRadius: 10,
+              }}
+            >
+              <AlertCircle size={16} color="#DC2626" />
+              <Text style={{ flex: 1, fontSize: 13, color: '#B91C1C', lineHeight: 18 }}>
+                {error}
+              </Text>
+            </View>
+          )}
+
           <View
             style={{
               flexDirection: 'row',
@@ -186,7 +212,9 @@ function LogoutConfirmModal({
               <Text style={{ fontSize: 15, fontWeight: '600', color: '#fff' }}>
                 {loading
                   ? t('profile.logout.loggingOut', { defaultValue: 'Logging out…' })
-                  : t('profile.logout.confirm', { defaultValue: 'Log out' })}
+                  : error
+                    ? t('profile.logout.retry', { defaultValue: 'Try again' })
+                    : t('profile.logout.confirm', { defaultValue: 'Log out' })}
               </Text>
             </TouchableOpacity>
           </View>
@@ -205,6 +233,7 @@ export default function ProfileScreen() {
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const {
@@ -231,14 +260,39 @@ export default function ProfileScreen() {
   // True while detecting the location OR saving it to the backend
   const locationBusy = locationLoading || updateLocationMutation.isPending;
 
+  const getLogoutErrorMessage = (error: any): string => {
+    if (error?.code === 'ECONNABORTED') {
+      return t('profile.logout.errorTimeout', {
+        defaultValue: 'Connection is slow. Please try again.',
+      });
+    }
+    if (!error?.response) {
+      return t('profile.logout.errorNetwork', {
+        defaultValue: 'No internet connection. Please check your network and try again.',
+      });
+    }
+    return t('profile.logout.errorGeneric', {
+      defaultValue: 'Unable to log out right now. Please try again.',
+    });
+  };
+
   const handleLogoutConfirmed = async () => {
+    setLogoutError(null);
+    setLogoutLoading(true);
     try {
-      setLogoutLoading(true);
       await handleLogout();
+      setShowLogoutModal(false); // success: close
+    } catch (error) {
+      setLogoutError(getLogoutErrorMessage(error)); // failure: stay open, show error
     } finally {
       setLogoutLoading(false);
-      setShowLogoutModal(false);
     }
+  };
+
+  const closeLogoutModal = () => {
+    if (logoutLoading) return;
+    setShowLogoutModal(false);
+    setLogoutError(null);
   };
 
   // Pull-to-refresh: `background: true` avoids the full-screen loading state
@@ -648,7 +702,10 @@ export default function ProfileScreen() {
         {/* Logout Button */}
         <View className="px-6 mt-6 mb-6">
           <TouchableOpacity
-            onPress={() => setShowLogoutModal(true)}
+            onPress={() => {
+              setLogoutError(null);
+              setShowLogoutModal(true);
+            }}
             className="bg-red-50 border border-red-200 rounded-xl py-4 flex-row items-center justify-center"
             activeOpacity={0.8}
           >
@@ -681,8 +738,9 @@ export default function ProfileScreen() {
       <LogoutConfirmModal
         visible={showLogoutModal}
         loading={logoutLoading}
+        error={logoutError}
         onConfirm={handleLogoutConfirmed}
-        onCancel={() => !logoutLoading && setShowLogoutModal(false)}
+        onCancel={closeLogoutModal}
       />
 
       {/* Toast */}
