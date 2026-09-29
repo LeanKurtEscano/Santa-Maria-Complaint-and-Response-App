@@ -8,6 +8,7 @@ import { handleApiError } from '@/utils/general/errorHandler';
 import { useTranslation } from 'react-i18next';
 import useToast from './useToast';
 import { useQueryClient } from '@tanstack/react-query';
+import { authApiClient } from '@/lib/client/user';
 export const useProfileLogic = () => {
   const { t } = useTranslation();
   const { toastType, toastMessage, showToast, setToastVisible, toastVisible } = useToast();
@@ -38,6 +39,7 @@ const clearUser = useCurrentUser((s) => s.clearUser);
       setShowLocationModal(false);
       setShowMapPicker(false);
       queryClient.invalidateQueries({ queryKey: ['evacuation-centers', 'nearby'] });
+      queryClient.invalidateQueries({ queryKey: ['announcements', 'recent'] });
       showToast(t('profile.location.success.message'), 'success');
       await fetchCurrentUser(true);
     },
@@ -104,14 +106,23 @@ const handleAllowLocation = async () => {
       longitude: longitude.toString(),
     });
 
- 
+   
   };
 
-  // ✅ No Alert here — confirmation is handled by LogoutConfirmModal in the UI
-  const handleLogout = async () => {
+
+const handleLogout = () => {
   
-    clearUser();
-  };
+  authApiClient.post('/logout-resident').catch((error) => {
+    console.error('Server logout failed:', error);
+  });
+
+ 
+  clearUser();
+
+  queryClient.invalidateQueries({
+    queryKey: ['announcements', 'recent'],
+  });
+};
 
   const hasLocation = userData?.latitude && userData?.longitude;
 

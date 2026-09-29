@@ -26,7 +26,7 @@ import * as SecureStore from 'expo-secure-store';
 import { authApiClient } from '@/lib/client/user';
 import { THEME } from '@/constants/theme';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
-
+import { useQueryClient } from '@tanstack/react-query';
 // Adjust these to match your actual backend routes.
 const VERIFY_DEVICE_ROUTE = '/verify-device-otp';
 const RESEND_DEVICE_OTP_ROUTE = '/resend-device-otp';
@@ -58,7 +58,7 @@ export default function VerifyDeviceScreen({ navigation }: any) {
   const router = useRouter();
   const { t } = useTranslation();
   const { fetchCurrentUser } = useCurrentUser();
-
+  const queryClient = useQueryClient();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isVerifying, setIsVerifying] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -218,6 +218,7 @@ export default function VerifyDeviceScreen({ navigation }: any) {
       // Pull the authenticated user's data into the store.
       await fetchCurrentUser();
       await useCurrentUser.getState().syncPushToken();
+      await queryClient.invalidateQueries({ queryKey: ['announcements', 'recent'] });
 
       router.replace('/(tabs)');
     } catch (err: any) {

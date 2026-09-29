@@ -855,7 +855,7 @@ export default function RegisterScreen() {
           {/* Login Link */}
           <View className="flex-row justify-center items-center mt-6">
             <Text className="text-neutral-600 text-sm">{t('haveAccount')} </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)')} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => router.push('/(auth)/Login')} activeOpacity={0.7}>
               <Text style={{ color: THEME.primary }} className="font-semibold text-sm">
                 {t('login')}
               </Text>

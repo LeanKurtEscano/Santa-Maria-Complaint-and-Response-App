@@ -41,7 +41,7 @@ import {
 import { useSSO, useAuth } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
-
+import { useQueryClient } from '@tanstack/react-query';
 // Native Google Sign-In is imported separately and only used by AndroidGoogleSignIn
 import { useSignInWithGoogle } from '@clerk/expo/google';
 
@@ -327,6 +327,7 @@ export default function LoginScreen({ navigation }: any) {
     const router = useRouter();
     const { t, i18n } = useTranslation();
     const { fetchCurrentUser } = useCurrentUser();
+    const queryClient = useQueryClient();
 
     const [formData, setFormData] = useState<LoginFormData>({
         email: '',
@@ -424,6 +425,7 @@ export default function LoginScreen({ navigation }: any) {
     await useCurrentUser
         .getState()
         .syncPushToken();
+      queryClient.invalidateQueries({ queryKey: ['announcements', 'recent'] });
 };
 
     const loginMutation = useSubmitForm<LoginRequestPayload>({
@@ -482,6 +484,7 @@ export default function LoginScreen({ navigation }: any) {
                 await useCurrentUser
                     .getState()
                     .syncPushToken();
+                queryClient.invalidateQueries({ queryKey: ['announcements', 'recent'] });
 
                 // router.replace('/(tabs)');
             } catch (error) {
