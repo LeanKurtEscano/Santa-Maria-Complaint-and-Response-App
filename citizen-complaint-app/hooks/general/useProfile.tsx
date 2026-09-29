@@ -13,7 +13,7 @@ export const useProfileLogic = () => {
   const { toastType, toastMessage, showToast, setToastVisible, toastVisible } = useToast();
   const queryClient = useQueryClient();
 
-
+const [locationError, setLocationError] = useState<string | null>(null);
   const userData = useCurrentUser((s) => s.userData);
 const loading = useCurrentUser((s) => s.loading);
 const isAuthenticated = useCurrentUser((s) => s.isAuthenticated);
@@ -68,32 +68,35 @@ const clearUser = useCurrentUser((s) => s.clearUser);
     },
   });
 
-  const handleAllowLocation = async () => {
-    const result = await requestLocationPermission();
+const handleAllowLocation = async () => {
+  setShowLocationModal(false); // close right away, the screen shows the loading state
 
-    if (result.granted && result.latitude && result.longitude) {
-      updateLocationMutation.mutate({
-        latitude: result.latitude.toString(),
-        longitude: result.longitude.toString(),
-      });
+  const result = await requestLocationPermission();
 
-      queryClient.invalidateQueries({ queryKey: ['evacuation-centers', 'nearby'] });
-    } else if (!result.granted) {
-      setShowLocationModal(false);
+  if (result.granted && result.latitude != null && result.longitude != null) {
+    updateLocationMutation.mutate({
+      latitude: result.latitude.toString(),
+      longitude: result.longitude.toString(),
+    });
+    return;
+  }
 
-      Alert.alert(
-        t('profile.location.permissionDenied.title'),
-        t('profile.location.permissionDenied.message'),
-        [
-          { text: t('common.cancel'), style: 'cancel' },
-          {
-            text: t('profile.location.useMap'),
-            onPress: () => setShowMapPicker(true),
-          },
-        ]
-      );
+  if (result.reason === 'denied') {
+    if (result.canAskAgain === false) {
+      setShowMapPicker(true);
+    } else {
+      showToast(t('profile.location.permissionDenied.tryAgain'), 'error');
     }
-  };
+    return;
+  }
+
+  showToast(
+    result.reason === 'services_disabled'
+      ? t('profile.location.servicesDisabled')
+      : t('profile.location.fetchFailed'),
+    'error',
+  );
+};
 
   const handleLocationFromMap = async (latitude: number, longitude: number) => {
     updateLocationMutation.mutate({

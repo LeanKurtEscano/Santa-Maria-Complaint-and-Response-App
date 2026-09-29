@@ -23,26 +23,27 @@ interface LocationPickerProps {
 }
 
 const GPS_COOLDOWN_SECONDS = 30;
+const GPS_TIMEOUT_MS = 12_000;
 
-// Default center (Manila) when no initial coords are supplied.
-const DEFAULT_CENTER = { latitude: 14.5995, longitude: 120.9842 };
+// Default center: Santa Maria, Laguna (approximate; drag the pin to the exact
+// spot you want and copy those values here).
+const DEFAULT_CENTER = { latitude: 14.4703, longitude: 121.4229 };
 
-// Flip to false in production. While true, every message coming out of the
-// WebView (mapLoaded, tile errors, JS exceptions) is printed to the RN console.
-const DEBUG_MAP = true;
+// Logs from the WebView only show in development builds.
+const DEBUG_MAP = __DEV__;
 
 type GpsErrorType = 'permission_denied' | 'position_unavailable' | 'timeout' | 'unknown';
 
 function getGpsErrorMessage(type: GpsErrorType): string {
   switch (type) {
     case 'permission_denied':
-      return 'Location permission denied. Please enable it in your device Settings.';
+      return 'Location permission denied. Tap the map or drag the pin to set your location.';
     case 'position_unavailable':
-      return 'Your position could not be determined. Make sure GPS is enabled.';
+      return 'Your position could not be determined. Make sure GPS is on, or pin it on the map.';
     case 'timeout':
-      return 'Location request timed out. Move to an open area and try again.';
+      return 'Location request timed out. Try again or pin it on the map.';
     default:
-      return 'Could not get your location. Please try again.';
+      return 'Could not get your location. Try again or pin it on the map.';
   }
 }
 
@@ -62,6 +63,23 @@ function classifyLocationError(error: unknown): GpsErrorType {
   return 'unknown';
 }
 
+// Rejects after `ms` and always clears its timer (no leaked timeouts).
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error('timeout')), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(id);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(id);
+        reject(e);
+      },
+    );
+  });
+}
+
 export const LocationPicker: React.FC<LocationPickerProps> = ({
   visible,
   initialLatitude,
@@ -73,6 +91,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mountedRef = useRef(true);
 
   const [loading, setLoading] = useState(true);
   const [mapError, setMapError] = useState(false);
@@ -99,18 +118,32 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
   // ── Cleanup on unmount ──
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
       if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
     };
   }, []);
 
+  const stopCooldown = useCallback(() => {
+    if (cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current);
+      cooldownIntervalRef.current = null;
+    }
+    setCooldownRemaining(0);
+  }, []);
+
   const startCooldown = useCallback(() => {
+    if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
     setCooldownRemaining(GPS_COOLDOWN_SECONDS);
     cooldownIntervalRef.current = setInterval(() => {
       setCooldownRemaining((prev) => {
         if (prev <= 1) {
-          if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+          if (cooldownIntervalRef.current) {
+            clearInterval(cooldownIntervalRef.current);
+            cooldownIntervalRef.current = null;
+          }
           return 0;
         }
         return prev - 1;
@@ -118,7 +151,10 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     }, 1000);
   }, []);
 
-  // Defined before the effects that call it so the reference is never stale.
+  // ── GPS button ──
+  // Checks the current permission first and only shows the system prompt if it
+  // isn't granted yet. A failed attempt does NOT start the cooldown, so the
+  // user can press again right away. Only a successful fix starts it.
   const getCurrentLocation = useCallback(async () => {
     if (cooldownRemaining > 0 || gettingLocation) return;
 
@@ -126,18 +162,34 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     setGettingLocation(true);
 
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      // 1. Check without prompting
+      let { status } = await Location.getForegroundPermissionsAsync();
+
+      // 2. Only prompt if not granted yet
+      if (status !== 'granted') {
+        ({ status } = await Location.requestForegroundPermissionsAsync());
+      }
+
+      // 3. Still denied: short message, no Settings mention
       if (status !== 'granted') {
         setGpsError(getGpsErrorMessage('permission_denied'));
         return;
       }
 
-      const loc = await Promise.race([
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 12_000)
-        ),
-      ]);
+      // 4. Granted: use a recent cached position (instant) or a fresh fix
+      let loc = await Location.getLastKnownPositionAsync({
+        maxAge: 2 * 60 * 1000,
+        requiredAccuracy: 300,
+      });
+
+      if (!loc) {
+        loc = await withTimeout(
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          GPS_TIMEOUT_MS,
+        );
+      }
+
+      if (!mountedRef.current) return;
 
       const newLocation = {
         latitude: loc.coords.latitude,
@@ -151,10 +203,10 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
       startCooldown();
     } catch (error) {
-      const errType = classifyLocationError(error);
-      setGpsError(getGpsErrorMessage(errType));
+      if (!mountedRef.current) return;
+      setGpsError(getGpsErrorMessage(classifyLocationError(error)));
     } finally {
-      setGettingLocation(false);
+      if (mountedRef.current) setGettingLocation(false);
     }
   }, [cooldownRemaining, gettingLocation, startCooldown]);
 
@@ -167,6 +219,8 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     setLoading(true);
     setGpsError(null);
     setIsSatellite(false);
+    setGettingLocation(false);
+    stopCooldown();
 
     const hasInitial =
       typeof initialLatitude === 'number' &&
@@ -174,6 +228,8 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
       !Number.isNaN(initialLatitude) &&
       !Number.isNaN(initialLongitude);
 
+    // Saved location if there is one, otherwise Santa Maria, Laguna.
+    // No automatic GPS request here: the user taps the GPS button if they want it.
     const center = hasInitial
       ? { latitude: initialLatitude as number, longitude: initialLongitude as number }
       : DEFAULT_CENTER;
@@ -183,10 +239,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
     // Remount the WebView so it boots with the correct centre baked in.
     setWebViewKey((k) => k + 1);
-
-    if (!hasInitial) getCurrentLocation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, initialLatitude, initialLongitude]);
+  }, [visible, initialLatitude, initialLongitude, stopCooldown]);
 
   // ── Load timeout ──
   useEffect(() => {
@@ -263,6 +316,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
   };
 
   const handleConfirm = () => {
+    if (confirming) return;
     setConfirming(true);
     onConfirm(selectedLocation.latitude, selectedLocation.longitude);
   };
@@ -424,7 +478,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     <Modal
       visible={visible}
       animationType="slide"
-      onRequestClose={onCancel}
+      onRequestClose={confirming ? undefined : onCancel}
       statusBarTranslucent
     >
       <View style={styles.container}>
@@ -433,7 +487,12 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <Text style={styles.title}>{title}</Text>
-            <TouchableOpacity onPress={onCancel} style={styles.closeButton} activeOpacity={0.7}>
+            <TouchableOpacity
+              onPress={onCancel}
+              style={styles.closeButton}
+              activeOpacity={0.7}
+              disabled={confirming}
+            >
               <X size={24} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -528,8 +587,16 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         {/* Bottom panel — errors + cooldown + footer */}
         <View style={styles.bottomPanel}>
 
+          {/* Finding location */}
+          {gettingLocation && (
+            <View style={styles.infoRow}>
+              <ActivityIndicator size="small" color={THEME.primary} />
+              <Text style={styles.infoText}>Finding your location…</Text>
+            </View>
+          )}
+
           {/* GPS error banner */}
-          {gpsError && (
+          {!!gpsError && (
             <View style={styles.errorRow}>
               <AlertCircle size={14} color="#DC2626" />
               <Text style={styles.errorRowText}>{gpsError}</Text>
@@ -553,7 +620,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
           <View style={styles.footer}>
             <TouchableOpacity
               onPress={onCancel}
-              style={styles.cancelButton}
+              style={[styles.cancelButton, confirming && { opacity: 0.6 }]}
               activeOpacity={0.8}
               disabled={confirming}
             >
@@ -743,6 +810,16 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
     gap: 10,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  infoText: {
+    fontSize: 12,
+    color: '#6B7280',
   },
   errorRow: {
     flexDirection: 'row',

@@ -17,6 +17,7 @@ import { LocationCard } from '@/components/location/Locationcard';
 import ErrorScreen from '@/screen/general/ErrorScreen';
 import { handleApiError } from '@/utils/general/errorHandler';
 import { useProfileLogic } from '@/hooks/general/useProfile';
+import GeneralToast from '@/components/Toast/GeneralToast';// adjust to your real path/props
 
 import {
   User,
@@ -30,7 +31,6 @@ import {
   Map,
   LogOut,
   Settings,
-  ChevronLeft
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -133,8 +133,7 @@ function LogoutConfirmModal({
               }}
             >
               {t('profile.logout.confirmMessage', {
-                defaultValue:
-                  'You will need to sign in again to access your account.',
+                defaultValue: 'You will need to sign in again to access your account.',
               })}
             </Text>
           </View>
@@ -202,13 +201,10 @@ function LogoutConfirmModal({
 // ---------------------------------------------------------------------------
 export default function ProfileScreen() {
   const { t } = useTranslation();
-
   const router = useRouter();
 
-  // Local state for the logout modal
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  // Local state for pull-to-refresh
   const [refreshing, setRefreshing] = useState(false);
 
   const {
@@ -226,25 +222,26 @@ export default function ProfileScreen() {
     handleLogout,
     fetchCurrentUser,
     isAuthenticated,
+    toastVisible,
+    toastMessage,
+    toastType,
+    setToastVisible,
   } = useProfileLogic();
 
-  // Wrap the original handleLogout so we can show a loading state and close the modal
+  // True while detecting the location OR saving it to the backend
+  const locationBusy = locationLoading || updateLocationMutation.isPending;
+
   const handleLogoutConfirmed = async () => {
     try {
       setLogoutLoading(true);
-      await handleLogout(); 
+      await handleLogout();
     } finally {
       setLogoutLoading(false);
       setShowLogoutModal(false);
     }
   };
 
-  // Pull-to-refresh — re-fetches the current user so verification status
-  // (is_verified flipping true after an admin approves) and any other
-  // profile fields update without leaving/re-entering the tab.
-  // `background: true` is passed so this doesn't flip the full-screen
-  // `loading` state (which would unmount this screen and show the spinner
-  // screen instead) — RefreshControl's own spinner handles the loading UI.
+  // Pull-to-refresh: `background: true` avoids the full-screen loading state
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -265,7 +262,7 @@ export default function ProfileScreen() {
     );
   }
 
-  if(!isAuthenticated) {
+  if (!isAuthenticated) {
     return <AuthGuard />;
   }
 
@@ -277,7 +274,7 @@ export default function ProfileScreen() {
         type={appError.type}
         title={t('profile.failedToLoad')}
         message={t('profile.unableToRetrieve')}
-        onRetry={fetchCurrentUser}
+        onRetry={() => fetchCurrentUser()}
       />
     );
   }
@@ -307,8 +304,6 @@ export default function ProfileScreen() {
       >
         {/* Header */}
         <View style={{ backgroundColor: THEME.primary }} className="px-6 pt-6 pb-12">
-
-
           <View className="flex-row items-center justify-between">
             <Text className="text-white text-2xl font-bold">{t('profile.title')}</Text>
             <TouchableOpacity
@@ -369,20 +364,22 @@ export default function ProfileScreen() {
                 <View className="mt-3 gap-2">
                   <TouchableOpacity
                     onPress={() => setShowLocationModal(true)}
-                    disabled={updateLocationMutation.isPending}
+                    disabled={locationBusy}
                     style={{
-                      backgroundColor: updateLocationMutation.isPending
-                        ? THEME.primary + 'AA'
-                        : THEME.primary,
+                      backgroundColor: locationBusy ? THEME.primary + 'AA' : THEME.primary,
                     }}
                     className="rounded-lg py-2.5 items-center flex-row justify-center"
                     activeOpacity={0.8}
                   >
-                    {updateLocationMutation.isPending ? (
+                    {locationBusy ? (
                       <>
                         <ActivityIndicator size="small" color="#fff" />
                         <Text className="text-white font-semibold text-sm ml-2">
-                          {t('profile.location.saving')}
+                          {locationLoading
+                            ? t('profile.location.detecting', {
+                                defaultValue: 'Detecting location…',
+                              })
+                            : t('profile.location.saving')}
                         </Text>
                       </>
                     ) : (
@@ -397,8 +394,11 @@ export default function ProfileScreen() {
 
                   <TouchableOpacity
                     onPress={() => setShowMapPicker(true)}
-                    disabled={updateLocationMutation.isPending}
-                    style={{ borderColor: THEME.primary }}
+                    disabled={locationBusy}
+                    style={{
+                      borderColor: THEME.primary,
+                      opacity: locationBusy ? 0.5 : 1,
+                    }}
                     className="bg-white border rounded-lg py-2.5 items-center flex-row justify-center"
                     activeOpacity={0.8}
                   >
@@ -439,7 +439,6 @@ export default function ProfileScreen() {
             );
 
             if (hasSubmittedIdDocs) {
-              // Already submitted — awaiting manual review, don't let them resubmit
               return (
                 <View className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
                   <View className="flex-row items-start">
@@ -457,7 +456,6 @@ export default function ProfileScreen() {
               );
             }
 
-            // Not submitted yet — prompt to verify
             return (
               <View className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
                 <View className="flex-row items-start">
@@ -582,7 +580,9 @@ export default function ProfileScreen() {
                     </Text>
                   </View>
                   <Text className="text-base text-neutral-900 capitalize">
-                    {t(`profile.personalInfo.${userData.gender.toLowerCase()}`)}
+                    {t(`profile.personalInfo.${userData.gender.toLowerCase()}`, {
+                      defaultValue: userData.gender,
+                    })}
                   </Text>
                 </View>
                 <View className="h-px bg-neutral-200 my-4" />
@@ -645,7 +645,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Logout Button — now opens the confirmation modal */}
+        {/* Logout Button */}
         <View className="px-6 mt-6 mb-6">
           <TouchableOpacity
             onPress={() => setShowLogoutModal(true)}
@@ -660,10 +660,10 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
-      {/* Location Permission Modal */}
+      {/* Location Permission Modal (closes immediately on Allow) */}
       <LocationPermissionModal
         visible={showLocationModal}
-        loading={locationLoading || updateLocationMutation.isPending}
+        loading={false}
         onAllow={handleAllowLocation}
         onCancel={() => setShowLocationModal(false)}
       />
@@ -685,6 +685,13 @@ export default function ProfileScreen() {
         onCancel={() => !logoutLoading && setShowLogoutModal(false)}
       />
 
+      {/* Toast */}
+      <GeneralToast
+        visible={toastVisible}
+        message={toastMessage}
+        type={toastType}
+        onHide={() => setToastVisible(false)}
+      />
     </SafeAreaView>
   );
 }

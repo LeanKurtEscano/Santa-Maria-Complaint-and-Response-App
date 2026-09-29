@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Alert } from 'react-native';
 import * as Location from 'expo-location';
 
 interface LocationResult {
   granted: boolean;
   latitude?: number;
   longitude?: number;
+  reason?: 'services_disabled' | 'denied' | 'error';
+  canAskAgain?: boolean;
 }
 
 interface UseLocationPermissionReturn {
@@ -13,18 +14,26 @@ interface UseLocationPermissionReturn {
   requestLocationPermission: () => Promise<LocationResult>;
 }
 
+const LOCATION_TIMEOUT_MS = 10000;
+
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+  new Promise((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error('timeout')), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(id);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(id);
+        reject(e);
+      },
+    );
+  });
+
 /**
- * Reusable hook for requesting location permission and getting coordinates
- * 
- * @example
- * const { locationLoading, requestLocationPermission } = useLocationPermission();
- * 
- * const handleGetLocation = async () => {
- *   const result = await requestLocationPermission();
- *   if (result.granted) {
- *     console.log('Lat:', result.latitude, 'Lng:', result.longitude);
- *   }
- * };
+ * Requests location permission and returns coordinates.
+ * Shows no alerts: callers decide what to show based on `reason`.
  */
 export const useLocationPermission = (): UseLocationPermissionReturn => {
   const [locationLoading, setLocationLoading] = useState(false);
@@ -33,37 +42,30 @@ export const useLocationPermission = (): UseLocationPermissionReturn => {
     try {
       setLocationLoading(true);
 
-      // Check if location services are enabled
       const enabled = await Location.hasServicesEnabledAsync();
       if (!enabled) {
-        Alert.alert(
-          'Location Services Disabled',
-          'Please enable location services in your device settings to continue.',
-          [{ text: 'OK' }]
-        );
-        setLocationLoading(false);
-        return { granted: false };
+        return { granted: false, reason: 'services_disabled' };
       }
 
-      // Request foreground permissions
-      const { status } = await Location.requestForegroundPermissionsAsync();
-
+      // Prompts again on each call, as long as the OS allows it
+      const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          'Permission Denied',
-          'Location permission is required to file complaints in your area.',
-          [{ text: 'OK' }]
-        );
-        setLocationLoading(false);
-        return { granted: false };
+        return { granted: false, reason: 'denied', canAskAgain };
       }
 
-      // Get current location
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+      // Use a recent cached position if available (instant),
+      // otherwise fetch a fresh one with a timeout for slow devices
+      let location = await Location.getLastKnownPositionAsync({
+        maxAge: 5 * 60 * 1000,
+        requiredAccuracy: 500,
       });
 
-      setLocationLoading(false);
+      if (!location) {
+        location = await withTimeout(
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          LOCATION_TIMEOUT_MS,
+        );
+      }
 
       return {
         granted: true,
@@ -71,21 +73,12 @@ export const useLocationPermission = (): UseLocationPermissionReturn => {
         longitude: location.coords.longitude,
       };
     } catch (error) {
-
+      console.warn('Failed to get location:', error);
+      return { granted: false, reason: 'error' };
+    } finally {
       setLocationLoading(false);
-      
-      Alert.alert(
-        'Error',
-        'Failed to get your location. Please try again.',
-        [{ text: 'OK' }]
-      );
-      
-      return { granted: false };
     }
   };
 
-  return {
-    locationLoading,
-    requestLocationPermission,
-  };
+  return { locationLoading, requestLocationPermission };
 };

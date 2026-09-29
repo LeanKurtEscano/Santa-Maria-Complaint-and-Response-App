@@ -422,6 +422,12 @@ const resources = {
         location: {
           myLocation: "Your Location",
           required: "Location Required",
+            "detecting": "Detecting location…",
+      "servicesDisabled": "Location services are turned off. Please turn them on or pin your location on the map.",
+      "fetchFailed": "Couldn't get your location. Try again or pin it on the map.",
+      "permissionDenied": {
+        "tryAgain": "Location permission was denied. Tap Auto-detect to try again."
+      },
           requiredMessage: "Enable location access to file complaints in your area.",
           autoDetect: "Auto-Detect Location",
           pinOnMap: "Pin on Map",
@@ -435,10 +441,7 @@ const resources = {
             title: "Success",
             message: "Your location has been saved successfully!"
           },
-          permissionDenied: {
-            title: "Permission Denied",
-            message: "Location permission was denied. You can still set your location manually using the map."
-          }
+         
         },
         personalInfo: {
           title: "Personal Information",
@@ -1613,6 +1616,12 @@ const resources = {
 },
         location: {
           myLocation: "Ang iyong Lokasyon",
+            "detecting": "Hinahanap ang iyong lokasyon…",
+      "servicesDisabled": "Naka-off ang location services. I-on ito o i-pin ang iyong lokasyon sa mapa.",
+      "fetchFailed": "Hindi makuha ang iyong lokasyon. Subukan muli o i-pin ito sa mapa.",
+      "permissionDenied": {
+        "tryAgain": "Tinanggihan ang pahintulot sa lokasyon. I-tap ang Auto-detect para subukan muli."
+      },
           required: "Kailangan ang Lokasyon",
           requiredMessage: "Paganahin ang access sa lokasyon upang magsumite ng reklamo sa iyong lugar.",
           autoDetect: "Auto-Detect ng Lokasyon",
@@ -1627,10 +1636,7 @@ const resources = {
             title: "Tagumpay",
             message: "Matagumpay na na-save ang iyong lokasyon!"
           },
-          permissionDenied: {
-            title: "Tinanggihan ang Pahintulot",
-            message: "Tinanggihan ang pahintulot sa lokasyon. Maaari mo pa ring itakda ang iyong lokasyon gamit ang mapa."
-          }
+         
         },
         personalInfo: {
           title: "Personal na Impormasyon",
