@@ -814,34 +814,31 @@ const resources = {
 },
 
 
- "postIncidentFeedback": {
-"title": "Rate Your Experience",
-"heading": "How was your experience?",
-"subheading": "Your feedback helps us improve barangay services and respond better to residents.",
-"ratingPrompt": "Please rate your overall experience",
-"commentLabel": "Additional comments (optional)",
-"commentPlaceholder": "Share more details about your experience...",
-"submit": "Submit Feedback",
-
-"ratingLabels": {
-  "terrible": "Terrible",
-  "bad": "Bad",
-  "okay": "Okay",
-  "good": "Good",
-  "excellent": "Excellent"
-},
-
-"success": {
-  "headerTitle": "Feedback Submitted",
-  "title": "Thank You!",
-  "message": "Your feedback has been successfully submitted. We appreciate your time and effort in helping improve our services.",
-  "viewComplaints": "View My Complaints",
-  "goBack": "Go Back"
-},
-
-"errorTitle": "Submission Failed",
-"errorMessage": "Something went wrong while submitting your feedback. Please try again."
-
+"postIncidentFeedback": {
+  "title": "Rate Your Experience",
+  "resolvedBadge": "Resolved",
+  "heading": "Your complaint has been resolved",
+  "subheading": "Thank you for your patience. We'd love to know how we handled it.",
+  "ratingPrompt": "How satisfied are you with the resolution?",
+  "ratingLabels": {
+    "terrible": "Very unsatisfied",
+    "bad": "Unsatisfied",
+    "okay": "Neutral",
+    "good": "Satisfied",
+    "excellent": "Very satisfied"
+  },
+  "commentLabel": "Anything you'd like to add? (optional)",
+  "commentPlaceholder": "Tell us what went well or what we could improve...",
+  "submit": "Submit Feedback",
+  "errorTitle": "Couldn't send feedback",
+  "errorMessage": "Something went wrong. Please try again.",
+  "success": {
+    "headerTitle": "Feedback Sent",
+    "title": "Thank you for your feedback!",
+    "message": "Your response helps us resolve future concerns faster and better.",
+    "viewComplaints": "View My Complaints",
+    "goBack": "Go Back"
+  }
 },
       complaintDetail: {
         "feedbackButton": "Submit Feedback",
@@ -889,7 +886,7 @@ const resources = {
       barangaySub: "Under barangay assessment",
       "rejectedBarangay": "Rejected by Barangay",
  
-      lgu: "LGU Review",
+      lgu: "Forwarded to LGU",
       
       lguSub: "Escalated to local government",
          "lguReviewSub": "Being reviewed by the Local Government Unit",
@@ -1892,7 +1889,7 @@ const resources = {
       barangay: "Pagsusuri ng Barangay",
       barangaySub: "Sinusuri ng barangay",
       
-      lgu: "Pagsusuri ng LGU",
+      lgu: "Ipinadala sa LGU",
       lguSub: "Ipinasa sa lokal na pamahalaan",
        "lguReviewSub": "Sinusuri ng Lgu",
       department: "Pagsusuri ng Departamento",
@@ -2367,33 +2364,30 @@ const resources = {
   "noDate": "Wala pang nakatakdang petsa ng pagdinig."
 },
 "postIncidentFeedback": {
-"title": "I-rate ang Iyong Karanasan",
-"heading": "Kumusta ang iyong karanasan?",
-"subheading": "Mahalaga ang iyong feedback upang mapabuti ang serbisyo ng barangay at mas mahusay na makatulong sa mga residente.",
-"ratingPrompt": "Paki-rate ang iyong kabuuang karanasan",
-"commentLabel": "Karagdagang komento (opsyonal)",
-"commentPlaceholder": "Magbahagi ng karagdagang detalye tungkol sa iyong karanasan...",
-"submit": "Isumite ang Feedback",
-
-"ratingLabels": {
-  "terrible": "Napakasama",
-  "bad": "Hindi Maganda",
-  "okay": "Katamtaman",
-  "good": "Maganda",
-  "excellent": "Napakaganda"
-},
-
-"success": {
-  "headerTitle": "Naipasa ang Feedback",
-  "title": "Maraming Salamat!",
-  "message": "Matagumpay na naipasa ang iyong feedback. Pinahahalagahan namin ang iyong oras at tulong sa pagpapabuti ng aming mga serbisyo.",
-  "viewComplaints": "Tingnan ang Aking Mga Reklamo",
-  "goBack": "Bumalik"
-},
-
-"errorTitle": "Hindi Maipasa",
-"errorMessage": "Nagkaroon ng problema sa pagpapasa ng iyong feedback. Pakisubukang muli."
-
+  "title": "I-rate ang Iyong Karanasan",
+  "resolvedBadge": "Nalutas na",
+  "heading": "Nalutas na ang iyong reklamo",
+  "subheading": "Salamat sa iyong pasensya. Gusto naming malaman kung paano namin ito naasikaso.",
+  "ratingPrompt": "Gaano ka nasiyahan sa naging solusyon?",
+  "ratingLabels": {
+    "terrible": "Lubhang hindi nasiyahan",
+    "bad": "Hindi nasiyahan",
+    "okay": "Katamtaman",
+    "good": "Nasiyahan",
+    "excellent": "Lubos na nasiyahan"
+  },
+  "commentLabel": "May gusto ka bang idagdag? (opsyonal)",
+  "commentPlaceholder": "Sabihin sa amin kung ano ang naging maayos o ano ang maaari naming pagbutihin...",
+  "submit": "Isumite ang Feedback",
+  "errorTitle": "Hindi naipadala ang feedback",
+  "errorMessage": "May nangyaring mali. Pakisubukan muli.",
+  "success": {
+    "headerTitle": "Naipadala na ang Feedback",
+    "title": "Salamat sa iyong feedback!",
+    "message": "Nakakatulong ang iyong sagot para mas mabilis at mas maayos naming matugunan ang mga susunod na hinaing.",
+    "viewComplaints": "Tingnan ang Aking mga Reklamo",
+    "goBack": "Bumalik"
+  }
 },
 
 "notifications": {

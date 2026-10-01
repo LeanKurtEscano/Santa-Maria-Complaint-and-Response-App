@@ -717,7 +717,7 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const connectionQuality = useConnectionQuality();
-  const { t } = useTranslation();
+  const { t,i18n } = useTranslation();
 
   const { userData, isAuthenticated } = useCurrentUser();
   const isLoggedIn = isAuthenticated && !!userData;
@@ -897,102 +897,112 @@ export default function ChatbotModal({ visible, onClose }: ChatbotModalProps) {
     startCooldown();
   }, [isCoolingDown, startCooldown]);
 
-  const sendMessage = useCallback(
-    async (text: string, isSuggestion = false) => {
-      const trimmed = text.trim();
-      if (!trimmed || isOffline) return;
+ const sendMessage = useCallback(
+  async (text: string, isSuggestion = false) => {
+    const trimmed = text.trim();
+    if (!trimmed || isOffline) return;
 
-      if (isSendingRef.current || isCoolingDown) return;
-      isSendingRef.current = true;
+    if (isSendingRef.current || isCoolingDown) return;
+    isSendingRef.current = true;
 
-      startCooldown();
+    startCooldown();
 
-      if (isTyping || isStreaming) handleCancel();
+    if (isTyping || isStreaming) handleCancel();
 
-      generationRef.current += 1;
-      const myGeneration = generationRef.current;
+    generationRef.current += 1;
+    const myGeneration = generationRef.current;
 
-      setInput('');
+    setInput('');
 
-      const userMsg: Message = {
-        id: uid(),
-        role: 'user',
-        text: trimmed,
-        timestamp: new Date(),
-        streaming: false,
-        streamed: true,
-      };
-      setMessages((prev) => [...prev, userMsg]);
+    const userMsg: Message = {
+      id: uid(),
+      role: 'user',
+      text: trimmed,
+      timestamp: new Date(),
+      streaming: false,
+      streamed: true,
+    };
+    setMessages((prev) => [...prev, userMsg]);
 
-      isNearBottomRef.current = true;
-      scrollToBottom();
+    isNearBottomRef.current = true;
+    scrollToBottom();
 
-      setIsTyping(true);
+    setIsTyping(true);
 
-      let reply: string;
+    let reply: string;
 
-      if (isSuggestion) {
-        await new Promise((r) => setTimeout(r, 400 + Math.random() * 300));
-        if (generationRef.current !== myGeneration) return;
-        reply = getFaqReply(trimmed);
-      } else {
-        try {
-          abortRef.current = new AbortController();
-          const response = await chatbotApiClient.post(
-            '/ask',
-            { question: trimmed, session_id: sessionId },
-            { signal: abortRef.current.signal }
-          );
-          if (generationRef.current !== myGeneration) return;
-          reply = response.data.answer;
-        } catch (err: any) {
-          if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
-            setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
-            setIsTyping(false);
-            isSendingRef.current = false;
-            return;
-          }
-          if (generationRef.current !== myGeneration) return;
-          reply =
-            'Pasensya na, may problema sa koneksyon. Subukan ulit o pumili mula sa mga mungkahi sa itaas. 🙏';
-        } finally {
-          abortRef.current = null;
-        }
-      }
-
-      setIsTyping(false);
-      setIsStreaming(true);
-
-      const botId = uid();
-      currentBotIdRef.current = botId;
-
-      const botMsg: Message = {
-        id: botId,
-        role: 'bot',
-        text: reply,
-        timestamp: new Date(),
-        streaming: true,
-        streamed: false,
-      };
-      setMessages((prev) => [...prev, botMsg]);
-
-      isNearBottomRef.current = true;
-      scrollToBottom();
-
-      const estimatedDuration = reply.length * 13;
-      streamFinishRef.current = setTimeout(() => {
-        if (generationRef.current !== myGeneration) return;
-        setMessages((prev) =>
-          prev.map((m) => (m.id === botId ? { ...m, streaming: false, streamed: true } : m))
+    if (isSuggestion) {
+      await new Promise((r) => setTimeout(r, 400 + Math.random() * 300));
+      if (generationRef.current !== myGeneration) return;
+      reply = getFaqReply(trimmed, i18n.language);
+    } else {
+      try {
+        abortRef.current = new AbortController();
+        const response = await chatbotApiClient.post(
+          '/ask',
+          { question: trimmed, session_id: sessionId },
+          { signal: abortRef.current.signal }
         );
-        setIsStreaming(false);
-        streamFinishRef.current = null;
-        currentBotIdRef.current = null;
-        isSendingRef.current = false;
-      }, estimatedDuration);
-    },
-    [isTyping, isStreaming, handleCancel, scrollToBottom, sessionId, isOffline, isCoolingDown, startCooldown]
-  );
+        if (generationRef.current !== myGeneration) return;
+        reply = response.data.answer;
+      } catch (err: any) {
+        if (err?.name === 'CanceledError' || err?.name === 'AbortError') {
+          setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+          setIsTyping(false);
+          isSendingRef.current = false;
+          return;
+        }
+        if (generationRef.current !== myGeneration) return;
+        reply = t('chatbot.errorReply');
+      } finally {
+        abortRef.current = null;
+      }
+    }
+
+    setIsTyping(false);
+    setIsStreaming(true);
+
+    const botId = uid();
+    currentBotIdRef.current = botId;
+
+    const botMsg: Message = {
+      id: botId,
+      role: 'bot',
+      text: reply,
+      timestamp: new Date(),
+      streaming: true,
+      streamed: false,
+    };
+    setMessages((prev) => [...prev, botMsg]);
+
+    isNearBottomRef.current = true;
+    scrollToBottom();
+
+    const estimatedDuration = reply.length * 13;
+    streamFinishRef.current = setTimeout(() => {
+      if (generationRef.current !== myGeneration) return;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === botId ? { ...m, streaming: false, streamed: true } : m))
+      );
+      setIsStreaming(false);
+      streamFinishRef.current = null;
+      currentBotIdRef.current = null;
+      isSendingRef.current = false;
+    }, estimatedDuration);
+  },
+  [
+    isTyping,
+    isStreaming,
+    handleCancel,
+    scrollToBottom,
+    sessionId,
+    isOffline,
+    isCoolingDown,
+    startCooldown,
+    i18n.language,
+    t,
+  ]
+);
 
   const isBusy = isTyping || isStreaming;
   const sendDisabled = isOffline || !input.trim() || isCoolingDown;

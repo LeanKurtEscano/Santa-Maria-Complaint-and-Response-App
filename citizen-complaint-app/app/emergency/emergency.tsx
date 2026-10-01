@@ -252,28 +252,30 @@ export default function EmergencyScreen() {
               {pendingContact?.phoneNumber}
             </Text>
 
-            <View className="flex-row gap-x-3 w-full">
-              <TouchableOpacity
-                className="flex-1 bg-slate-100 rounded-xl py-4 items-center justify-center"
-                onPress={handleCancelCall}
-                activeOpacity={0.8}
-              >
-                <Text className="text-[15px] font-semibold text-slate-600">
-                  {t('emergency.modal.cancel')}
-                </Text>
-              </TouchableOpacity>
+           <View className="flex-row gap-x-3 w-full">
+  {/* Cancel: red */}
+  <TouchableOpacity
+    className="flex-1 bg-red-600 rounded-xl py-4 items-center justify-center"
+    onPress={handleCancelCall}
+    activeOpacity={0.85}
+  >
+    <Text className="text-[15px] font-bold text-white">
+      {t('emergency.modal.cancel')}
+    </Text>
+  </TouchableOpacity>
 
-              <TouchableOpacity
-                className="flex-1 bg-red-600 rounded-xl py-4 flex-row items-center justify-center gap-x-2"
-                onPress={handleConfirmCall}
-                activeOpacity={0.85}
-              >
-                <Phone size={16} color="#fff" />
-                <Text className="text-[15px] font-bold text-white">
-                  {t('emergency.modal.confirm')}
-                </Text>
-              </TouchableOpacity>
-            </View>
+  {/* Call now: green */}
+  <TouchableOpacity
+    className="flex-1 bg-green-600 rounded-xl py-4 flex-row items-center justify-center gap-x-2"
+    onPress={handleConfirmCall}
+    activeOpacity={0.85}
+  >
+    <Phone size={16} color="#fff" />
+    <Text className="text-[15px] font-bold text-white">
+      {t('emergency.modal.confirm')}
+    </Text>
+  </TouchableOpacity>
+</View>
           </Pressable>
         </Pressable>
       </Modal>

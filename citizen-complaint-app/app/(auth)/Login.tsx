@@ -465,11 +465,12 @@ export default function LoginScreen({ navigation }: any) {
                 // Use formData.email (what the user typed) rather than
                 // data.email, since the backend does not reliably echo
                 // the email back in this response.
-                if (data.is_verified === false) {
+                {/*   if (data.is_verified === false) {
                     await secureSet('pending_verify_email', formData.email);
                     router.replace('/(auth)/VerifyDeviceScreen');
                     return;
-                }
+                } */}
+              
 
                 await secureSet('complaint_token', data.access_token);
                 await secureSet('complaint_refresh_token', data.refresh_token);

@@ -1,6 +1,7 @@
 import { complaintApiClient } from "@/lib/client/complaint";
 import { handleApiError } from "@/utils/general/errorHandler";
 import ErrorScreen from "@/screen/general/ErrorScreen";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   formatDate,
   formatTime,
@@ -47,8 +48,10 @@ import {
   RefreshControl,
   Dimensions,
 } from "react-native";
+import { useEffect,useRef } from "react";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { useEvent } from "expo";
+import { useCurrentUser } from "@/store/useCurrentUserStore";
 // ─── Local Types for incident_links ──────────────────────────────────────────
 
 interface ResponseAttachment {
@@ -147,7 +150,18 @@ function getTrackerSteps(
       ? primary
       : pendingCol;
 
-  const submittedState: StepState = currentOrder >= 0 ? "completed" : "pending";
+  // ── Which optional steps have actually happened ──
+  const lguHappened =
+    status === "forwarded_to_lgu" ||
+    status === "reviewed_by_lgu" ||
+    status === "resolved_by_lgu" ||
+    (isRejectedByLgu && !isResolved);
+
+  const showLgu = lguHappened;
+  const showResolved = isResolved;
+
+  // ── Step states ──
+  const submittedState: StepState = "completed";
 
   let barangayState: StepState = "pending";
   if (isRejectedByBarangay) barangayState = "rejected";
@@ -156,15 +170,11 @@ function getTrackerSteps(
 
   let lguState: StepState = "pending";
   if (isRejectedByLgu && !isResolved) lguState = "rejected";
-  else if (currentOrder >= 4) lguState = "completed";
-  else if (
-    (currentOrder === 2 && status === "forwarded_to_lgu") ||
-    (currentOrder === 3 && status === "reviewed_by_lgu")
-  )
+  else if (status === "resolved_by_lgu") lguState = "completed";
+  else if (status === "forwarded_to_lgu" || status === "reviewed_by_lgu")
     lguState = "active";
 
-  let resolvedState: StepState = "pending";
-  if (isResolved) resolvedState = "completed";
+  const resolvedState: StepState = "completed";
 
   const resolvedSublabel =
     status === "resolved_by_barangay"
@@ -173,7 +183,7 @@ function getTrackerSteps(
       ? t("complaintDetail.tracker.resolvedByLgu")
       : t("complaintDetail.tracker.resolvedSub");
 
-  return [
+  const steps: TrackerStep[] = [
     {
       id: "submitted",
       label: t("complaintDetail.tracker.submitted"),
@@ -198,27 +208,31 @@ function getTrackerSteps(
         <Shield size={ICON} color={col(barangayState)} strokeWidth={2.5} />
       ),
     },
-    {
+  ];
+
+  if (showLgu) {
+    const lguRejected = isRejectedByLgu && !isResolved;
+    steps.push({
       id: "lgu",
-      label:
-        isRejectedByLgu && !isResolved
-          ? t("complaintDetail.tracker.rejectedLgu")
-          : t("complaintDetail.tracker.lgu"),
-      sublabel:
-        isRejectedByLgu && !isResolved
-          ? t("complaintDetail.tracker.rejectedSub")
-          : status === "reviewed_by_lgu"
-          ? t("complaintDetail.tracker.lguReviewSub")
-          : t("complaintDetail.tracker.lguSub"),
+      label: lguRejected
+        ? t("complaintDetail.tracker.rejectedLgu")
+        : t("complaintDetail.tracker.lgu"),
+      sublabel: lguRejected
+        ? t("complaintDetail.tracker.rejectedSub")
+        : status === "reviewed_by_lgu"
+        ? t("complaintDetail.tracker.lguReviewSub")
+        : t("complaintDetail.tracker.lguSub"),
       state: lguState,
-      icon:
-        isRejectedByLgu && !isResolved ? (
-          <XCircle size={ICON} color={red} strokeWidth={2.5} />
-        ) : (
-          <Landmark size={ICON} color={col(lguState)} strokeWidth={2.5} />
-        ),
-    },
-    {
+      icon: lguRejected ? (
+        <XCircle size={ICON} color={red} strokeWidth={2.5} />
+      ) : (
+        <Landmark size={ICON} color={col(lguState)} strokeWidth={2.5} />
+      ),
+    });
+  }
+
+  if (showResolved) {
+    steps.push({
       id: "resolved",
       label: t("complaintDetail.tracker.resolved"),
       sublabel: resolvedSublabel,
@@ -230,8 +244,10 @@ function getTrackerSteps(
           strokeWidth={2.5}
         />
       ),
-    },
-  ];
+    });
+  }
+
+  return steps;
 }
 
 function getStatusDisplay(
@@ -1738,6 +1754,10 @@ export default function ComplaintDetail() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [showLetter, setShowLetter] = useState(false);
+ const {userData} = useCurrentUser();
+ const userId = userData?.id;
+
+
 
  const { data, error, isLoading, isFetching, refetch } =
   useQuery<ComplaintWithLinks>({
@@ -1752,6 +1772,38 @@ export default function ComplaintDetail() {
     },
     enabled: !!id,
   });
+
+
+  const hasAutoRedirected = useRef(false);
+
+useEffect(() => {
+  if (!data || !userId || hasAutoRedirected.current) return;
+
+  const resolved =
+    data.status === "resolved_by_barangay" ||
+    data.status === "resolved_by_lgu";
+
+  if (!resolved || data.has_feedback) return;
+
+  hasAutoRedirected.current = true;
+
+  (async () => {
+    try {
+      const key = `feedbackAutoRedirect:${userId}:${data.id}`;
+      const alreadyRedirected = await AsyncStorage.getItem(key);
+      if (alreadyRedirected) return;
+
+      await AsyncStorage.setItem(key, "1");
+
+      router.push({
+        pathname: "/feedback/PostIncident",
+        params: { incidentId: data.id, complaintTitle: data.title },
+      });
+    } catch (e) {
+      // storage failed: skip the redirect rather than risk a loop
+    }
+  })();
+}, [data, userId, router]);
 
 
   if (error) {

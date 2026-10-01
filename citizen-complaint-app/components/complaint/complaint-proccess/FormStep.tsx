@@ -269,6 +269,10 @@ export function FormStep({
   const [detailsLocalError, setDetailsLocalError] = useState<string | null>(null);
 
   const isOtherSelected = selectedPreset?.key === OTHER_KEY;
+  const sortedPresets = [
+  ...presets.filter((p) => p.key !== OTHER_KEY),
+  ...presets.filter((p) => p.key === OTHER_KEY),
+];
   const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer();
 
   // ── Details validation state ──────────────────────────────────────────────
@@ -608,7 +612,7 @@ export function FormStep({
               <Text className="text-sm text-gray-500 mt-1">{t('complaint_form.picker_subtitle')}</Text>
             </View>
             <FlatList
-              data={presets}
+              data={sortedPresets}
               keyExtractor={(item) => item.key}
               style={{ maxHeight: 380 }}
               contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8 }}

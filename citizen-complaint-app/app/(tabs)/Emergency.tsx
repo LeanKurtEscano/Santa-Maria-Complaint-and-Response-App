@@ -655,17 +655,17 @@ export default function EmergencyScreen() {
 
             <View className="flex-row gap-x-3 w-full">
               <TouchableOpacity
-                className="flex-1 bg-slate-100 rounded-xl py-4 items-center justify-center"
+                className="flex-1 bg-red-600 rounded-xl py-4 items-center justify-center"
                 onPress={handleCancelCall}
                 activeOpacity={0.8}
               >
-                <Text className="text-[15px] font-semibold text-slate-600">
+                <Text className="text-[15px] font-semibold text-white">
                   {t('emergency.modal.cancel')}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                className="flex-1 bg-red-600 rounded-xl py-4 flex-row items-center justify-center gap-x-2"
+                className="flex-1 bg-green-600 rounded-xl py-4 flex-row items-center justify-center gap-x-2"
                 onPress={handleConfirmCall}
                 activeOpacity={0.85}
               >

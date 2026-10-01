@@ -27,6 +27,11 @@ const GPS_COOLDOWN_SECONDS = 30;
 // calls, JS exceptions, etc.) gets printed to the RN console with a [MapWebView] tag.
 const DEBUG_MAP = true;
 
+
+// TESTING ONLY: set to true to let the confirm button work even when
+// the user is outside the barangay boundary. Set back to false before release.
+const BYPASS_BOUNDARY_CHECK = true;
+
 type GpsErrorType = 'permission_denied' | 'position_unavailable' | 'timeout' | 'unknown';
 
 function getGpsErrorMessage(type: GpsErrorType): string {
@@ -336,7 +341,12 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   }
 
   // ── Confirm disabled when: map error | still syncing | user outside boundary ──
-  const isConfirmDisabled = mapError || syncingLocation || userOutsideBoundary;
+  //const isConfirmDisabled = mapError || syncingLocation || userOutsideBoundary;
+  const isConfirmDisabled =
+  mapError ||
+  syncingLocation ||
+  (!BYPASS_BOUNDARY_CHECK && userOutsideBoundary);
+  
   const isGpsDisabled = gettingGps || cooldownRemaining > 0;
   const pinColor =  '#16A34A';
 
