@@ -843,6 +843,7 @@ const resources = {
       complaintDetail: {
         "feedbackButton": "Submit Feedback",
     loading: "Loading complaint details…",
+
  
     error: {
       title: "Something went wrong",
@@ -941,6 +942,7 @@ const resources = {
       remarkLabel: "Remark #{{number}}",
       viewAll: "View All {{count}} Remarks",
       showLess: "Show Less",
+      "respondedBy": "Responded by"
     },
   }
 
@@ -1848,6 +1850,7 @@ const resources = {
    complaintDetail: {
     loading: "Nino-load ang detalye ng reklamo…",
      "feedbackButton": "Mag-submit ng Feedback",
+   
      
        "feedbackSubmitted": {
     "title": "Feedback Already Submitted",
@@ -1943,6 +1946,7 @@ const resources = {
       remarkLabel: "Tugon #{{number}}",
       viewAll: "Tingnan Lahat ({{count}})",
       showLess: "Ipakita ang Mas Kaunti",
+       "respondedBy": "Tumugon"
     },
   },
 

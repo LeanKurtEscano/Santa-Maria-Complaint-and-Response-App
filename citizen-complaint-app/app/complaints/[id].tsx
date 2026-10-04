@@ -61,6 +61,12 @@ interface ResponseAttachment {
   media_type: "image" | "video";
 }
 
+interface Responders {
+  id: number;
+  name: string;
+  position: string;
+}
+
 interface IncidentResponse {
   id: number;
   incident_id: number;
@@ -74,6 +80,7 @@ interface IncidentResponse {
     [key: string]: unknown;
   };
   response_attachments?: ResponseAttachment[];
+  barangay_members?: Responders[];  
 }
 
 interface IncidentDetail {
@@ -1352,6 +1359,87 @@ function getRoleMeta(role?: string): {
   }
 }
 
+function getInitials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function RespondersBlock({ members }: { members?: Responders[] }) {
+  const { t } = useTranslation();
+
+  if (!members || members.length === 0) return null;
+
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: "700",
+          color: "#9ca3af",
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+          marginBottom: 8,
+        }}
+      >
+        {t("complaintDetail.remarks.respondedBy")}
+      </Text>
+
+      <View style={{ gap: 8 }}>
+        {members.map((member) => (
+          <View
+            key={member.id}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+              backgroundColor: "#f0f4ff",
+              borderRadius: 14,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              borderWidth: 1,
+              borderColor: "#e0e7ff",
+            }}
+          >
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                backgroundColor: THEME.primary,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800" }}>
+                {getInitials(member.name)}
+              </Text>
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{ fontSize: 15, fontWeight: "700", color: "#1f2937" }}
+                numberOfLines={1}
+              >
+                {member.name}
+              </Text>
+              <Text
+                style={{ fontSize: 13, color: "#6b7280", marginTop: 1 }}
+                numberOfLines={1}
+              >
+                {member.position}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 const PREVIEW_COUNT = 2;
 
 function ResponsesSection({
@@ -1601,6 +1689,8 @@ function ResponsesSection({
 
               {/* Body */}
               <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+               <RespondersBlock members={resp.barangay_members} />
+
                 {hasText ? (
                   <Text
                     style={{

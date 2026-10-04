@@ -25,12 +25,12 @@ const GPS_COOLDOWN_SECONDS = 30;
 // Flip to false once you've confirmed the map loads reliably. While true,
 // every message coming out of the WebView (mapReady, tile errors, drawBoundary
 // calls, JS exceptions, etc.) gets printed to the RN console with a [MapWebView] tag.
-const DEBUG_MAP = true;
+const DEBUG_MAP = false;
 
 
 // TESTING ONLY: set to true to let the confirm button work even when
 // the user is outside the barangay boundary. Set back to false before release.
-const BYPASS_BOUNDARY_CHECK = true;
+const BYPASS_BOUNDARY_CHECK = false;
 
 type GpsErrorType = 'permission_denied' | 'position_unavailable' | 'timeout' | 'unknown';
 
@@ -87,6 +87,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   const webViewRef = useRef<WebView>(null);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoPinDoneRef = useRef(false); // auto-pin runs once, and never after the user takes control
   const { t } = useTranslation();
 
   const { userData, fetchCurrentUser } = useCurrentUser();
@@ -106,6 +107,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   // ── Background location update state ──
   const [syncingLocation, setSyncingLocation] = useState(true); // true while mount fetch is in-flight
   const [userOutsideBoundary, setUserOutsideBoundary] = useState(false);
+  const [deviceCoords, setDeviceCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // ── Fetch boundary geometry ──
   const { data: locationDetails } = useQuery({
@@ -159,6 +161,9 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
 
         const { latitude, longitude } = loc.coords;
 
+        // Save device coords right away so the auto-pin doesn't wait on network calls
+        setDeviceCoords({ lat: latitude, lng: longitude });
+
         // Silently update backend location
         await userApiClient.put('/update-current-location', {
           latitude: String(latitude),
@@ -193,6 +198,26 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
       webViewRef.current?.injectJavaScript(`drawBoundary(${geoJson}); true;`);
     }
   }, [mapReady, locationDetails?.geometry]);
+
+  // ── Auto-pin to the user's location if they're inside the boundary ──
+  useEffect(() => {
+    if (autoPinDoneRef.current) return;
+    // Wait until we have GPS, the map is ready, AND the boundary has actually loaded
+    if (!deviceCoords || !mapReady || boundaryRings.length === 0) return;
+
+    autoPinDoneRef.current = true;
+
+    const inside = boundaryRings.some((ring) =>
+      isPointInPolygon(deviceCoords.lat, deviceCoords.lng, ring)
+    );
+    if (!inside) return; // outside → pin stays at the barangay center
+
+    setPinned({ lat: deviceCoords.lat, lng: deviceCoords.lng });
+    setLocationMode('gps');
+    webViewRef.current?.injectJavaScript(
+      `movePin(${deviceCoords.lat}, ${deviceCoords.lng}, true); true;`
+    );
+  }, [deviceCoords, mapReady, locationDetails?.geometry]);
 
   // ── Load timeout ──
   useEffect(() => {
@@ -231,10 +256,15 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   }, []);
 
   const handleRetry = useCallback(() => {
+    // The reloaded WebView starts with the pin at the barangay center,
+    // so reset React state to match and let auto-pin run again.
+    setPinned({ lat: barangayLat, lng: barangayLng });
+    setLocationMode('barangay');
+    autoPinDoneRef.current = false;
     setMapError(false);
     setMapReady(false);
     setWebViewKey((k) => k + 1);
-  }, []);
+  }, [barangayLat, barangayLng]);
 
   const handleWebViewError = useCallback((syntheticEvent: any) => {
     if (DEBUG_MAP) {
@@ -246,6 +276,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
   }, []);
 
   const handleResetToBarangay = () => {
+    autoPinDoneRef.current = true;
     setGpsError(null);
     setBoundaryError(null);
     setPinned({ lat: barangayLat, lng: barangayLng });
@@ -255,6 +286,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
 
   const handleUseCurrentLocation = async () => {
     if (cooldownRemaining > 0 || gettingGps) return;
+    autoPinDoneRef.current = true;
     setGpsError(null);
     setBoundaryError(null);
     setGettingGps(true);
@@ -315,6 +347,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         setMapReady(true);
         setMapError(false);
       } else if (data.type === 'pinMoved') {
+        autoPinDoneRef.current = true;
         setPinned({ lat: data.lat, lng: data.lng });
         setLocationMode('pin');
         setGpsError(null);
@@ -338,17 +371,16 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         console.log('[MapWebView][RN] failed to parse message:', event?.nativeEvent?.data, err);
       }
     }
-  }
+  };
 
   // ── Confirm disabled when: map error | still syncing | user outside boundary ──
-  //const isConfirmDisabled = mapError || syncingLocation || userOutsideBoundary;
   const isConfirmDisabled =
-  mapError ||
-  syncingLocation ||
-  (!BYPASS_BOUNDARY_CHECK && userOutsideBoundary);
-  
+    mapError ||
+    syncingLocation ||
+    (!BYPASS_BOUNDARY_CHECK && userOutsideBoundary);
+
   const isGpsDisabled = gettingGps || cooldownRemaining > 0;
-  const pinColor =  '#16A34A';
+  const pinColor = '#16A34A';
 
   const mapHTML = `
   <!DOCTYPE html>
@@ -697,7 +729,7 @@ export function LocationStep({ barangayName, barangayLat, barangayLng, onConfirm
         </View>
 
         {/* Outside boundary warning — shown above confirm button */}
-        { userOutsideBoundary && !syncingLocation && (
+        {userOutsideBoundary && !syncingLocation && (
           <View style={styles.outsideBoundaryBanner}>
             <ShieldAlert size={15} color="#991B1B" style={{ flexShrink: 0 }} />
             <Text style={styles.outsideBoundaryText}>
