@@ -4,8 +4,7 @@ on:
   workflow_dispatch:
 
   schedule:
-    # 12:00 AM Philippines time (UTC+8)
-    # GitHub Actions uses UTC
+    # 12:00 AM Philippines time = 16:00 UTC
     - cron: "0 16 * * *"
 
 jobs:
@@ -33,6 +32,7 @@ jobs:
 
           sudo apt-get install -y \
             curl \
+            unzip \
             ca-certificates \
             postgresql-common
 
@@ -60,12 +60,18 @@ jobs:
 
 
       # ==========================================
-      # 2. Install AWS CLI
+      # 2. Install AWS CLI v2
       # ==========================================
       - name: Install AWS CLI
         run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" \
+            -o "awscliv2.zip"
+
+          unzip -q awscliv2.zip
+
+          sudo ./aws/install
+
+          aws --version
 
 
       # ==========================================
@@ -129,8 +135,12 @@ jobs:
 
           BACKUP_FILE="backup/production-$(date -u +%Y-%m-%d).dump"
 
-          echo "Creating database backup..."
-          echo "Output file: $BACKUP_FILE"
+          echo "=========================================="
+          echo "Creating database backup"
+          echo "=========================================="
+
+          echo "Output file:"
+          echo "$BACKUP_FILE"
 
           pg_dump \
             --format=custom \
@@ -149,7 +159,7 @@ jobs:
       - name: Verify backup
         run: |
           echo "=========================================="
-          echo "Checking backup"
+          echo "Verifying backup"
           echo "=========================================="
 
           ls -lh backup/
@@ -185,7 +195,7 @@ jobs:
 
 
       # ==========================================
-      # 7. Upload to Neon Object Storage
+      # 7. Upload backup to Neon Object Storage
       # ==========================================
       - name: Upload backup to Neon Object Storage
         run: |
