@@ -5,6 +5,7 @@ on:
 
   schedule:
     # 12:00 AM Philippines time (UTC+8)
+    # GitHub Actions uses UTC
     - cron: "0 16 * * *"
 
 jobs:
@@ -13,67 +14,195 @@ jobs:
 
     env:
       DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+
       AWS_ENDPOINT_URL_S3: ${{ secrets.NEON_S3_ENDPOINT }}
       AWS_ACCESS_KEY_ID: ${{ secrets.NEON_S3_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.NEON_S3_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.NEON_S3_REGION }}
+
       S3_BUCKET: database-backups
 
     steps:
-      - name: Install PostgreSQL client
+
+      # ==========================================
+      # 1. Install PostgreSQL 17 client
+      # ==========================================
+      - name: Install PostgreSQL 17 client
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-common ca-certificates
 
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+
+      # ==========================================
+      # 2. Install AWS CLI
+      # ==========================================
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli
+
+
+      # ==========================================
+      # 3. Check installed tools
+      # ==========================================
       - name: Check tools
         run: |
+          echo "PostgreSQL client:"
           pg_dump --version
+
+          echo ""
+          echo "AWS CLI:"
           aws --version
 
+
+      # ==========================================
+      # 4. Check required secrets
+      # ==========================================
+      - name: Check configuration
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "ERROR: PRODUCTION_DATABASE_URL is not configured."
+            exit 1
+          fi
+
+          if [ -z "$AWS_ENDPOINT_URL_S3" ]; then
+            echo "ERROR: NEON_S3_ENDPOINT is not configured."
+            exit 1
+          fi
+
+          if [ -z "$AWS_ACCESS_KEY_ID" ]; then
+            echo "ERROR: NEON_S3_ACCESS_KEY_ID is not configured."
+            exit 1
+          fi
+
+          if [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "ERROR: NEON_S3_SECRET_ACCESS_KEY is not configured."
+            exit 1
+          fi
+
+          if [ -z "$AWS_REGION" ]; then
+            echo "ERROR: NEON_S3_REGION is not configured."
+            exit 1
+          fi
+
+          echo "All required configuration is present."
+
+
+      # ==========================================
+      # 5. Create database backup
+      # ==========================================
       - name: Create database backup
         run: |
           mkdir -p backup
+
+          BACKUP_FILE="backup/production-$(date -u +%Y-%m-%d).dump"
+
+          echo "Creating database backup..."
+          echo "Output file: $BACKUP_FILE"
 
           pg_dump \
             --format=custom \
             --no-owner \
             --no-acl \
             "$DATABASE_URL" \
-            --file="backup/production-$(date -u +%Y-%m-%d).dump"
+            --file="$BACKUP_FILE"
 
+          echo "Database backup created successfully."
+
+
+      # ==========================================
+      # 6. Verify backup file
+      # ==========================================
       - name: Verify backup
         run: |
+          echo "Backup directory:"
           ls -lh backup/
 
-          BACKUP_FILE=$(find backup -name "*.dump" -type f)
+          BACKUP_FILE=$(find backup -name "*.dump" -type f | head -n 1)
 
-          if [ ! -s "$BACKUP_FILE" ]; then
-            echo "Backup file is empty or missing!"
+          if [ -z "$BACKUP_FILE" ]; then
+            echo "ERROR: Backup file was not created."
             exit 1
           fi
 
-          echo "Backup created successfully:"
+          if [ ! -s "$BACKUP_FILE" ]; then
+            echo "ERROR: Backup file is empty."
+            exit 1
+          fi
+
+          echo ""
+          echo "Backup file:"
           echo "$BACKUP_FILE"
 
+          echo ""
+          echo "Backup size:"
+          du -h "$BACKUP_FILE"
+
+          echo ""
+          echo "Testing backup archive..."
+
+          pg_restore \
+            --list "$BACKUP_FILE" > /dev/null
+
+          echo "Backup archive is valid."
+
+
+      # ==========================================
+      # 7. Upload backup to Neon Object Storage
+      # ==========================================
       - name: Upload backup to Neon Object Storage
         run: |
-          BACKUP_FILE=$(find backup -name "*.dump" -type f)
+          BACKUP_FILE=$(find backup -name "*.dump" -type f | head -n 1)
+
+          FILE_NAME=$(basename "$BACKUP_FILE")
+
+          echo "Uploading:"
+          echo "$FILE_NAME"
+
+          echo ""
+          echo "Destination:"
+          echo "s3://$S3_BUCKET/$FILE_NAME"
 
           aws s3 cp \
             "$BACKUP_FILE" \
-            "s3://$S3_BUCKET/$(basename "$BACKUP_FILE")" \
+            "s3://$S3_BUCKET/$FILE_NAME" \
             --endpoint-url "$AWS_ENDPOINT_URL_S3" \
             --region "$AWS_REGION"
 
+          echo ""
+          echo "Upload completed."
+
+
+      # ==========================================
+      # 8. Verify uploaded backup
+      # ==========================================
       - name: Verify upload
         run: |
-          BACKUP_FILE=$(find backup -name "*.dump" -type f)
+          BACKUP_FILE=$(find backup -name "*.dump" -type f | head -n 1)
+
+          FILE_NAME=$(basename "$BACKUP_FILE")
+
+          echo "Checking uploaded file..."
 
           aws s3 ls \
-            "s3://$S3_BUCKET/$(basename "$BACKUP_FILE")" \
+            "s3://$S3_BUCKET/$FILE_NAME" \
             --endpoint-url "$AWS_ENDPOINT_URL_S3" \
             --region "$AWS_REGION"
 
-          echo "================================="
+          echo ""
+          echo "=========================================="
           echo "BACKUP UPLOADED SUCCESSFULLY"
-          echo "================================="
+          echo "=========================================="
+          echo ""
+          echo "File:"
+          echo "$FILE_NAME"
+          echo ""
+          echo "Bucket:"
+          echo "$S3_BUCKET"
+          echo ""
+          echo "Backup completed successfully."
