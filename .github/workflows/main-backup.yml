@@ -30,11 +30,32 @@ jobs:
       - name: Install PostgreSQL 17 client
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-common ca-certificates
 
-          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+          sudo apt-get install -y \
+            curl \
+            ca-certificates \
+            postgresql-common
+
+          sudo install -d /usr/share/postgresql-common/pgdg
+
+          sudo curl \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            --fail \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+
+          . /etc/os-release
+
+          sudo tee /etc/apt/sources.list.d/pgdg.sources > /dev/null <<EOF
+          Types: deb deb-src
+          URIs: https://apt.postgresql.org/pub/repos/apt
+          Suites: ${VERSION_CODENAME}-pgdg
+          Architectures: $(dpkg --print-architecture)
+          Components: main
+          Signed-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          EOF
 
           sudo apt-get update
+
           sudo apt-get install -y postgresql-client-17
 
 
@@ -52,11 +73,17 @@ jobs:
       # ==========================================
       - name: Check tools
         run: |
-          echo "PostgreSQL client:"
+          echo "=========================================="
+          echo "PostgreSQL version"
+          echo "=========================================="
+
           pg_dump --version
 
           echo ""
-          echo "AWS CLI:"
+          echo "=========================================="
+          echo "AWS CLI version"
+          echo "=========================================="
+
           aws --version
 
 
@@ -112,15 +139,19 @@ jobs:
             "$DATABASE_URL" \
             --file="$BACKUP_FILE"
 
+          echo ""
           echo "Database backup created successfully."
 
 
       # ==========================================
-      # 6. Verify backup file
+      # 6. Verify backup
       # ==========================================
       - name: Verify backup
         run: |
-          echo "Backup directory:"
+          echo "=========================================="
+          echo "Checking backup"
+          echo "=========================================="
+
           ls -lh backup/
 
           BACKUP_FILE=$(find backup -name "*.dump" -type f | head -n 1)
@@ -149,11 +180,12 @@ jobs:
           pg_restore \
             --list "$BACKUP_FILE" > /dev/null
 
+          echo ""
           echo "Backup archive is valid."
 
 
       # ==========================================
-      # 7. Upload backup to Neon Object Storage
+      # 7. Upload to Neon Object Storage
       # ==========================================
       - name: Upload backup to Neon Object Storage
         run: |
@@ -161,12 +193,16 @@ jobs:
 
           FILE_NAME=$(basename "$BACKUP_FILE")
 
-          echo "Uploading:"
+          echo "=========================================="
+          echo "Uploading backup"
+          echo "=========================================="
+
+          echo "File:"
           echo "$FILE_NAME"
 
           echo ""
-          echo "Destination:"
-          echo "s3://$S3_BUCKET/$FILE_NAME"
+          echo "Bucket:"
+          echo "$S3_BUCKET"
 
           aws s3 cp \
             "$BACKUP_FILE" \
@@ -179,7 +215,7 @@ jobs:
 
 
       # ==========================================
-      # 8. Verify uploaded backup
+      # 8. Verify upload
       # ==========================================
       - name: Verify upload
         run: |
@@ -187,7 +223,9 @@ jobs:
 
           FILE_NAME=$(basename "$BACKUP_FILE")
 
-          echo "Checking uploaded file..."
+          echo "=========================================="
+          echo "Verifying uploaded backup"
+          echo "=========================================="
 
           aws s3 ls \
             "s3://$S3_BUCKET/$FILE_NAME" \
@@ -198,11 +236,14 @@ jobs:
           echo "=========================================="
           echo "BACKUP UPLOADED SUCCESSFULLY"
           echo "=========================================="
+
           echo ""
-          echo "File:"
+          echo "Backup:"
           echo "$FILE_NAME"
+
           echo ""
           echo "Bucket:"
           echo "$S3_BUCKET"
+
           echo ""
-          echo "Backup completed successfully."
+          echo "The database backup completed successfully."
