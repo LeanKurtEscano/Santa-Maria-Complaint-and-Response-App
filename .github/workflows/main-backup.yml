@@ -12,13 +12,16 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
+      # Production Neon PostgreSQL
       DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
 
-      AWS_ENDPOINT_URL_S3: ${{ secrets.NEON_S3_ENDPOINT }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.NEON_S3_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.NEON_S3_SECRET_ACCESS_KEY }}
-      AWS_REGION: ${{ secrets.NEON_S3_REGION }}
+      # Neon Object Storage / S3
+      AWS_ENDPOINT_URL_S3: ${{ secrets.AWS_ENDPOINT_URL_S3 }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
 
+      # Neon Object Storage bucket
       S3_BUCKET: database-backups
 
     steps:
@@ -63,6 +66,7 @@ jobs:
       # ==========================================
       - name: Check AWS CLI
         run: |
+          echo "AWS CLI version:"
           aws --version
 
 
@@ -90,28 +94,30 @@ jobs:
       # ==========================================
       - name: Check configuration
         run: |
+          echo "Checking required configuration..."
+
           if [ -z "$DATABASE_URL" ]; then
             echo "ERROR: PRODUCTION_DATABASE_URL is not configured."
             exit 1
           fi
 
           if [ -z "$AWS_ENDPOINT_URL_S3" ]; then
-            echo "ERROR: NEON_S3_ENDPOINT is not configured."
+            echo "ERROR: AWS_ENDPOINT_URL_S3 is not configured."
             exit 1
           fi
 
           if [ -z "$AWS_ACCESS_KEY_ID" ]; then
-            echo "ERROR: NEON_S3_ACCESS_KEY_ID is not configured."
+            echo "ERROR: AWS_ACCESS_KEY_ID is not configured."
             exit 1
           fi
 
           if [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-            echo "ERROR: NEON_S3_SECRET_ACCESS_KEY is not configured."
+            echo "ERROR: AWS_SECRET_ACCESS_KEY is not configured."
             exit 1
           fi
 
           if [ -z "$AWS_REGION" ]; then
-            echo "ERROR: NEON_S3_REGION is not configured."
+            echo "ERROR: AWS_REGION is not configured."
             exit 1
           fi
 
@@ -131,7 +137,7 @@ jobs:
           echo "Creating database backup"
           echo "=========================================="
 
-          echo "Output file:"
+          echo "Backup file:"
           echo "$BACKUP_FILE"
 
           pg_dump \
@@ -146,7 +152,7 @@ jobs:
 
 
       # ==========================================
-      # 6. Verify backup
+      # 6. Verify backup file
       # ==========================================
       - name: Verify backup
         run: |
@@ -213,11 +219,11 @@ jobs:
             --region "$AWS_REGION"
 
           echo ""
-          echo "Upload completed."
+          echo "Upload completed successfully."
 
 
       # ==========================================
-      # 8. Verify upload
+      # 8. Verify uploaded backup
       # ==========================================
       - name: Verify upload
         run: |
@@ -248,4 +254,4 @@ jobs:
           echo "$S3_BUCKET"
 
           echo ""
-          echo "The database backup completed successfully."
+          echo "The production database backup completed successfully."
