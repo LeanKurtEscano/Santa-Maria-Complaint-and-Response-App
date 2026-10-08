@@ -1,0 +1,283 @@
+name: Production Database Backup
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    # 12:00 AM Philippines time = 16:00 UTC
+    - cron: "0 16 * * *"
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    env:
+      # Production Neon PostgreSQL
+      DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+
+      # Neon Object Storage / S3
+      AWS_ENDPOINT_URL_S3: ${{ secrets.AWS_ENDPOINT_URL_S3 }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      # Neon Object Storage bucket
+      S3_BUCKET: database-backups
+
+    steps:
+
+      # ==========================================
+      # 1. Install PostgreSQL 17 client
+      # ==========================================
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo apt-get update
+
+          sudo apt-get install -y \
+            curl \
+            ca-certificates \
+            postgresql-common
+
+          sudo install -d /usr/share/postgresql-common/pgdg
+
+          sudo curl \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            --fail \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+
+          . /etc/os-release
+
+          sudo tee /etc/apt/sources.list.d/pgdg.sources > /dev/null <<EOF
+          Types: deb deb-src
+          URIs: https://apt.postgresql.org/pub/repos/apt
+          Suites: ${VERSION_CODENAME}-pgdg
+          Architectures: $(dpkg --print-architecture)
+          Components: main
+          Signed-By: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          EOF
+
+          sudo apt-get update
+
+          sudo apt-get install -y postgresql-client-17
+
+          echo "=========================================="
+          echo "PostgreSQL 17 installation"
+          echo "=========================================="
+
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+          /usr/lib/postgresql/17/bin/pg_restore --version
+
+          # Put PostgreSQL 17 BEFORE PostgreSQL 16 in PATH
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+
+      # ==========================================
+      # 2. Check AWS CLI
+      # ==========================================
+      - name: Check AWS CLI
+        run: |
+          echo "=========================================="
+          echo "AWS CLI"
+          echo "=========================================="
+
+          aws --version
+
+
+      # ==========================================
+      # 3. Check PostgreSQL version
+      # ==========================================
+      - name: Check PostgreSQL tools
+        run: |
+          echo "=========================================="
+          echo "PostgreSQL tools"
+          echo "=========================================="
+
+          echo "pg_dump:"
+          which pg_dump
+          pg_dump --version
+
+          echo ""
+          echo "pg_restore:"
+          which pg_restore
+          pg_restore --version
+
+
+      # ==========================================
+      # 4. Check required secrets
+      # ==========================================
+      - name: Check configuration
+        run: |
+          echo "=========================================="
+          echo "Checking configuration"
+          echo "=========================================="
+
+          if [ -z "$DATABASE_URL" ]; then
+            echo "ERROR: PRODUCTION_DATABASE_URL is not configured."
+            exit 1
+          fi
+
+          if [ -z "$AWS_ENDPOINT_URL_S3" ]; then
+            echo "ERROR: AWS_ENDPOINT_URL_S3 is not configured."
+            exit 1
+          fi
+
+          if [ -z "$AWS_ACCESS_KEY_ID" ]; then
+            echo "ERROR: AWS_ACCESS_KEY_ID is not configured."
+            exit 1
+          fi
+
+          if [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "ERROR: AWS_SECRET_ACCESS_KEY is not configured."
+            exit 1
+          fi
+
+          if [ -z "$AWS_REGION" ]; then
+            echo "ERROR: AWS_REGION is not configured."
+            exit 1
+          fi
+
+          echo "All required configuration is present."
+
+
+      # ==========================================
+      # 5. Create database backup
+      # ==========================================
+      - name: Create database backup
+        run: |
+          mkdir -p backup
+
+          BACKUP_FILE="backup/production-$(date -u +%Y-%m-%d).dump"
+
+          echo "=========================================="
+          echo "Creating database backup"
+          echo "=========================================="
+
+          echo "Backup file:"
+          echo "$BACKUP_FILE"
+
+          echo ""
+          echo "Using pg_dump:"
+          which pg_dump
+          pg_dump --version
+
+          pg_dump \
+            --format=custom \
+            --no-owner \
+            --no-acl \
+            "$DATABASE_URL" \
+            --file="$BACKUP_FILE"
+
+          echo ""
+          echo "Database backup created successfully."
+
+
+      # ==========================================
+      # 6. Verify backup
+      # ==========================================
+      - name: Verify backup
+        run: |
+          echo "=========================================="
+          echo "Verifying backup"
+          echo "=========================================="
+
+          ls -lh backup/
+
+          BACKUP_FILE=$(find backup -name "*.dump" -type f | head -n 1)
+
+          if [ -z "$BACKUP_FILE" ]; then
+            echo "ERROR: Backup file was not created."
+            exit 1
+          fi
+
+          if [ ! -s "$BACKUP_FILE" ]; then
+            echo "ERROR: Backup file is empty."
+            exit 1
+          fi
+
+          echo ""
+          echo "Backup file:"
+          echo "$BACKUP_FILE"
+
+          echo ""
+          echo "Backup size:"
+          du -h "$BACKUP_FILE"
+
+          echo ""
+          echo "Using pg_restore:"
+          which pg_restore
+          pg_restore --version
+
+          echo ""
+          echo "Testing backup archive..."
+
+          pg_restore \
+            --list "$BACKUP_FILE" > /dev/null
+
+          echo ""
+          echo "Backup archive is valid."
+
+
+      # ==========================================
+      # 7. Upload backup to Neon Object Storage
+      # ==========================================
+      - name: Upload backup to Neon Object Storage
+        run: |
+          BACKUP_FILE=$(find backup -name "*.dump" -type f | head -n 1)
+
+          FILE_NAME=$(basename "$BACKUP_FILE")
+
+          echo "=========================================="
+          echo "Uploading backup"
+          echo "=========================================="
+
+          echo "File:"
+          echo "$FILE_NAME"
+
+          echo ""
+          echo "Bucket:"
+          echo "$S3_BUCKET"
+
+          aws s3 cp \
+            "$BACKUP_FILE" \
+            "s3://$S3_BUCKET/$FILE_NAME" \
+            --endpoint-url "$AWS_ENDPOINT_URL_S3" \
+            --region "$AWS_REGION"
+
+          echo ""
+          echo "Upload completed successfully."
+
+
+      # ==========================================
+      # 8. Verify upload
+      # ==========================================
+      - name: Verify upload
+        run: |
+          BACKUP_FILE=$(find backup -name "*.dump" -type f | head -n 1)
+
+          FILE_NAME=$(basename "$BACKUP_FILE")
+
+          echo "=========================================="
+          echo "Verifying uploaded backup"
+          echo "=========================================="
+
+          aws s3 ls \
+            "s3://$S3_BUCKET/$FILE_NAME" \
+            --endpoint-url "$AWS_ENDPOINT_URL_S3" \
+            --region "$AWS_REGION"
+
+          echo ""
+          echo "=========================================="
+          echo "BACKUP UPLOADED SUCCESSFULLY"
+          echo "=========================================="
+
+          echo ""
+          echo "Backup:"
+          echo "$FILE_NAME"
+
+          echo ""
+          echo "Bucket:"
+          echo "$S3_BUCKET"
+
+          echo ""
+          echo "The production database backup completed successfully."

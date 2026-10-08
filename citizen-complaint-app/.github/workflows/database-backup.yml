@@ -1,0 +1,72 @@
+name: Production Database Backup
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    # 12:00 AM Philippines time (UTC+8)
+    # GitHub Actions uses UTC, so this is 16:00 UTC.
+    - cron: "0 16 * * *"
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+      AWS_ENDPOINT_URL_S3: ${{ secrets.NEON_S3_ENDPOINT }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.NEON_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.NEON_S3_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.NEON_S3_REGION }}
+      S3_BUCKET: database-backups
+
+    steps:
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Check PostgreSQL client
+        run: |
+          pg_dump --version
+
+      - name: Create database backup
+        run: |
+          mkdir -p backup
+
+          pg_dump \
+            --format=custom \
+            --no-owner \
+            --no-acl \
+            "$DATABASE_URL" \
+            --file="backup/production-$(date -u +%Y-%m-%d).dump"
+
+      - name: Verify backup file
+        run: |
+          ls -lh backup/
+          
+          if [ ! -s backup/*.dump ]; then
+            echo "Backup file is empty or missing!"
+            exit 1
+          fi
+
+      - name: Upload backup to Neon Object Storage
+        run: |
+          BACKUP_FILE=$(find backup -name "*.dump" -type f)
+
+          aws s3 cp \
+            "$BACKUP_FILE" \
+            "s3://$S3_BUCKET/$(basename "$BACKUP_FILE")"
+            --endpoint-url "$AWS_ENDPOINT_URL_S3" \
+            --region "$AWS_REGION"
+
+      - name: Verify upload
+        run: |
+          BACKUP_FILE=$(find backup -name "*.dump" -type f)
+
+          aws s3 ls \
+            "s3://$S3_BUCKET/$(basename "$BACKUP_FILE")"
+            --endpoint-url "$AWS_ENDPOINT_URL_S3" \
+            --region "$AWS_REGION"
+
+          echo "Backup uploaded successfully!"
