@@ -145,53 +145,26 @@ useEffect(() => {
     await initializeApp();
     setRetrying(false);
   };
+useEffect(() => {
+  if (loading || retrying) return;
 
-  useEffect(() => {
-    if (loading || retrying) return;
+  const inAuthGroup = segments[0] === "(auth)";
 
-    const inAuthGroup = segments[0] === "(auth)";
-
-    console.log("🔍 Auth Check:", {
-      isAuthenticated: !!userData,
-      isVerified: userData?.is_verified,
-      currentSegment: segments[0],
-      inAuthGroup,
-      userData: userData,
-    });
-
-    if (userData && userData.is_suspended) {
-      if (segments[1] !== "AccountSuspended") {
-        router.replace("/(auth)/AccountSuspended");
-      }
-      return;
+  // Suspended users are always sent to the suspended screen
+  if (userData && userData.is_suspended) {
+    if (segments[1] !== "AccountSuspended") {
+      router.replace("/(auth)/AccountSuspended");
     }
+    return;
+  }
 
-    // ✅ Authenticated but NOT verified
-    if (userData && !userData.is_verified) {
-      // Any account with a linked clerk_user_id (i.e. has used Google login,
-      // whether that was their original signup method or linked later) is
-      // allowed inside the app while unverified. Verification-gated actions
-      // like filing complaints are enforced separately inside the app
-      // (VerifyGuard / pending-review banners), so this redirect only needs
-      // to handle users who have never touched Google login at all.
-      const isGoogleLinked = !!userData.clerk_user_id;
-
-      if (!isGoogleLinked) {
-        if (segments[1] !== "NotVerified") {
-          router.replace("/(auth)/NotVerified");
-        }
-        return;
-      }
-      // else: Google-linked account, unverified — let them into the app
-    }
-
-    // ✅ Authenticated and verified
-    if (userData && userData.is_verified && inAuthGroup) {
-      router.replace("/(tabs)");
-      return;
-    }
-
-  }, [userData, loading, segments, retrying]);
+  // Any logged-in user (verified or not, Google-linked or not)
+  // gets out of the auth screens and into the app
+  if (userData && inAuthGroup) {
+    router.replace("/(tabs)");
+    return;
+  }
+}, [userData, loading, segments, retrying]);
 
   if (initError && !loading) {
     const appError = handleApiError(initError);

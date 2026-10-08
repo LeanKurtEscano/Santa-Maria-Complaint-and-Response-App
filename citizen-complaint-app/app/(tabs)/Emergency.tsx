@@ -511,6 +511,7 @@ export default function EmergencyScreen() {
     areaLabel={isUsingFallback ? undefined : selectedBarangay?.barangay_name}
     userLatitude={userLat}
     userLongitude={userLng}
+    isAuthenticated={isAuthenticated}
   />
 )}
 

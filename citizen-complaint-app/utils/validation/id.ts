@@ -3,19 +3,23 @@
  *
  * Formats based on official Philippine government ID number standards:
  * - Driver's License: LTO format A00-00-000000 (1 letter + 2d + 2d + 6d)
- * - National ID (PhilSys): 16-digit PhilSys number
+ * - National ID (PhilSys): 16-digit PhilSys number (1233-1233-1322-1312)
  * - Passport: DFA format A0000000 (old) or AA0000000 (ePassport)
  * - UMID: SSS/GSIS CRN format ####-#######-# (12 digits)
  * - SSS: ##-#######-# (10 digits)
- * - PhilHealth: 12-digit PIN (############)
- * - TIN ID: usually 9–12 digits or formatted with hyphens
- * - Voter's ID: COMELEC precinct-based, loose alphanumeric (7–13 chars)
+ * - PhilHealth: 12-digit PIN, displayed as ##-#########-# (19-089627619-4)
+ * - TIN ID: 9 or 12 digits, displayed as ###-###-###(-###) (221-029-916-000)
+ * - Voter's ID: 22 alphanumeric chars, displayed as ####-#####-############-#
+ *   (3427-0002A-B0777MPR2000-7)
  * - Postal ID: PhilPost alphanumeric, varies by region (10–15 chars)
  * - Barangay ID: No national standard, free-form (3–30 chars)
  * - Senior Citizen ID: government-issued, usually 10–20 alphanumeric chars
  * - PWD ID: government-issued, usually 8–20 alphanumeric chars
  * - PRC ID: professional license ID, usually 6–20 alphanumeric chars
  * - Student ID: Institution-specific, free-form (3–30 chars)
+ *
+ * "Formatted" ID types (nationalId, philhealth, tinId, votersId) are stored
+ * RAW (no dashes/spaces). Dashes are added for display only.
  */
 
 type TFunction = (key: string, options?: Record<string, any>) => string;
@@ -29,7 +33,7 @@ interface IdValidationRule {
 
 const ID_RULES: Record<string, IdValidationRule> = {
   nationalId: {
-    // PhilSys national ID: 16 digits
+    // PhilSys national ID: 16 digits (tested against the raw value)
     regex: /^\d{16}$/,
     format: '16 digits (e.g. 1233-1233-1322-1312)',
   },
@@ -55,21 +59,19 @@ const ID_RULES: Record<string, IdValidationRule> = {
     format: '##-#######-# (e.g. 01-2345678-9)',
   },
   philhealth: {
-    // PhilHealth PIN: 12 digits, no dashes
+    // PhilHealth PIN: 12 digits (tested against the raw value)
     regex: /^\d{12}$/,
-    format: '############  (e.g. 012345678901)',
+    format: '12 digits (e.g. 19-089627619-4)',
   },
   tinId: {
-    // TIN commonly appears as 9 or 12 digits, sometimes with hyphen separators
-    regex: /^(?:\d{9}|\d{12}|\d{3}-\d{3}-\d{3}-\d{3}|\d{3}-\d{3}-\d{3})$/,
-    format: '9 or 12 digits, or a hyphenated format (e.g. 123-456-789 or 123-456-789-000)',
+    // 9 digits (e.g. 221-029-916) or 12 digits (e.g. 221-029-916-000)
+    regex: /^(?:\d{9}|\d{12})$/,
+    format: '9 or 12 digits (e.g. 221-029-916-000)',
   },
-  votersId: {
-    // COMELEC precinct-based, no strict national standard
-    // Alphanumeric, typically 7–13 characters
-    regex: /^[A-Z0-9\-]{7,13}$/,
-    format: '7–13 alphanumeric characters (e.g. 1234567 or ABC-1234567)',
-  },
+ votersId: {
+  regex: /^[A-Z0-9]{22}$/,
+  format: '22 characters (e.g. 3427-0002A-B0777MPR2000-7)',
+},
   postalId: {
     // PhilPost format varies by region, alphanumeric 10–15 chars
     regex: /^[A-Z0-9\-]{10,15}$/,
@@ -104,6 +106,74 @@ const ID_RULES: Record<string, IdValidationRule> = {
   },
 };
 
+// ── Formatted ID types (auto-dash display, raw storage) ──────────────────────
+
+interface FormattedIdConfig {
+  /** Size of each dash-separated group, in order. */
+  groups: number[];
+  charset: 'digits' | 'alphanumeric';
+}
+
+const FORMATTED_ID_CONFIG: Record<string, FormattedIdConfig> = {
+  nationalId: { groups: [4, 4, 4, 4], charset: 'digits' }, // 1233-1233-1322-1312
+  philhealth: { groups: [2, 9, 1], charset: 'digits' }, // 19-089627619-4
+  tinId: { groups: [3, 3, 3, 3], charset: 'digits' }, // 221-029-916-000
+  votersId: { groups: [4, 5, 12, 1], charset: 'alphanumeric' }, // 3427-0002A-B0777MPR2000-7
+};
+
+const rawMaxLength = (cfg: FormattedIdConfig): number =>
+  cfg.groups.reduce((sum, g) => sum + g, 0);
+
+export const isFormattedIdType = (idType: string): boolean =>
+  idType in FORMATTED_ID_CONFIG;
+
+export const isNumericIdType = (idType: string): boolean =>
+  FORMATTED_ID_CONFIG[idType]?.charset === 'digits';
+
+/**
+ * Cleans raw keyboard/paste input. For formatted types, dashes and spaces
+ * are stripped and the value is capped at the raw max length.
+ */
+export const sanitizeIdInput = (text: string, idType: string): string => {
+  const cfg = FORMATTED_ID_CONFIG[idType];
+  if (!cfg) return text.replace(/[^a-zA-Z0-9\- ]/g, '').toUpperCase();
+
+  const stripped =
+    cfg.charset === 'digits'
+      ? text.replace(/\D/g, '')
+      : text.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+  return stripped.slice(0, rawMaxLength(cfg));
+};
+
+/** Display formatting only; the stored value stays raw. */
+export const formatIdNumber = (value: string, idType: string): string => {
+  const cfg = FORMATTED_ID_CONFIG[idType];
+  if (!cfg) return value;
+
+  const raw = sanitizeIdInput(value ?? '', idType);
+  const parts: string[] = [];
+  let i = 0;
+  for (const size of cfg.groups) {
+    if (i >= raw.length) break;
+    parts.push(raw.slice(i, i + size));
+    i += size;
+  }
+  return parts.join('-');
+};
+
+/** TextInput maxLength, which counts the displayed (dashed) text. */
+export const getIdInputMaxLength = (idType: string): number => {
+  const cfg = FORMATTED_ID_CONFIG[idType];
+  return cfg ? rawMaxLength(cfg) + cfg.groups.length - 1 : 30;
+};
+
+/** Kept so existing imports don't break. */
+export const formatNationalId = (value: string): string =>
+  formatIdNumber(value, 'nationalId');
+
+// ── Validation ───────────────────────────────────────────────────────────────
+
 export const validateIdNumberByType = (
   idNumber: string,
   idType: string,
@@ -125,10 +195,12 @@ export const validateIdNumberByType = (
 
   // Regex-based validation
   if (rule.regex) {
-    if (!rule.regex.test(idType === 'nationalId' ? normalized : trimmed)) {
+    // Formatted types are tested against the dash/space-stripped value
+    const target = isFormattedIdType(idType) ? normalized : trimmed;
+    if (!rule.regex.test(target)) {
       return (
         t('invalidIdFormat', { format: rule.format }) ||
-        `Invalid formaat. Expected: ${rule.format}`
+        `Invalid format. Expected: ${rule.format}`
       );
     }
     return null;
@@ -151,6 +223,8 @@ export const validateIdNumberByType = (
   return null;
 };
 
+// ── Placeholders & hints ─────────────────────────────────────────────────────
+
 /**
  * Returns a placeholder string for the ID number input
  * based on the selected ID type.
@@ -162,9 +236,9 @@ export const getIdNumberPlaceholder = (idType: string): string => {
     passport: 'P1234567 or EC1234567',
     umid: '0012-3456789-0',
     sss: '01-2345678-9',
-    philhealth: '012345678901',
-    tinId: '123-456-789 or 123-456-789-000',
-    votersId: '1234567 or ABC-1234567',
+    philhealth: '19-089627832-4',
+    tinId: '231-049-915-000',
+    votersId: '3427-0002A-B0586MPR2000-7',
     postalId: 'PH1234567890',
     barangayId: 'e.g. BRG-2024-001',
     seniorCitizenId: 'e.g. 1234567890',
@@ -187,8 +261,9 @@ export const getIdNumberHint = (idType: string): string => {
     umid: 'Format: ####-#######-# (12-digit CRN on your UMID card)',
     sss: 'Format: ##-#######-# (10-digit SSS number)',
     philhealth: 'Enter your 12-digit PhilHealth Identification Number (PIN)',
-    tinId: 'Enter your TIN ID number (9 or 12 digits, with or without hyphens)',
-    votersId: 'Enter your COMELEC Voter ID number (7–13 characters)',
+    tinId: 'Enter your 9 or 12-digit TIN. Dashes are added automatically',
+    votersId:
+      'Enter your 22-character COMELEC Voter ID number. Dashes are added automatically',
     postalId: 'Enter your PhilPost Postal ID number (10–15 characters)',
     barangayId: 'Enter the ID number as printed on your Barangay ID',
     seniorCitizenId: 'Enter the ID number printed on your Senior Citizen ID',
@@ -197,10 +272,4 @@ export const getIdNumberHint = (idType: string): string => {
     studentId: 'Enter the ID number as printed on your School ID',
   };
   return hints[idType] || '';
-};
-
-/** Formats the PhilSys number for display without changing the stored digits. */
-export const formatNationalId = (value: string): string => {
-  const digits = value.replace(/\D/g, '').slice(0, 16);
-  return digits.replace(/(\d{4})(?=\d)/g, '$1-');
 };

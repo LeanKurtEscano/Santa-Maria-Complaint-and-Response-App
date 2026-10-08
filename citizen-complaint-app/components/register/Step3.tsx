@@ -31,7 +31,10 @@ import {
   validateIdNumberByType,
   getIdNumberPlaceholder,
   getIdNumberHint,
-  formatNationalId,
+  formatIdNumber,
+  sanitizeIdInput,
+  getIdInputMaxLength,
+  isNumericIdType,
 } from '@/utils/validation/id';
 import ErrorMessage from './ErrorMessage';
 import Recaptcha from './Recaptcha';
@@ -487,27 +490,25 @@ const Step3IdVerification = ({
                 }`}
               >
                 <FileText size={20} color="#6B7280" />
-                <TextInput
-                  className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
-                  onBlur={() => {
-                    onBlur();
-                    const err = validateIdNumberByType(value, selectedIdType, t);
-                    if (err) setError('idNumber', { type: 'manual', message: err });
-                    else clearErrors('idNumber');
-                  }}
-                  onChangeText={(text) => {
-                    const sanitized = selectedIdType === 'nationalId'
-                      ? text.replace(/\D/g, '').slice(0, 16)
-                      : text.replace(/[^a-zA-Z0-9\- ]/g, '').toUpperCase();
-                    onChange(sanitized);
-                    clearErrors('idNumber');
-                  }}
-                  maxLength={selectedIdType === 'nationalId' ? 19 : 30}
-                  value={selectedIdType === 'nationalId' ? formatNationalId(value) : value}
-                  placeholder={idPlaceholder}
-                  placeholderTextColor="#9CA3AF"
-                  autoCapitalize="characters"
-                />
+             <TextInput
+  className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
+  onBlur={() => {
+    onBlur();
+    const err = validateIdNumberByType(value, selectedIdType, t);
+    if (err) setError('idNumber', { type: 'manual', message: err });
+    else clearErrors('idNumber');
+  }}
+  onChangeText={(text) => {
+    onChange(sanitizeIdInput(text, selectedIdType));
+    clearErrors('idNumber');
+  }}
+  maxLength={getIdInputMaxLength(selectedIdType)}
+  value={formatIdNumber(value, selectedIdType)}
+  keyboardType={isNumericIdType(selectedIdType) ? 'number-pad' : 'default'}
+  placeholder={idPlaceholder}
+  placeholderTextColor="#9CA3AF"
+  autoCapitalize="characters"
+/>
               </View>
               {idHint ? (
                 <Text className="text-xs text-neutral-500 mt-1">{idHint}</Text>

@@ -6,7 +6,7 @@ import { handleApiError } from '@/utils/general/errorHandler';
 import { ErrorScreen } from '@/screen/general/ErrorScreen';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
-import { ChevronRight,ChevronUp, FileText, Search, X } from 'lucide-react-native';
+import { ChevronRight, ChevronUp, FileText, MapPin, Search, X } from 'lucide-react-native';
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Barangay } from '@/types/general/barangay';
 import { getBarangayCoords, DEFAULT_COORDS } from '@/constants/general/barangay';
@@ -15,6 +15,8 @@ import { useCurrentUser } from "@/store/useCurrentUserStore";
 import AuthGuard from '@/screen/general/AuthGuard';
 import VerifyGuard from '@/screen/general/VerifyGuard';
 import { BarangayPage } from '@/types/general/barangay';
+import { useCurrentBarangay } from '@/hooks/general/useCurrentBarangay';
+import { canonicalBarangayName, isPointInBarangay } from '@/utils/general/barangayMatcher';
 
 const PAGE_SIZE = 20;
 
@@ -91,11 +93,46 @@ export default function ComplaintsScreen() {
     enabled: isAuthenticated && !!userData?.is_verified,
   });
 
+  // Optional location enhancement. Every failure path inside the hook resolves
+  // to `null`, so the screen behaves exactly as before when location is
+  // unavailable. Must stay above the early returns.
+  const detectedBarangay = useCurrentBarangay(isAuthenticated && !!userData?.is_verified);
+
   // Flatten all fetched pages into a single array
   const allBarangays = useMemo(() => {
     if (!data) return [];
     return data.pages.flatMap((page) => page.data);
   }, [data]);
+
+  // Link the detected polygon to an API barangay: by name first, then by the
+  // API barangay's own lat/lng falling inside the detected polygon.
+  const detectedBarangayId = useMemo(() => {
+    if (!detectedBarangay) return null;
+    const byName = allBarangays.find(
+      (b) => canonicalBarangayName(b.barangay_name) === detectedBarangay.key
+    );
+    if (byName) return byName.id;
+    const byCoords = allBarangays.find(
+      (b) =>
+        Number.isFinite(b.latitude) &&
+        Number.isFinite(b.longitude) &&
+        isPointInBarangay(detectedBarangay.key, b.latitude, b.longitude)
+    );
+    return byCoords?.id ?? null;
+  }, [detectedBarangay, allBarangays]);
+
+  // Detected but not on a loaded page yet: keep fetching pages until it shows
+  // up. Only runs when location succeeded, so the no-location flow is unchanged.
+  useEffect(() => {
+    if (
+      detectedBarangay &&
+      detectedBarangayId === null &&
+      hasNextPage &&
+      !isFetchingNextPage
+    ) {
+      fetchNextPage();
+    }
+  }, [detectedBarangay, detectedBarangayId, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Client-side filter over whatever pages have been loaded so far
   const filteredData = useMemo(() => {
@@ -108,8 +145,18 @@ export default function ComplaintsScreen() {
           barangay.barangay_contact_number?.toLowerCase().includes(query)
       )
       : allBarangays;
-    return filtered.slice().sort((a, b) => a.barangay_name.localeCompare(b.barangay_name));
-  }, [allBarangays, searchQuery]);
+    const sorted = filtered.slice().sort((a, b) => a.barangay_name.localeCompare(b.barangay_name));
+
+    // Pin the detected barangay only when not searching. Everything else keeps
+    // its alphabetical order and the detected one is moved, never duplicated.
+    if (query || detectedBarangayId === null) return sorted;
+    const idx = sorted.findIndex((b) => b.id === detectedBarangayId);
+    if (idx > 0) {
+      const [pinned] = sorted.splice(idx, 1);
+      sorted.unshift(pinned);
+    }
+    return sorted;
+  }, [allBarangays, searchQuery, detectedBarangayId]);
 
   // Pull-to-refresh now also re-checks the user's verification status, not
   // just the barangay list. That way, once an admin verifies you, pulling
@@ -162,21 +209,49 @@ export default function ComplaintsScreen() {
       },
     });
   };
-
-  const renderBarangayItem = ({ item }: { item: Barangay }) => (
-    <TouchableOpacity
-      onPress={() => handleBarangayPress(item)}
-      className="bg-white mx-4 mb-3 p-4 rounded-xl border border-gray-300 active:scale-[0.98]"
-      style={{
-        shadowColor: THEME.primary,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-      }}
-    >
+const renderBarangayItem = ({ item }: { item: Barangay }) => {
+  const isDetected = item.id === detectedBarangayId;
+  return (
+   <TouchableOpacity
+  onPress={() => handleBarangayPress(item)}
+  className="bg-white mx-4 mb-3 p-4 rounded-xl active:scale-[0.98]"
+  style={{
+    borderLeftWidth: isDetected ? 3 : 1,
+    borderRightWidth: isDetected ? 3 : 1,
+    borderColor: isDetected ? THEME.primary : '#D1D5DB',
+    shadowColor: THEME.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  }}
+>
       <View className="flex-row items-center justify-between">
         <View className="flex-1">
+          {isDetected && (
+            <View className="mb-2">
+              <View
+                className="flex-row items-center"
+                style={{
+                  alignSelf: 'flex-start',
+                  
+                  backgroundColor: THEME.primaryMuted,
+                  borderRadius: 99,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                }}
+              >
+                <MapPin size={12} color={THEME.primary} />
+                <Text style={{ fontSize: 11, fontWeight: '600', color: THEME.primary, marginLeft: 4 }}>
+                  {t('complaintsScreen.location.currentBarangay')}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 12, color: THEME.primary, marginTop: 4 }}>
+                {t('complaintsScreen.location.canSubmit')}
+              </Text>
+            </View>
+          )}
+
           <Text className="text-lg font-semibold text-gray-900 mb-1">{item.barangay_name}</Text>
           <Text className="text-sm text-gray-500 mb-1">{item.barangay_address}</Text>
           <Text style={{ fontSize: 12, color: THEME.primary }}>{item.barangay_contact_number}</Text>
@@ -187,6 +262,7 @@ export default function ComplaintsScreen() {
       </View>
     </TouchableOpacity>
   );
+};
 
   const renderFooter = () => {
     if (!isFetchingNextPage) return null;
@@ -240,44 +316,44 @@ export default function ComplaintsScreen() {
       </View>
 
       <View className="px-4 pt-4 pb-2">
-<TouchableOpacity
-  onPress={() => router.push('/complaints/UserComplaints')}
-  className="rounded-xl"
-  style={{
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: THEME.primary,
-    shadowColor: THEME.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  }}
->
-  <View
-    style={{
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexWrap: 'wrap',
-    }}
-  >
-    <FileText size={20} color="white" style={{ marginRight: 8 }} />
-    <Text
-      style={{
-        color: 'white',
-        fontWeight: '600',
-        fontSize: 16,
-        textAlign: 'center',
-      }}
-      numberOfLines={2}
-      adjustsFontSizeToFit
-      minimumFontScale={0.85}
-    >
-      {t('complaintsScreen.buttons.viewMyComplaints')}
-    </Text>
-  </View>
-</TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => router.push('/complaints/UserComplaints')}
+          className="rounded-xl"
+          style={{
+            paddingVertical: 16,
+            paddingHorizontal: 16,
+            backgroundColor: THEME.primary,
+            shadowColor: THEME.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 8,
+            elevation: 4,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
+            <FileText size={20} color="white" style={{ marginRight: 8 }} />
+            <Text
+              style={{
+                color: 'white',
+                fontWeight: '600',
+                fontSize: 16,
+                textAlign: 'center',
+              }}
+              numberOfLines={2}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {t('complaintsScreen.buttons.viewMyComplaints')}
+            </Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
       <View className="px-4 pt-3 pb-2">
@@ -294,32 +370,32 @@ export default function ComplaintsScreen() {
           }}
         >
           <Search size={22} color={isSearchFocused ? THEME.primary : '#6B7280'} style={{ marginRight: 10 }} />
-        <TextInput
-  ref={searchInputRef}
-  value={searchQuery}
-  onChangeText={setSearchQuery}
-  onFocus={() => setIsSearchFocused(true)}
-  onBlur={() => setIsSearchFocused(false)}
-  placeholder={t('complaintsScreen.search.placeholder', { defaultValue: 'Search barangays' })}
-  placeholderTextColor="#9CA3AF"
-  returnKeyType="search"
-  clearButtonMode="never"
-  autoCorrect={false}
-  autoCapitalize="words"
-  numberOfLines={1}
-  multiline={false}
-  ellipsizeMode="tail"
-  maxFontSizeMultiplier={1.2}
-  style={{
-    flex: 1,
-    height: 48,
-    paddingVertical: 0,
-    fontSize: 16,
-    color: '#111827',
-    textAlignVertical: 'center',
-    includeFontPadding: false,
-  }}
-/>
+          <TextInput
+            ref={searchInputRef}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setIsSearchFocused(false)}
+            placeholder={t('complaintsScreen.search.placeholder', { defaultValue: 'Search barangays' })}
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="search"
+            clearButtonMode="never"
+            autoCorrect={false}
+            autoCapitalize="words"
+            numberOfLines={1}
+            multiline={false}
+            ellipsizeMode="tail"
+            maxFontSizeMultiplier={1.2}
+            style={{
+              flex: 1,
+              height: 48,
+              paddingVertical: 0,
+              fontSize: 16,
+              color: '#111827',
+              textAlignVertical: 'center',
+              includeFontPadding: false,
+            }}
+          />
           {isSearchFocused && (
             <TouchableOpacity
               onPress={handleClearSearch}
@@ -357,6 +433,7 @@ export default function ComplaintsScreen() {
           <FlatList
             ref={flatListRef}
             data={filteredData}
+            extraData={detectedBarangayId}
             renderItem={renderBarangayItem}
             keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={{ paddingBottom: 100, paddingTop: 8 }}
@@ -428,47 +505,47 @@ export default function ComplaintsScreen() {
             alignItems: 'center',
           }}
         >
-        <TouchableOpacity
-  onPress={scrollToTop}
-  activeOpacity={0.82}
-  style={{
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: THEME.primary,
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 99,
-    shadowColor: THEME.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 14,
-    elevation: 10,
-  }}
->
-  <Animated.View
-    style={{
-      transform: [{ translateY: bounceAnim }],
-    }}
-  >
-    <ChevronUp
-      size={18}
-      color="#FFFFFF"
-      strokeWidth={3}
-    />
-  </Animated.View>
+          <TouchableOpacity
+            onPress={scrollToTop}
+            activeOpacity={0.82}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              backgroundColor: THEME.primary,
+              paddingHorizontal: 22,
+              paddingVertical: 12,
+              borderRadius: 99,
+              shadowColor: THEME.primary,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.4,
+              shadowRadius: 14,
+              elevation: 10,
+            }}
+          >
+            <Animated.View
+              style={{
+                transform: [{ translateY: bounceAnim }],
+              }}
+            >
+              <ChevronUp
+                size={18}
+                color="#FFFFFF"
+                strokeWidth={3}
+              />
+            </Animated.View>
 
-  <Text
-    style={{
-      color: '#FFFFFF',
-      fontSize: 14,
-      fontWeight: '600',
-      letterSpacing: 0.3,
-    }}
-  >
-    Back to top
-  </Text>
-</TouchableOpacity>
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '600',
+                letterSpacing: 0.3,
+              }}
+            >
+              Back to top
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
 

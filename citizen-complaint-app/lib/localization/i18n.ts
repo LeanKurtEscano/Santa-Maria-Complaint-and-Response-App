@@ -636,6 +636,10 @@ const resources = {
           "title": "File a Complaint",
           "subtitle": "Select a barangay to submit your complaint"
         },
+        "location": {
+          "currentBarangay": "Your current barangay",
+          "canSubmit": "You can submit complaints in this barangay"
+        },
         "buttons": {
           "viewMyComplaints": "View My Complaints"
         },
@@ -1076,7 +1080,19 @@ const resources = {
         "legendUser": "Your location",
         "legendDest": "Evacuation center",
         "legendRoute": "Route",
-        "loadingMap": "Loading map…"
+        "loadingMap": "Loading map…",
+        "live": {
+  "off": "Live Location",
+  "on": "Live Location On",
+  "loading": "Locating…",
+  "deniedTitle": "Location permission needed",
+  "deniedBody": "Location permission is required to use Live Location. Allow it to see your position on the map.",
+  "deniedBodySettings": "Location permission is blocked. Open your device Settings and allow location access to use Live Location.",
+  "unavailableTitle": "Location unavailable",
+  "unavailableBody": "We couldn't get your location. Make sure GPS is on and try again.",
+  "tryAgain": "Try Again",
+  "openSettings": "Open Settings"
+},
       }
     }
   }, 
@@ -1825,6 +1841,10 @@ const resources = {
           "title": "Mag-file ng Reklamo",
           "subtitle": "Pumili ng barangay para isumite ang iyong reklamo"
         },
+       "location": {
+  "currentBarangay": 'Ang iyong kasalukuyang barangay',
+  "canSubmit": 'Maaari kang magsumite ng reklamo sa barangay na ito',
+},
         "search": {
           "placeholder": "Maghanap ng barangay..."
         },
@@ -2252,7 +2272,19 @@ const resources = {
         "legendUser": "Iyong lokasyon",
         "legendDest": "Evacuation center",
         "legendRoute": "Ruta",
-        "loadingMap": "Nilo-load ang mapa…"
+        "loadingMap": "Nilo-load ang mapa…",
+        "live": {
+  "off": "Live na Lokasyon",
+  "on": "Naka-on ang Live na Lokasyon",
+  "loading": "Hinahanap ang lokasyon…",
+  "deniedTitle": "Kailangan ang pahintulot sa lokasyon",
+  "deniedBody": "Kailangan ang pahintulot sa lokasyon para magamit ang Live na Lokasyon. Payagan ito para makita ang iyong posisyon sa mapa.",
+  "deniedBodySettings": "Naka-block ang pahintulot sa lokasyon. Buksan ang Settings ng iyong device at payagan ang access sa lokasyon para magamit ang Live na Lokasyon.",
+  "unavailableTitle": "Hindi available ang lokasyon",
+  "unavailableBody": "Hindi makuha ang iyong lokasyon. Tiyaking naka-on ang GPS at subukan muli.",
+  "tryAgain": "Subukan Muli",
+  "openSettings": "Buksan ang Settings"
+},
       }
     }
   }, 

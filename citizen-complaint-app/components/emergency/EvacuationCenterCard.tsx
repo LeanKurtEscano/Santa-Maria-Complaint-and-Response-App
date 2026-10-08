@@ -156,6 +156,7 @@ interface EvacuationCenterCardProps {
   areaLabel?: string;
   userLatitude?: number | null;
   userLongitude?: number | null;
+  isAuthenticated?: boolean;
 }
 
 export const EvacuationCenterCard: React.FC<EvacuationCenterCardProps> = ({
@@ -163,6 +164,7 @@ export const EvacuationCenterCard: React.FC<EvacuationCenterCardProps> = ({
   areaLabel,
   userLatitude,
   userLongitude,
+  isAuthenticated = false,
 }) => {
   const { t } = useTranslation();
   const [routeOpen, setRouteOpen] = useState(false);
@@ -374,6 +376,7 @@ export const EvacuationCenterCard: React.FC<EvacuationCenterCardProps> = ({
         centers={centers}
         userLat={userLatitude}
         userLng={userLongitude}
+        isAuthenticated={isAuthenticated}
       />
     </>
   );

@@ -5,20 +5,18 @@ import { CategoryIcon } from "@/components/complaint/CategoryIcon";
 import { StatusBadge } from "@/components/complaint/StatusBadge";
 import {
   ALL_STATUSES,
-  CATEGORY_LABELS,
   formatDate,
   formatTime,
   getCategoryLabel,
   getStatusConfig,
 } from "@/constants/complaint/complaint";
-import { THEME } from '@/constants/theme';
+import { THEME } from "@/constants/theme";
 import { Complaint } from "@/types/complaints/complaint";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import {
   AlertCircle,
   ArrowLeft,
-  ArrowRight,
   ArrowUpDown,
   Building2,
   CheckCircle2,
@@ -61,8 +59,7 @@ interface PaginatedComplaints {
 // ─── Complaint Card ───────────────────────────────────────────────────────────
 
 function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: () => void }) {
-
- const { t } = useTranslation();
+  const { t } = useTranslation();
   const catKey = complaint.category?.category_name ?? "";
 
   const isOther = catKey === "other";
@@ -79,7 +76,6 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
   const translatedTitle = isOther
     ? complaint.title
     : t(`complaints.titles.${titleKey}`, { defaultValue: complaint.title });
-
 
   return (
     <TouchableOpacity
@@ -112,7 +108,7 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
           </View>
 
           <Text className="text-sm font-bold text-gray-900 mb-1" numberOfLines={1}>
-             {translatedTitle}
+            {translatedTitle}
           </Text>
 
           {complaint.description && (
@@ -174,10 +170,11 @@ function PaginationBar({
   onNext: () => void;
   onPageSelect: (page: number) => void;
 }) {
-  if (totalPages <= 1) return null;
-   
-
+  // Hooks must run before any early return
   const { t } = useTranslation();
+
+  if (totalPages <= 1) return null;
+
   const startItem = (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems);
 
@@ -222,7 +219,7 @@ function PaginationBar({
           fontWeight: "500",
         }}
       >
-          {t("complaints.pagination.showing", { start: startItem, end: endItem, total: totalItems })}
+        {t("complaints.pagination.showing", { start: startItem, end: endItem, total: totalItems })}
       </Text>
 
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
@@ -340,7 +337,7 @@ function LoadingState() {
   );
 }
 
-// ─── Filter Modal (single-select) ──────────────────────────────────────────────
+// ─── Filter Modal (single-select) ─────────────────────────────────────────────
 
 function FilterModal({
   visible,
@@ -437,7 +434,7 @@ function FilterModal({
 export default function UserComplaints() {
   const router = useRouter();
   const { t } = useTranslation();
-  const {userData, isAuthenticated} = useCurrentUser();
+  const { isAuthenticated } = useCurrentUser();
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -453,8 +450,11 @@ export default function UserComplaints() {
   }, [search]);
 
   // Reset to page 1 whenever search, status, or order changes
-  useEffect(() => { setCurrentPage(1); }, [debouncedSearch, selectedStatus, order]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, selectedStatus, order]);
 
+  // Filtered + paginated list
   const { data, isPending, error, refetch, isPlaceholderData } = useQuery<PaginatedComplaints>({
     queryKey: ["my-complaints", currentPage, debouncedSearch, selectedStatus, order],
     queryFn: async () => {
@@ -469,17 +469,32 @@ export default function UserComplaints() {
       });
       return response.data;
     },
-    enabled: isAuthenticated, // Only fetch if authenticated
+    enabled: isAuthenticated,
     placeholderData: keepPreviousData,
   });
 
+  // Unfiltered overall total (size 1 keeps it cheap)
+  const { data: overallData, refetch: refetchOverall } = useQuery<PaginatedComplaints>({
+    queryKey: ["my-complaints-total"],
+    queryFn: async () => {
+      const response = await complaintApiClient.get("/my-complaints", {
+        params: { page: 1, size: 1 },
+      });
+      return response.data;
+    },
+    enabled: isAuthenticated,
+  });
+
   const complaints = data?.data ?? [];
-  const totalItems = data?.total ?? 0;
+  const totalItems = data?.total ?? complaints.length; // filtered count
   const totalPages = data?.pages ?? Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+
+  // Never let the overall total be smaller than the filtered count
+  const overallTotal = Math.max(overallData?.total ?? 0, totalItems);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([refetch(), refetchOverall()]);
     setRefreshing(false);
   };
 
@@ -501,7 +516,7 @@ export default function UserComplaints() {
   const goToNext = () => setCurrentPage((p) => Math.min(totalPages, p + 1));
   const goToPage = (page: number) => setCurrentPage(page);
 
-  if(!isAuthenticated) {
+  if (!isAuthenticated) {
     return <AuthGuard />;
   }
 
@@ -601,8 +616,9 @@ export default function UserComplaints() {
             </Text>
           </TouchableOpacity>
 
+          {/* Dynamic: filtered count of overall total */}
           <Text className="text-xs text-gray-400">
-            {t("complaints.count_plural", { filtered: totalItems, total: totalItems })}
+            {t("complaints.count_plural", { filtered: totalItems, total: overallTotal })}
           </Text>
         </View>
 

@@ -33,7 +33,10 @@ import {
   validateIdNumberByType,
   getIdNumberPlaceholder,
   getIdNumberHint,
-  formatNationalId,
+  formatIdNumber,
+  sanitizeIdInput,
+  getIdInputMaxLength,
+  isNumericIdType,
 } from '@/utils/validation/id';
 import ErrorMessage from '@/components/register/ErrorMessage';
 import Recaptcha from '@/components/register/Recaptcha';
@@ -479,34 +482,32 @@ export default function GoogleAccountVerification() {
             }}
             render={({ field: { onChange, onBlur, value } }) => (
               <>
-                <View
-                  className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
-                    errors.idNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'
-                  }`}
-                >
-                  <FileText size={20} color="#6B7280" />
-                  <TextInput
-                    className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
-                    onBlur={() => {
-                      onBlur();
-                      const err = validateIdNumberByType(value, selectedIdType, t);
-                      if (err) setError('idNumber', { type: 'manual', message: err });
-                      else clearErrors('idNumber');
-                    }}
-                    onChangeText={(text) => {
-                      const sanitized = selectedIdType === 'nationalId'
-                        ? text.replace(/\D/g, '').slice(0, 16)
-                        : text.replace(/[^a-zA-Z0-9\- ]/g, '').toUpperCase();
-                      onChange(sanitized);
-                      clearErrors('idNumber');
-                    }}
-                    maxLength={selectedIdType === 'nationalId' ? 19 : 30}
-                    value={selectedIdType === 'nationalId' ? formatNationalId(value) : value}
-                    placeholder={idPlaceholder}
-                    placeholderTextColor="#9CA3AF"
-                    autoCapitalize="characters"
-                  />
-                </View>
+               <View
+                              className={`flex-row items-center border-2 rounded-xl px-4 py-1 bg-white ${
+                                errors.idNumber ? 'border-error-500 bg-error-50' : 'border-neutral-200'
+                              }`}
+                            >
+                              <FileText size={20} color="#6B7280" />
+                           <TextInput
+                className="flex-1 ml-3 text-base text-neutral-900 py-2.5"
+                onBlur={() => {
+                  onBlur();
+                  const err = validateIdNumberByType(value, selectedIdType, t);
+                  if (err) setError('idNumber', { type: 'manual', message: err });
+                  else clearErrors('idNumber');
+                }}
+                onChangeText={(text) => {
+                  onChange(sanitizeIdInput(text, selectedIdType));
+                  clearErrors('idNumber');
+                }}
+                maxLength={getIdInputMaxLength(selectedIdType)}
+                value={formatIdNumber(value, selectedIdType)}
+                keyboardType={isNumericIdType(selectedIdType) ? 'number-pad' : 'default'}
+                placeholder={idPlaceholder}
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="characters"
+              />
+                            </View>
                 {idHint ? <Text className="text-xs text-neutral-500 mt-1">{idHint}</Text> : null}
               </>
             )}

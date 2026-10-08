@@ -1,32 +1,30 @@
 /**
  * EvacuationRouteModal
  *
- * CHANGED: now takes a whole GROUP of evacuation centers instead of one,
- * AND lets the user switch which center the route is drawn to (e.g. if the
- * nearest one is full).
+ * Takes a whole GROUP of evacuation centers and lets the user switch which
+ * center the route is drawn to (e.g. if the nearest one is full).
  *
  * Fullscreen modal that renders a Leaflet map (via WebView) showing:
- *  - User's current location as a blue pulsing marker
+ *  - User's saved location as a blue pulsing marker
  *  - EVERY evacuation center in the group as a numbered red marker
  *    (greyed out + "Full" ring if isFull is true)
  *  - The currently SELECTED center highlighted with a gold ring + star popup
- *    (defaults to the best/fastest non-full center)
- *  - The driving route to the currently selected center, fetched from OSRM,
- *    drawn as a bold red polyline
- *  - A horizontal picker strip (native RN, below the map) listing every
- *    center ranked by ETA, so the user can tap a different one if the
- *    default choice is full or otherwise unavailable
+ *  - The driving route to the selected center, fetched from OSRM
+ *  - LIVE LOCATION: a button that requests device location permission,
+ *    centers the map on the user's GPS position, and keeps the marker
+ *    updated while active. Manual pan/zoom stops auto-follow so the user
+ *    can still explore the map.
  *
- * Algorithm:
- *  - OSRM Table Service: one request, user -> every center, to rank them
- *    by driving duration ("shortest/best path" target)
- *  - OSRM Route Service (Contraction Hierarchies): actual road-snapped
- *    route geometry to whichever center is currently selected
- *  - Free, no API key required
+ * Live location error handling:
+ *  - Permission denied (can ask again / blocked -> Open Settings)
+ *  - Device location services (GPS) turned off
+ *  - First-fix timeout with last-known-position fallback
+ *  - Any failure tears down watcher + map marker in one place
+ *  - Mid-session signal loss detection
+ *  - Banner auto-clears when returning from Settings
  *
- * If no user location is available, all centers are still pinned and fit
- * to the viewport, with a notice instead of a route, and the picker strip
- * is hidden (there's nothing to rank without a user location).
+ * If no saved user location is available, all centers are still pinned and
+ * fit to the viewport, with a notice instead of a route.
  */
 
 import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
@@ -38,10 +36,13 @@ import {
   ActivityIndicator,
   StatusBar,
   StyleSheet,
+  Linking,
+  AppState,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import * as Location from 'expo-location';
 import { useTranslation } from 'react-i18next';
-import { X, Building2, WifiOff, RefreshCw } from 'lucide-react-native';
+import { X, Building2, WifiOff, RefreshCw, LocateFixed } from 'lucide-react-native';
 import { isValidCoordinate } from '@/hooks/general/useReverseGeocode';
 import { EvacuationCenter } from '@/constants/emergency/evacuation';
 import { THEME } from '@/constants/theme';
@@ -56,38 +57,75 @@ interface EvacuationRouteModalProps {
   areaLabel?: string;
   userLat?: number | null;
   userLng?: number | null;
+  isAuthenticated?: boolean;
 }
 
-type MapCenter = { id: number; name: string; lat: number; lng: number; isFull?: boolean };
+type MapCenter = { id: string | number; name: string; lat: number; lng: number; isFull?: boolean };
 
 /** One row of the ranked-by-ETA list, posted back from the WebView. */
 type RankedCenter = {
-  id: number;
+  id: string | number;
   name: string;
   durationSec: number | null;
   distanceM: number | null;
   isFull?: boolean;
 };
 
+type LiveState = 'off' | 'loading' | 'on';
+type LiveError =
+  | null
+  | { kind: 'denied'; canAskAgain: boolean }
+  | { kind: 'servicesOff' }
+  | { kind: 'unavailable' };
+
+const FIX_TIMEOUT_MS = 15_000;
+const SIGNAL_LOST_MS = 30_000;
+const PLAZA_LOCATION = { lat: 14.47001, lng: 121.42324 };
+
+/** Rejects if the promise doesn't settle within `ms`. */
+const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error('timeout')), ms);
+    p.then(
+      (v) => {
+        clearTimeout(id);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(id);
+        reject(e);
+      },
+    );
+  });
+
+/** JSON that is safe to embed inside an inline <script>. */
+const safeJson = (v: unknown) =>
+  JSON.stringify(v)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+
 // ── Build the self-contained HTML page ───────────────────────────────────────
 function buildMapHtml(
   centers: MapCenter[],
-  userLat: number | null,
-  userLng: number | null,
+  startLat: number | null,
+  startLng: number | null,
 ): string {
   const hasUser =
-    userLat !== null &&
-    userLng !== null &&
-    isValidCoordinate(userLat!, userLng!);
+    startLat !== null &&
+    startLng !== null &&
+    isValidCoordinate(startLat, startLng);
 
   const firstCenter = centers[0];
-  const viewLat = hasUser ? userLat! : firstCenter.lat;
-  const viewLng = hasUser ? userLng! : firstCenter.lng;
+  const viewLat = hasUser ? startLat! : firstCenter.lat;
+  const viewLng = hasUser ? startLng! : firstCenter.lng;
 
-  const centersJson = JSON.stringify(
+  const centersJson = safeJson(
     centers.map((c) => ({
       id: c.id,
-      name: c.name.replace(/'/g, "\\'"),
+      name: c.name, // JSON handles quote escaping; no manual replace
       lat: c.lat,
       lng: c.lng,
       isFull: !!c.isFull,
@@ -107,11 +145,75 @@ function buildMapHtml(
       iconSize: [18, 18],
       iconAnchor: [9, 9],
     });
-    L.marker([${userLat}, ${userLng}], { icon: userIcon })
+    window.userMarker = L.marker([${startLat}, ${startLng}], { icon: userIcon })
       .addTo(map)
       .bindPopup('<b>Your Location</b>');
   `
     : '';
+
+  // Live location code. Lives outside routingJs so it works even when there
+  // is no saved profile location.
+  const liveLocationJs = `
+    let liveMarker = null, liveCircle = null;
+    let following = false, programmatic = false;
+
+    const liveIcon = L.divIcon({
+      className: '',
+      html: \`<div style="
+        width:20px;height:20px;border-radius:50%;
+        background:#2563EB;border:3px solid #fff;
+        box-shadow:0 0 0 4px rgba(37,99,235,0.3);
+        animation: pulse 1.8s ease-in-out infinite;
+      "></div>\`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10],
+    });
+
+    function programmaticMove(fn) {
+      programmatic = true;
+      fn();
+      setTimeout(function () { programmatic = false; }, 800);
+    }
+
+    // Any manual pan/zoom stops auto-follow so the user can explore freely.
+    map.on('dragstart', function () { following = false; });
+    map.on('zoomstart', function () { if (!programmatic) following = false; });
+
+    window.setLiveLocation = function (lat, lng, acc, recenter) {
+      const ll = [lat, lng];
+      if (!liveMarker) {
+        liveMarker = L.marker(ll, { icon: liveIcon, zIndexOffset: 1000 })
+          .addTo(map)
+          .bindPopup('<b>Your Location</b>');
+        if (window.userMarker) map.removeLayer(window.userMarker); // avoid two "you" dots
+      } else {
+        liveMarker.setLatLng(ll);
+      }
+      if (acc != null) {
+        if (!liveCircle) {
+          liveCircle = L.circle(ll, {
+            radius: acc, color: '#2563EB', weight: 1, fillColor: '#2563EB', fillOpacity: 0.1,
+          }).addTo(map);
+        } else {
+          liveCircle.setLatLng(ll);
+          liveCircle.setRadius(acc);
+        }
+      }
+      if (recenter) {
+        following = true;
+        programmaticMove(function () { map.setView(ll, Math.max(map.getZoom(), 16)); });
+      } else if (following) {
+        programmaticMove(function () { map.panTo(ll); });
+      }
+    };
+
+    window.clearLiveLocation = function () {
+      if (liveMarker) { map.removeLayer(liveMarker); liveMarker = null; }
+      if (liveCircle) { map.removeLayer(liveCircle); liveCircle = null; }
+      following = false;
+      if (window.userMarker) window.userMarker.addTo(map);
+    };
+  `;
 
   const routingJs = hasUser
     ? `
@@ -156,6 +258,23 @@ function buildMapHtml(
       if (el) el.style.display = 'flex';
     }
 
+    window.routeStart = { lat: ${startLat}, lng: ${startLng} };
+    window.routeInFlight = false;
+    window.routeStartPending = false;
+
+    function setRouteStart(lat, lng) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      window.routeStart = { lat: lat, lng: lng };
+      if (selectedId !== null) {
+        if (window.routeInFlight) {
+          window.routeStartPending = true;
+        } else {
+          window.selectCenter(selectedId);
+        }
+      }
+    }
+    window.setRouteStart = setRouteStart;
+
     // Draws/redraws the route to a given center id. Exposed on window so
     // RN can call it via injectJavaScript when the user taps a different
     // center in the picker strip.
@@ -172,7 +291,7 @@ function buildMapHtml(
         destMarkers[c.id].setIcon(c.id === id ? selectedIcon() : normalIcon(i, c.isFull));
       });
       destMarkers[id].bindPopup(
-        '<b>' + center.name + '</b>' + (center.isFull ? '<br>⚠️ Reported full' : '<br>⭐ Selected route')
+        '<b>' + esc(center.name) + '</b>' + (center.isFull ? '<br>⚠️ Reported full' : '<br>⭐ Selected route')
       ).openPopup();
 
       // Let RN know the selection changed (so the picker strip below the
@@ -189,13 +308,14 @@ function buildMapHtml(
       statusEl.style.display = 'flex';
 
       const routeUrl =
-        'https://router.project-osrm.org/route/v1/driving/' +
-        '${userLng},${userLat};' + center.lng + ',' + center.lat +
-        '?overview=full&geometries=geojson';
+          'https://router.project-osrm.org/route/v1/driving/' +
+          window.routeStart.lng + ',' + window.routeStart.lat + ';' + center.lng + ',' + center.lat +
+          '?overview=full&geometries=geojson';
 
-      return fetch(routeUrl).then(r => r.json()).then(routeData => {
-        statusEl.style.display = 'none';
-        if (!routeData.routes || routeData.routes.length === 0) { showNoRoute(); return; }
+        if (window.routeInFlight) return;
+        window.routeInFlight = true;
+        return fetch(routeUrl).then(r => r.json()).then(routeData => {
+          if (!routeData.routes || routeData.routes.length === 0) { showNoRoute(); return; }
 
         const route = routeData.routes[0];
         const coords = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
@@ -215,14 +335,20 @@ function buildMapHtml(
         chip.textContent = (center.isFull ? '⚠️ ' : '★ ') + center.name + ' · ' + km + ' km · ~' + mins + ' min';
         chip.style.display = 'block';
       }).catch(() => {
-        statusEl.style.display = 'none';
         showNoRoute();
+      }).finally(() => {
+        window.routeInFlight = false;
+        statusEl.style.display = 'none';
+        if (window.routeStartPending) {
+          window.routeStartPending = false;
+          window.selectCenter(selectedId);
+        }
       });
     };
 
     const tableUrl =
       'https://router.project-osrm.org/table/v1/driving/' +
-      '${userLng},${userLat};' + centers.map(c => c.lng + ',' + c.lat).join(';') +
+      '${startLng},${startLat};' + centers.map(c => c.lng + ',' + c.lat).join(';') +
       '?sources=0&annotations=distance,duration';
 
     fetch(tableUrl)
@@ -373,6 +499,15 @@ function buildMapHtml(
     }).addTo(map);
 
     const centers = ${centersJson};
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
     const destMarkers = {};
     const bounds = [];
 
@@ -391,7 +526,7 @@ function buildMapHtml(
       });
       const marker = L.marker([c.lat, c.lng], { icon })
         .addTo(map)
-        .bindPopup('<b>' + c.name + '</b>' + (c.isFull ? '<br>⚠️ Reported full' : ''));
+        .bindPopup('<b>' + esc(c.name) + '</b>' + (c.isFull ? '<br>⚠️ Reported full' : ''));
 
       // Tapping the circle itself reroutes to that center (same effect as
       // tapping its chip in the native picker strip below the map).
@@ -404,7 +539,9 @@ function buildMapHtml(
 
     ${userMarkerJs}
 
-    if (${hasUser}) { bounds.push([${userLat}, ${userLng}]); }
+    ${liveLocationJs}
+
+    if (${hasUser}) { bounds.push([${startLat}, ${startLng}]); }
     if (bounds.length > 1) {
       map.fitBounds(bounds, { padding: [56, 56] });
     }
@@ -429,6 +566,7 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
   areaLabel,
   userLat,
   userLng,
+  isAuthenticated = false,
 }) => {
   const { t } = useTranslation();
 
@@ -439,6 +577,15 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
   const [mapLoading, setMapLoading] = useState(true);
   const [ranked, setRanked] = useState<RankedCenter[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  // ── Live Location state ────────────────────────────────────────────────────
+  const [liveState, setLiveState] = useState<LiveState>('off');
+  const [liveError, setLiveError] = useState<LiveError>(null);
+  const [signalLost, setSignalLost] = useState(false);
+  const watchRef = useRef<Location.LocationSubscription | null>(null);
+  const sessionRef = useRef(0); // invalidates stale async results after stop/close
+  const lastFixRef = useRef<{ lat: number; lng: number; acc: number | null } | null>(null);
+  const lastFixAtRef = useRef(0);
 
   const validCenters: MapCenter[] = useMemo(
     () =>
@@ -457,14 +604,24 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
   );
 
   const centersKey = validCenters.map((c) => `${c.id}:${c.lat},${c.lng}:${c.isFull ? 1 : 0}`).join('|');
+  const hasAuthenticatedCoordinates =
+    userLat != null &&
+    userLng != null &&
+    isValidCoordinate(userLat, userLng);
+  const routeStart = isAuthenticated
+    ? {
+        lat: hasAuthenticatedCoordinates ? userLat : null,
+        lng: hasAuthenticatedCoordinates ? userLng : null,
+      }
+    : PLAZA_LOCATION;
 
   const html = useMemo(
     () =>
       validCenters.length > 0
-        ? buildMapHtml(validCenters, userLat ?? null, userLng ?? null)
+        ? buildMapHtml(validCenters, routeStart.lat, routeStart.lng)
         : '',
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [centersKey, userLat, userLng, webViewKey],
+    [centersKey, routeStart.lat, routeStart.lng, webViewKey],
   );
 
   // Reset state whenever the modal opens or is retried
@@ -495,30 +652,192 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
     }
   }, [mapLoading, mapError]);
 
-  const handleWebViewMessage = useCallback((event: any) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'mapLoaded') {
-        setMapLoading(false);
-        setMapError(false);
-      }
-      if (data.type === 'ranked' && Array.isArray(data.ranked)) {
-        setRanked(data.ranked);
-        // The WebView picks its own default (best non-full center) and
-        // calls selectCenter internally — mirror that choice here so the
-        // native picker strip highlights the right chip. Fall back to the
-        // first ranked entry if something's off.
-        const firstNonFull = data.ranked.find((r: RankedCenter) => !r.isFull);
-        setSelectedId((firstNonFull ?? data.ranked[0])?.id ?? null);
-      }
-      if (data.type === 'selected' && typeof data.id === 'number') {
-        // Fired whenever the WebView's selection changes — including a tap
-        // on a marker circle on the map itself — so the native picker
-        // strip's highlighted chip stays in sync.
-        setSelectedId(data.id);
-      }
-    } catch (_) {}
+  // ── Live Location logic ────────────────────────────────────────────────────
+  const pushFix = useCallback(
+    (lat: number, lng: number, acc: number | null, recenter: boolean) => {
+      lastFixRef.current = { lat, lng, acc };
+      lastFixAtRef.current = Date.now();
+      setSignalLost(false);
+      webViewRef.current?.injectJavaScript(
+        `window.setLiveLocation && window.setLiveLocation(${lat}, ${lng}, ${acc ?? 'null'}, ${recenter}); true;`,
+      );
+    },
+    [],
+  );
+
+  /** Single teardown path: used by stop, by every failure, and on close. */
+  const teardownLive = useCallback(() => {
+    sessionRef.current += 1; // invalidate any in-flight async work
+    watchRef.current?.remove();
+    watchRef.current = null;
+    lastFixRef.current = null;
+    lastFixAtRef.current = 0;
+    setSignalLost(false);
+    webViewRef.current?.injectJavaScript(
+      'window.clearLiveLocation && window.clearLiveLocation(); true;',
+    );
   }, []);
+
+  const stopLive = useCallback(() => {
+    teardownLive();
+    setLiveState('off');
+  }, [teardownLive]);
+
+  const startLive = useCallback(async () => {
+    const session = ++sessionRef.current;
+    const stale = () => session !== sessionRef.current;
+
+    setLiveError(null);
+    setSignalLost(false);
+    setLiveState('loading');
+
+    try {
+      // 1. Permission
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (stale()) return;
+      if (perm.status !== 'granted') {
+        setLiveState('off');
+        setLiveError({ kind: 'denied', canAskAgain: perm.canAskAgain });
+        return;
+      }
+
+      // 2. Device location services (GPS toggle)
+      const servicesOn = await Location.hasServicesEnabledAsync();
+      if (stale()) return;
+      if (!servicesOn) {
+        setLiveState('off');
+        setLiveError({ kind: 'servicesOff' });
+        return;
+      }
+
+      // 3. First fix, with timeout and last-known fallback
+      let pos: Location.LocationObject | null = null;
+      try {
+        pos = await withTimeout(
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          FIX_TIMEOUT_MS,
+        );
+      } catch {
+        pos = await Location.getLastKnownPositionAsync().catch(() => null);
+      }
+      if (stale()) return;
+      if (!pos) throw new Error('no fix');
+
+      const { latitude, longitude, accuracy } = pos.coords;
+      if (!isValidCoordinate(latitude, longitude)) throw new Error('invalid coordinate');
+
+      pushFix(latitude, longitude, accuracy ?? null, true);
+      webViewRef.current?.injectJavaScript(
+        `window.setRouteStart && window.setRouteStart(${latitude}, ${longitude}); true;`,
+      );
+      setLiveState('on');
+
+      // 4. Continuous updates
+      const sub = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.Balanced, timeInterval: 3000, distanceInterval: 5 },
+        (p) => {
+          if (stale()) return;
+          const { latitude: la, longitude: lo, accuracy: ac } = p.coords;
+          if (isValidCoordinate(la, lo)) pushFix(la, lo, ac ?? null, false);
+        },
+      );
+      if (stale()) {
+        sub.remove();
+        return;
+      }
+      watchRef.current = sub;
+    } catch {
+      if (stale()) return;
+      teardownLive(); // removes watcher AND the orphaned map marker
+      setLiveState('off');
+      setLiveError({ kind: 'unavailable' });
+    }
+  }, [pushFix, teardownLive]);
+
+  const handleLivePress = useCallback(() => {
+    if (liveState === 'off') startLive();
+    else if (liveState === 'on') stopLive();
+  }, [liveState, startLive, stopLive]);
+
+  // Mid-session signal-loss detector
+  useEffect(() => {
+    if (liveState !== 'on') return;
+    const id = setInterval(() => {
+      if (lastFixAtRef.current && Date.now() - lastFixAtRef.current > SIGNAL_LOST_MS) {
+        setSignalLost(true);
+      }
+    }, 5000);
+    return () => clearInterval(id);
+  }, [liveState]);
+
+  // Clear stale banners when the user returns from Settings
+  useEffect(() => {
+    if (!liveError || liveError.kind === 'unavailable') return;
+    const sub = AppState.addEventListener('change', async (s) => {
+      if (s !== 'active') return;
+      try {
+        if (liveError.kind === 'denied') {
+          const p = await Location.getForegroundPermissionsAsync();
+          if (p.granted) setLiveError(null);
+        } else if (liveError.kind === 'servicesOff') {
+          if (await Location.hasServicesEnabledAsync()) setLiveError(null);
+        }
+      } catch {
+        /* ignore — banner stays until dismissed */
+      }
+    });
+    return () => sub.remove();
+  }, [liveError]);
+
+  // Stop tracking when the modal closes; clean up on unmount.
+  useEffect(() => {
+    if (!visible) {
+      stopLive();
+      setLiveError(null);
+    }
+  }, [visible, stopLive]);
+
+  useEffect(
+    () => () => {
+      sessionRef.current += 1;
+      watchRef.current?.remove();
+    },
+    [],
+  );
+
+  const handleWebViewMessage = useCallback(
+    (event: any) => {
+      try {
+        const data = JSON.parse(event.nativeEvent.data);
+        if (data.type === 'mapLoaded') {
+          setMapLoading(false);
+          setMapError(false);
+          // Restore the live marker if the WebView was remounted (Retry)
+          const f = lastFixRef.current;
+          if (f) pushFix(f.lat, f.lng, f.acc, true);
+        }
+        if (data.type === 'ranked' && Array.isArray(data.ranked)) {
+          setRanked(data.ranked);
+          // The WebView picks its own default (best non-full center) and
+          // calls selectCenter internally — mirror that choice here so the
+          // native picker strip highlights the right chip. Fall back to the
+          // first ranked entry if something's off.
+          const firstNonFull = data.ranked.find((r: RankedCenter) => !r.isFull);
+          setSelectedId((firstNonFull ?? data.ranked[0])?.id ?? null);
+        }
+        if (
+          data.type === 'selected' &&
+          (typeof data.id === 'string' || typeof data.id === 'number')
+        ) {
+          // Fired whenever the WebView's selection changes — including a tap
+          // on a marker circle on the map itself — so the native picker
+          // strip's highlighted chip stays in sync.
+          setSelectedId(data.id);
+        }
+      } catch (_) {}
+    },
+    [pushFix],
+  );
 
   const handleWebViewError = useCallback(() => {
     if (loadTimeoutRef.current) {
@@ -541,6 +860,49 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
       count: centers?.length ?? 0,
       defaultValue: `${centers?.length ?? 0} Evacuation Centers`,
     });
+
+  const needsSettings = liveError?.kind === 'denied' && !liveError.canAskAgain;
+
+  const banner = (() => {
+    if (!liveError) return null;
+    if (liveError.kind === 'denied') {
+      return {
+        title: t('emergency.evacuation.routeModal.live.deniedTitle', {
+          defaultValue: 'Location permission needed',
+        }),
+        body: liveError.canAskAgain
+          ? t('emergency.evacuation.routeModal.live.deniedBody', {
+              defaultValue:
+                'Location permission is required to use Live Location. Allow it to see your position on the map.',
+            })
+          : t('emergency.evacuation.routeModal.live.deniedBodySettings', {
+              defaultValue:
+                'Location permission is blocked. Open your device Settings and allow location access to use Live Location.',
+            }),
+        action: needsSettings ? 'settings' : 'retry',
+      } as const;
+    }
+    if (liveError.kind === 'servicesOff') {
+      return {
+        title: t('emergency.evacuation.routeModal.live.servicesOffTitle', {
+          defaultValue: 'Location is turned off',
+        }),
+        body: t('emergency.evacuation.routeModal.live.servicesOffBody', {
+          defaultValue: 'Turn on GPS / Location in your device settings, then try again.',
+        }),
+        action: 'settings',
+      } as const;
+    }
+    return {
+      title: t('emergency.evacuation.routeModal.live.unavailableTitle', {
+        defaultValue: 'Location unavailable',
+      }),
+      body: t('emergency.evacuation.routeModal.live.unavailableBody', {
+        defaultValue: "We couldn't get your location. Make sure GPS is on and try again.",
+      }),
+      action: 'retry',
+    } as const;
+  })();
 
   return (
     <Modal
@@ -667,13 +1029,78 @@ export const EvacuationRouteModal: React.FC<EvacuationRouteModalProps> = ({
             </TouchableOpacity>
           </View>
         )}
+
+        {/* ── Live Location: permission/error banner + button ── */}
+        {!mapLoading && !mapError && (
+          <>
+            {banner && (
+              <View style={styles.liveBanner}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.liveBannerTitle}>{banner.title}</Text>
+                  <Text style={styles.liveBannerBody}>{banner.body}</Text>
+                  <TouchableOpacity
+                    style={styles.liveBannerAction}
+                    onPress={() =>
+                      banner.action === 'settings' ? Linking.openSettings() : startLive()
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.liveBannerActionText}>
+                      {banner.action === 'settings'
+                        ? t('emergency.evacuation.routeModal.live.openSettings', {
+                            defaultValue: 'Open Settings',
+                          })
+                        : t('emergency.evacuation.routeModal.live.tryAgain', {
+                            defaultValue: 'Try Again',
+                          })}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity onPress={() => setLiveError(null)} hitSlop={12}>
+                  <X size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.liveButton, liveState === 'on' && styles.liveButtonOn]}
+              onPress={handleLivePress}
+              disabled={liveState === 'loading'}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityState={{ busy: liveState === 'loading', selected: liveState === 'on' }}
+            >
+              {liveState === 'loading' ? (
+                <ActivityIndicator size="small" color={THEME.primary} />
+              ) : (
+                <LocateFixed size={18} color={liveState === 'on' ? '#fff' : THEME.primary} />
+              )}
+              <Text style={[styles.liveButtonText, liveState === 'on' && styles.liveButtonTextOn]}>
+                {liveState === 'loading'
+                  ? t('emergency.evacuation.routeModal.live.loading', {
+                      defaultValue: 'Locating…',
+                    })
+                  : liveState === 'on' && signalLost
+                  ? t('emergency.evacuation.routeModal.live.signalLost', {
+                      defaultValue: 'Searching for signal…',
+                    })
+                  : liveState === 'on'
+                  ? t('emergency.evacuation.routeModal.live.on', {
+                      defaultValue: 'Live Location On',
+                    })
+                  : t('emergency.evacuation.routeModal.live.off', {
+                      defaultValue: 'Live Location',
+                    })}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-
   mapArea: {
     flex: 1,
     position: 'relative',
@@ -731,6 +1158,80 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 15,
     fontWeight: '600',
+    color: '#fff',
+  },
+
+  // ── Live Location ──
+  liveButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: THEME.primary,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  liveButtonOn: {
+    backgroundColor: THEME.primary,
+  },
+  liveButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: THEME.primary,
+  },
+  liveButtonTextOn: {
+    color: '#fff',
+  },
+  liveBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 88,
+    flexDirection: 'row',
+    gap: 12,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  liveBannerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  liveBannerBody: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 17,
+  },
+  liveBannerAction: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    backgroundColor: THEME.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+  },
+  liveBannerActionText: {
+    fontSize: 13,
+    fontWeight: '700',
     color: '#fff',
   },
 });
