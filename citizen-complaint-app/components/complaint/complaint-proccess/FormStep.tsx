@@ -29,7 +29,7 @@ import { useState } from 'react';
 // Minimum enforces meaningful complaints (prevents "noise" or "pothole" alone).
 // Maximum keeps records manageable for barangay staff across high-volume usage.
 export const COMPLAINT_DETAILS_MIN_LENGTH = 40;
-export const COMPLAINT_DETAILS_MAX_LENGTH = 500;
+export const COMPLAINT_DETAILS_MAX_LENGTH = 1000;
 
 const DETAILS_WARN_THRESHOLD = Math.floor(COMPLAINT_DETAILS_MAX_LENGTH * 0.9);  // 270 — "you're close to the limit"
 const DETAILS_GOOD_THRESHOLD = COMPLAINT_DETAILS_MIN_LENGTH;                    // 40  — minimum satisfied
