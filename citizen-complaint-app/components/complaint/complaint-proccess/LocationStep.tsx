@@ -30,7 +30,7 @@ const DEBUG_MAP = false;
 
 // TESTING ONLY: set to true to let the confirm button work even when
 // the user is outside the barangay boundary. Set back to false before release.
-const BYPASS_BOUNDARY_CHECK = false;
+const BYPASS_BOUNDARY_CHECK = true;
 
 type GpsErrorType = 'permission_denied' | 'position_unavailable' | 'timeout' | 'unknown';
 
