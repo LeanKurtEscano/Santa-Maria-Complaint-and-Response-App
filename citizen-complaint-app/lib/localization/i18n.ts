@@ -545,6 +545,7 @@ const resources = {
           "garbage_collection": "Garbage Collection Problem",
           "vandalism": "Vandalism / Property Damage",
           "landslide": "Landslide / Erosion",
+          "debt_related_concerns": "Debt-Related Concerns",
           "other": "Other (specify below)"
         }
       },
@@ -567,6 +568,7 @@ const resources = {
   "illegal_vending": "Illegal Vending",
   "water_supply_issue": "Water Supply Issue",
   "garbage_collection": "Garbage Collection",
+  "debt_related_concerns": "Debt-Related Concerns",
   "vandalism": "Vandalism"
 },
 
@@ -709,10 +711,22 @@ const resources = {
         "instruction_4_title": "WARNING: False or Malicious Complaints Are Prohibited",
         "instruction_4_body": "The filing of false, fabricated, frivolous, or malicious complaints is strictly prohibited under applicable Barangay Ordinances and the Local Government Code of the Philippines. Any person found to have knowingly submitted a fraudulent or nonsensical complaint may be subject to administrative sanctions, fines, or legal action as prescribed by law.",
         "instructions_disclaimer": "All information submitted through this form is strictly confidential and shall be used solely for official barangay purposes in accordance with applicable laws and regulations.",
+        "category_label": "Complaint Category",
+"category_description": "Select the category that best fits your complaint.",
+"category_placeholder": "Select a category",
+"complaint_title_label": "Complaint Title",
+"complaint_title_placeholder": "Enter a short title for your complaint",
+"complaint_title_hint": "A short, clear summary, e.g. \"Broken streetlight on Mabini St.\"",
+"complaint_title_required": "Complaint title is required.",
+"complaint_title_too_short": "Title must be at least 3 characters long.",
+"complaint_title_too_long": "Title must not exceed 100 characters.",
+"complaint_title_whitespace": "Title cannot contain only spaces.",
+
         "error": {
           "title_required": "Complaint category is required.",
           "title_too_short": "Complaint title must be at least 3 characters long.",
-          "details_required": "Complaint details are required."
+          "details_required": "Complaint details are required.",
+          "category_required": "Please select a complaint category."
         },
 
         "agreement": "By proceeding, you confirm that you have read and understood the above guidelines.",
@@ -1773,6 +1787,7 @@ const resources = {
           "garbage_collection": "Problema sa Koleksyon ng Basura",
           "vandalism": "Vandalism / Pinsala sa Ari-arian",
           "landslide":"Pagguho ng Lupa",
+          "debt_related_concerns":"Suliranin sa Utang",
           "other": "Iba pa (tukuyin sa ibaba)"
         }
       },
@@ -1797,6 +1812,7 @@ const resources = {
   "illegal_vending": "Ilegal na Pagbebenta",
   "water_supply_issue": "Problema sa Suplay ng Tubig",
   "garbage_collection": "Koleksyon ng Basura",
+  "debt_related_concerns": "Suliranin sa Utang",
   "vandalism": "Vandalismo"
 },
 
@@ -2052,11 +2068,23 @@ const resources = {
         "instruction_3_body": "Maaari kayong maglakip ng mga larawan, video, o dokumento bilang karagdagang patunay. Ang mga kalakip ay malaki ang maitutulong sa mas mabilis na pagproseso at tamang pagsusuri ng inyong reklamo ng barangay.",
         "instruction_4_title": "BABALA: Ang Huwad o Malisyosong Reklamo ay Ipinagbabawal",
         "instruction_4_body": "Ang paghahain ng huwad, gawa-gawa, walang saysay, o malisyosong reklamo ay mahigpit na ipinagbabawal alinsunod sa mga naaangkop na Ordinansa ng Barangay at ang Kodigo ng Lokal na Pamahalaan ng Pilipinas. Ang sinumang mapatunayang nagsumite ng mapanlinlang o walang kabuluhang reklamo ay maaaring makaranas ng mga administratibong parusa, multa, o legal na aksyon ayon sa batas.",
+       "category_label": "Kategorya ng Reklamo",
+"category_description": "Piliin ang kategoryang pinakaangkop sa iyong reklamo.",
+"category_placeholder": "Pumili ng kategorya",
+"complaint_title_label": "Pamagat ng Reklamo",
+"complaint_title_placeholder": "Maglagay ng maikling pamagat para sa iyong reklamo",
+"complaint_title_hint": "Maikli at malinaw na buod, hal. \"Sirang poste ng ilaw sa Kalye Mabini\"",
+"complaint_title_required": "Kailangan ang pamagat ng reklamo.",
+"complaint_title_too_short": "Dapat hindi bababa sa 3 character ang pamagat.",
+"complaint_title_too_long": "Hindi dapat lumampas sa 100 character ang pamagat.",
+"complaint_title_whitespace": "Hindi maaaring puro espasyo lamang ang pamagat.",
+
         "instructions_disclaimer": "Ang lahat ng impormasyong isinumite sa pamamagitan ng form na ito ay mahigpit na kumpidensyal at gagamitin lamang para sa opisyal na layunin ng barangay alinsunod sa mga naaangkop na batas at regulasyon.",
         "error": {
           "title_required": "Kinakailangan ang kategorya ng reklamo.",
           "title_too_short": "Ang pamagat ng reklamo ay dapat may hindi bababa sa 3 na karakter.",
-          "details_required": "Kinakailangan ang detalye ng reklamo."
+          "details_required": "Kinakailangan ang detalye ng reklamo.",
+           "category_required": "Pakipili ang kategorya ng reklamo."
         },
         "agreement": "Sa pagpapatuloy, kinukumpirma mo na nabasa mo at naintindihan mo ang mga gabay na nasa itaas.",
         "proceed_to_form": "Naiintindihan ko — Magpatuloy sa Form"

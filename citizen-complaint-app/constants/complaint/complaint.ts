@@ -113,6 +113,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   water_supply_issue:   "Water Supply Issue",
   garbage_collection:   "Garbage Collection",
   vandalism:            "Vandalism",
+  debt_related_concerns: "Debt-Related Concerns",
   other:                "Other",
 };
 

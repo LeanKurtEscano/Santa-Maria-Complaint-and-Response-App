@@ -16,14 +16,14 @@ import {
   Info, ArrowRight, MapPin, CheckCircle,
 } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { PRESET_TITLE_KEYS, OTHER_KEY, PresetTitle } from '@/constants/localization/complaint-title-key';
+import { OTHER_KEY, PresetTitle } from '@/constants/localization/complaint-title-key';
 import { Attachment } from '@/hooks/general/useAttachment';
 import { StepDots } from './StepDots';
 import { THEME } from '@/constants/theme';
 import { useAttachmentViewer } from '@/hooks/general/useAttachmentViewer';
 import { AttachmentViewer } from '@/components/media/AttachmentViewer';
 import { ActivityIndicator } from 'react-native';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 // ─── Validation Constants ──────────────────────────────────────────────────────
 // Minimum enforces meaningful complaints (prevents "noise" or "pothole" alone).
@@ -31,7 +31,12 @@ import { useState } from 'react';
 export const COMPLAINT_DETAILS_MIN_LENGTH = 40;
 export const COMPLAINT_DETAILS_MAX_LENGTH = 1000;
 
-const DETAILS_WARN_THRESHOLD = Math.floor(COMPLAINT_DETAILS_MAX_LENGTH * 0.9);  // 270 — "you're close to the limit"
+// ─── Title Validation Constants ────────────────────────────────────────────────
+// Keep these in sync with the backend `title` column / validator.
+export const COMPLAINT_TITLE_MIN_LENGTH = 3;
+export const COMPLAINT_TITLE_MAX_LENGTH = 100;
+
+const DETAILS_WARN_THRESHOLD = Math.floor(COMPLAINT_DETAILS_MAX_LENGTH * 0.9);  // 900 — "you're close to the limit"
 const DETAILS_GOOD_THRESHOLD = COMPLAINT_DETAILS_MIN_LENGTH;                    // 40  — minimum satisfied
 
 type DetailsValidationState = 'idle' | 'too_short' | 'good' | 'warning' | 'error';
@@ -45,7 +50,7 @@ function getDetailsValidationState(length: number, dirty: boolean): DetailsValid
 }
 
 
-// ─── Custom Title Validation ───────────────────────────────────────────────────
+// ─── Custom Title Validation (spam checks) ─────────────────────────────────────
 // Returns an error string or null if the value is valid.
 // Pass `t` from useTranslation into the validator
 export function validateCustomTitle(value: string, t: (key: string) => string): string | null {
@@ -65,6 +70,20 @@ export function validateCustomTitle(value: string, t: (key: string) => string): 
     }
   }
   return null;
+}
+
+// ─── Complaint Title Validation ────────────────────────────────────────────────
+// Single source of truth: used inline in FormStep AND by the parent on "Next".
+export function validateComplaintTitle(value: string, t: (key: string) => string): string | null {
+  const trimmed = value.trim();
+  if (trimmed === '') {
+    return value.length > 0
+      ? t('complaint_form.complaint_title_whitespace')
+      : t('complaint_form.complaint_title_required');
+  }
+  if (trimmed.length < COMPLAINT_TITLE_MIN_LENGTH) return t('complaint_form.complaint_title_too_short');
+  if (trimmed.length > COMPLAINT_TITLE_MAX_LENGTH) return t('complaint_form.complaint_title_too_long');
+  return validateCustomTitle(trimmed, t); // repeated chars / repeated words
 }
 
 export function validateComplaintDetails(value: string, t: (key: string) => string): string | null {
@@ -204,13 +223,14 @@ interface FormStepProps {
   isCategoriesLoading?: boolean;
   hasProfileLocation: boolean;
   selectedPreset: PresetTitle | null;
-  customTitle: string;
+  categoryError: string;
+  title: string;
   titleError: string;
   showTitlePicker: boolean;
   onOpenTitlePicker: () => void;
   onCloseTitlePicker: () => void;
   onSelectPreset: (preset: PresetTitle) => void;
-  onChangeCustomTitle: (text: string) => void;
+  onChangeTitle: (text: string) => void;
   message: string;
   messageError: string;
   onChangeMessage: (text: string) => void;
@@ -237,13 +257,14 @@ export function FormStep({
   barangayName,
   hasProfileLocation,
   selectedPreset,
-  customTitle,
+  categoryError,
+  title,
   titleError,
   showTitlePicker,
   onOpenTitlePicker,
   onCloseTitlePicker,
   onSelectPreset,
-  onChangeCustomTitle,
+  onChangeTitle,
   message,
   messageError,
   onChangeMessage,
@@ -265,14 +286,14 @@ export function FormStep({
 }: FormStepProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  const [customTitleLocalError, setCustomTitleLocalError] = useState<string | null>(null);
+  const [titleLocalError, setTitleLocalError] = useState<string | null>(null);
   const [detailsLocalError, setDetailsLocalError] = useState<string | null>(null);
+  const detailsInputRef = useRef<TextInput>(null);
 
-  const isOtherSelected = selectedPreset?.key === OTHER_KEY;
   const sortedPresets = [
-  ...presets.filter((p) => p.key !== OTHER_KEY),
-  ...presets.filter((p) => p.key === OTHER_KEY),
-];
+    ...presets.filter((p) => p.key !== OTHER_KEY),
+    ...presets.filter((p) => p.key === OTHER_KEY),
+  ];
   const { viewer, isOpening, openAttachment, closeViewer } = useAttachmentViewer();
 
   // ── Details validation state ──────────────────────────────────────────────
@@ -289,14 +310,22 @@ export function FormStep({
     }
   };
 
-  const handleCustomTitleChange = (text: string) => {
-    onChangeCustomTitle(text);
-    if (text.length > 0) {
-      setCustomTitleLocalError(validateCustomTitle(text, t));
-    } else {
-      setCustomTitleLocalError(null);
-    }
+  // ── Title handlers ────────────────────────────────────────────────────────
+  // Live feedback only once the title is long enough, so users aren't
+  // shown "at least 3 characters" while they're still typing the first letters.
+  const handleTitleChange = (text: string) => {
+    onChangeTitle(text);
+    setTitleLocalError(
+      text.trim().length >= COMPLAINT_TITLE_MIN_LENGTH ? validateComplaintTitle(text, t) : null
+    );
   };
+
+  // Full validation (incl. min length) once the user leaves the field.
+  const handleTitleBlur = () => {
+    setTitleLocalError(title.length > 0 ? validateComplaintTitle(title, t) : null);
+  };
+
+  const shownTitleError = titleLocalError || titleError;
 
   // ── Details change handler with inline validation ─────────────────────────
   const handleMessageChange = (text: string) => {
@@ -323,7 +352,12 @@ export function FormStep({
         <StepDots current={2} />
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ padding: 20 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
 
         {/* Profile location warning */}
         {!hasProfileLocation && (
@@ -343,18 +377,20 @@ export function FormStep({
           </TouchableOpacity>
         )}
 
-        {/* ── Complaint Title ── */}
+        {/* ── Category + Complaint Title ── */}
         <View className="mb-5">
+          {/* Category */}
           <Text className="text-base font-bold text-gray-800 mb-2">
-            {t('complaint_form.title_label')} <Text className="text-red-500">*</Text>
+            {t('complaint_form.category_label')} <Text className="text-red-500">*</Text>
           </Text>
           <Text className="text-sm text-gray-500 mb-3 leading-5">
-            {t('complaint_form.title_description')}
+            {t('complaint_form.category_description')}
           </Text>
           <TouchableOpacity
             onPress={isCategoriesLoading ? undefined : onOpenTitlePicker}
-            className={`flex-row items-center justify-between bg-white rounded-2xl px-4 py-4 border-2 ${titleError ? 'border-red-400' : 'border-gray-200'
-              }`}
+            accessibilityRole="button"
+            accessibilityLabel={t('complaint_form.category_label')}
+            className={`flex-row items-center justify-between bg-white rounded-2xl px-4 py-4 border-2 ${categoryError ? 'border-red-400' : 'border-gray-200'}`}
             style={{ shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}
           >
             {isCategoriesLoading ? (
@@ -367,62 +403,54 @@ export function FormStep({
                 numberOfLines={1}
                 className={`flex-1 text-base ${selectedPreset ? 'text-gray-900 font-medium' : 'text-gray-400'}`}
               >
-                {selectedPreset ? t(selectedPreset.key) : t('complaint_form.title_placeholder')}
+                {selectedPreset ? t(selectedPreset.key) : t('complaint_form.category_placeholder')}
               </Text>
             )}
             <ChevronDown size={20} color={isCategoriesLoading ? '#D1D5DB' : '#6B7280'} />
           </TouchableOpacity>
-
-          {isOtherSelected && (
-            <View className="mt-3">
-              <View
-                className={`flex-row items-center bg-white border-2 rounded-2xl px-4 py-3.5`}
-                style={{
-                  borderColor: customTitleLocalError
-                    ? '#EF4444'
-                    : titleError
-                      ? '#EF4444'
-                      : THEME.primary,
-                }}
-              >
-                <PenLine size={18} color={customTitleLocalError ? '#EF4444' : THEME.primary} />
-                <TextInput
-                  value={customTitle}
-                  onChangeText={handleCustomTitleChange}
-                  placeholder={t('complaint_form.custom_title_placeholder')}
-                  placeholderTextColor="#9CA3AF"
-                  maxLength={100}
-                  autoFocus
-                  className="flex-1 text-base text-gray-900 ml-3"
-                />
-                <Text className="text-xs text-gray-400 ml-2">{customTitle.length}/100</Text>
-              </View>
-
-              {/* Local validation error takes priority; parent titleError is a fallback */}
-              {customTitleLocalError ? (
-                <View className="flex-row items-center gap-1.5 mt-1.5">
-                  <AlertCircle size={14} color="#EF4444" />
-                  <Text className="text-sm text-red-500">{customTitleLocalError}</Text>
-                </View>
-              ) : titleError ? (
-                <View className="flex-row items-center gap-1.5 mt-1.5">
-                  <AlertCircle size={14} color="#EF4444" />
-                  <Text className="text-sm text-red-500">{titleError}</Text>
-                </View>
-              ) : (
-                <Text className="text-sm mt-1.5 ml-1" style={{ color: THEME.primary }}>
-                  {t('complaint_form.custom_title_hint')}
-                </Text>
-              )}
-            </View>
-          )}
-
-          {titleError ? (
+          {categoryError ? (
             <View className="flex-row items-center gap-1.5 mt-2">
               <AlertCircle size={14} color="#EF4444" />
-              <Text className="text-sm text-red-500">{titleError}</Text>
+              <Text className="text-sm text-red-500">{categoryError}</Text>
             </View>
           ) : null}
+
+          {/* Complaint Title — directly below the category */}
+          <Text className="text-base font-bold text-gray-800 mt-5 mb-2">
+            {t('complaint_form.complaint_title_label')} <Text className="text-red-500">*</Text>
+          </Text>
+          <View
+            className={`flex-row items-center bg-white border-2 rounded-2xl px-4 py-3.5 ${shownTitleError ? 'border-red-400' : 'border-gray-200'}`}
+            style={{ shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}
+          >
+            <PenLine size={18} color={shownTitleError ? '#EF4444' : THEME.primary} />
+            <TextInput
+              value={title}
+              onChangeText={handleTitleChange}
+              onBlur={handleTitleBlur}
+              placeholder={t('complaint_form.complaint_title_placeholder')}
+              placeholderTextColor="#9CA3AF"
+              maxLength={COMPLAINT_TITLE_MAX_LENGTH}   // also truncates pasted text
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => detailsInputRef.current?.focus()}
+              accessibilityLabel={t('complaint_form.complaint_title_label')}
+              className="flex-1 text-base text-gray-900 ml-3"
+            />
+            <Text className="text-xs text-gray-400 ml-2">
+              {title.length}/{COMPLAINT_TITLE_MAX_LENGTH}
+            </Text>
+          </View>
+          {shownTitleError ? (
+            <View className="flex-row items-center gap-1.5 mt-1.5">
+              <AlertCircle size={14} color="#EF4444" />
+              <Text className="text-sm text-red-500">{shownTitleError}</Text>
+            </View>
+          ) : (
+            <Text className="text-sm mt-1.5 ml-1" style={{ color: THEME.primary }}>
+              {t('complaint_form.complaint_title_hint')}
+            </Text>
+          )}
         </View>
 
         <View className="h-px bg-gray-100 mb-5" />
@@ -439,6 +467,7 @@ export function FormStep({
 
           {/* Textarea */}
           <TextInput
+            ref={detailsInputRef}
             value={message}
             onChangeText={handleMessageChange}
             onBlur={onMessageBlur}
@@ -598,7 +627,7 @@ export function FormStep({
         </TouchableOpacity>
       </View>
 
-      {/* ── Title Picker Modal ── */}
+      {/* ── Category Picker Modal ── */}
       <Modal visible={showTitlePicker} transparent animationType="slide" onRequestClose={onCloseTitlePicker}>
         <Pressable className="flex-1 bg-black/50 justify-end" onPress={onCloseTitlePicker}>
           <Pressable className="bg-white rounded-t-3xl" onPress={(e) => e.stopPropagation()}>

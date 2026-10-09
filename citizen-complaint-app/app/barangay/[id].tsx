@@ -16,21 +16,27 @@ import { useTranslation } from 'react-i18next';
 
 import { useAttachments } from '@/hooks/general/useAttachment';
 import { useCurrentUser } from '@/store/useCurrentUserStore';
-import { PRESET_TITLE_KEYS, OTHER_KEY, PresetTitle } from '@/constants/localization/complaint-title-key';
+import { PRESET_TITLE_KEYS, PresetTitle } from '@/constants/localization/complaint-title-key';
 
 import ComplaintLetterPreview from '@/components/letter-preview/ComplaintLetterPreview';
 import { complaintApiClient } from '@/lib/client/complaint';
 import { askForNotificationPermission } from '@/hooks/general/usePushNotifications';
 import { InstructionsStep } from '@/components/complaint/complaint-proccess/InstructionStep';
-import { FormStep } from '@/components/complaint/complaint-proccess/FormStep';
+import {
+  FormStep,
+  COMPLAINT_DETAILS_MAX_LENGTH,
+  COMPLAINT_DETAILS_MIN_LENGTH,
+  COMPLAINT_TITLE_MAX_LENGTH,
+  validateComplaintTitle,
+} from '@/components/complaint/complaint-proccess/FormStep';
 import { LocationStep } from '@/components/complaint/complaint-proccess/LocationStep';
-import { COMPLAINT_DETAILS_MAX_LENGTH, COMPLAINT_DETAILS_MIN_LENGTH } from '@/components/complaint/complaint-proccess/FormStep';
 import useToastStore from '@/store/useGlobalModal';
 import { userApiClient } from '@/lib/client/user';
 import { useComplaintCategories } from '@/hooks/general/useCategories';
-// ─── Step type ────────────────────────────────────────────────────────────────
 import { emergencyClassifierClient } from '@/lib/client/emergency';
 import { useQueryClient } from '@tanstack/react-query';
+
+// ─── Step type ────────────────────────────────────────────────────────────────
 type Step = 'instructions' | 'form' | 'location';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -43,25 +49,29 @@ export default function ComplaintFormScreen() {
   const { data: presets = PRESET_TITLE_KEYS, isLoading: categoriesLoading } = useComplaintCategories();
 
   // ── Route params ────────────────────────────────────────────────────────────
-  const barangayName     = (params.barangayName as string) || 'Barangay';
-  console.log('Received route params:', params)
-  const barangayId       = params.id as string;
+  const barangayName      = (params.barangayName as string) || 'Barangay';
+  const barangayId        = params.id as string;
   const barangayAccountId = params.barangayAccountId as string;
-  const barangayLat = parseFloat(params.barangayLat as string);
- const barangayLng = parseFloat(params.barangayLng as string);
+  const barangayLat       = parseFloat(params.barangayLat as string);
+  const barangayLng       = parseFloat(params.barangayLng as string);
+
   // ── Step ────────────────────────────────────────────────────────────────────
   const [step, setStep] = useState<Step>('instructions');
-  const { showToast:showGlobalToast } = useToastStore();
-  // ── Title / category ────────────────────────────────────────────────────────
+  const { showToast: showGlobalToast } = useToastStore();
+
+  // ── Category + Title ────────────────────────────────────────────────────────
   const [selectedPreset, setSelectedPreset]   = useState<PresetTitle | null>(null);
-  const [customTitle, setCustomTitle]         = useState('');
+  const [title, setTitle]                     = useState('');
   const [showTitlePicker, setShowTitlePicker] = useState(false);
+  const [categoryError, setCategoryError]     = useState('');
   const [titleError, setTitleError]           = useState('');
   const queryClient = useQueryClient();
+
   // ── Message ─────────────────────────────────────────────────────────────────
-  const [message, setMessage]           = useState('');
-  const [messageError, setMessageError] = useState('');
+  const [message, setMessage]                     = useState('');
+  const [messageError, setMessageError]           = useState('');
   const [messageWasTouched, setMessageWasTouched] = useState(false);
+
   // ── Submission ──────────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreview, setShowPreview]   = useState(false);
@@ -92,25 +102,21 @@ export default function ComplaintFormScreen() {
   );
 
   // ── Derived values ───────────────────────────────────────────────────────────
-  const isOtherSelected   = selectedPreset?.key === OTHER_KEY;
-const resolvedTitle = isOtherSelected
-  ? customTitle.trim()
-  : selectedPreset?.key ? t(selectedPreset.key, { lng: 'en' }) : '';
-
+  const resolvedTitle      = title.trim();   // trimmed value is what's validated AND submitted
   const resolvedCategoryId = selectedPreset?.category_id ?? null;
   const hasProfileLocation = !!(userData?.latitude && userData?.longitude);
 
-  // ── Handlers: title ──────────────────────────────────────────────────────────
+  // ── Handlers: category / title ───────────────────────────────────────────────
   const handleSelectPreset = (preset: PresetTitle) => {
     setSelectedPreset(preset);
-    setTitleError('');
-    if (preset.key !== OTHER_KEY) setCustomTitle('');
+    setCategoryError('');
     setShowTitlePicker(false);
   };
 
-  const handleChangeCustomTitle = (text: string) => {
-    setCustomTitle(text);
-    if (text.trim().length >= 3) setTitleError('');
+  const handleChangeTitle = (text: string) => {
+    const next = text.slice(0, COMPLAINT_TITLE_MAX_LENGTH); // defensive cap
+    setTitle(next);
+    if (titleError) setTitleError(validateComplaintTitle(next, t) ?? ''); // clears as soon as it's fixed
   };
 
   // ── Handlers: message ────────────────────────────────────────────────────────
@@ -119,35 +125,41 @@ const resolvedTitle = isOtherSelected
     if (text.trim()) setMessageError('');
   };
 
- // ── Validation ───────────────────────────────────────────────────────────────
-const validateForm = (): boolean => {
-  let valid = true;
-  if (!resolvedTitle) {
-    setTitleError(t('complaint_form.error.title_required'));
-    valid = false;
-  } else if (isOtherSelected && customTitle.trim().length < 3) {
-    setTitleError(t('complaint_form.error.title_too_short'));
-    valid = false;
-  } else {
-    setTitleError('');
-  }
+  // ── Validation ───────────────────────────────────────────────────────────────
+  const validateForm = (): boolean => {
+    let valid = true;
 
-  if (!message.trim()) {
-    setMessageError(t('complaint_form.error.details_required'));
-    valid = false;
-  } else if (message.trim().length < COMPLAINT_DETAILS_MIN_LENGTH) {
-    setMessageError(`Description must be at least ${COMPLAINT_DETAILS_MIN_LENGTH} characters long.`);
-    valid = false;
-  } else if (message.trim().length > COMPLAINT_DETAILS_MAX_LENGTH) {
-    setMessageError(`Description must not exceed ${COMPLAINT_DETAILS_MAX_LENGTH} characters.`);
-    valid = false;
-  } else {
-    setMessageError('');
-  }
+    if (!selectedPreset) {
+      setCategoryError(t('complaint_form.error.category_required'));
+      valid = false;
+    } else {
+      setCategoryError('');
+    }
 
-  // ← remove the stray setMessageError('') that was here
-  return valid;
-};
+    const titleValidation = validateComplaintTitle(title, t);
+    if (titleValidation) {
+      setTitleError(titleValidation);
+      valid = false;
+    } else {
+      setTitleError('');
+    }
+
+    if (!message.trim()) {
+      setMessageError(t('complaint_form.error.details_required'));
+      valid = false;
+    } else if (message.trim().length < COMPLAINT_DETAILS_MIN_LENGTH) {
+      setMessageError(`Description must be at least ${COMPLAINT_DETAILS_MIN_LENGTH} characters long.`);
+      valid = false;
+    } else if (message.trim().length > COMPLAINT_DETAILS_MAX_LENGTH) {
+      setMessageError(`Description must not exceed ${COMPLAINT_DETAILS_MAX_LENGTH} characters.`);
+      valid = false;
+    } else {
+      setMessageError('');
+    }
+
+    return valid;
+  };
+
   // ── Form "Next" → location step ──────────────────────────────────────────────
   const handleFormNext = () => {
     if (!validateForm()) return;
@@ -172,171 +184,179 @@ const validateForm = (): boolean => {
     setIncidentLocation({ latitude: lat, longitude: lng });
     setShowPreview(true);
   };
-const handleSubmit = async () => {
-  setIsSubmitting(true);
-  let submissionSuccess = false;
-  let emergencyResult: { is_emergency: boolean; agency: string; confidence: string; reason: string | null } | null = null;
 
-  try {
-    if (!incidentLocation) {
-      showGlobalToast('Location unavailable. Please go back and try again.', 'error');
-      return;
-    }
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    let submissionSuccess = false;
+    let emergencyResult: { is_emergency: boolean; agency: string; confidence: string; reason: string | null } | null = null;
 
-    const parsedBarangayId = parseInt(barangayId, 10);
-    const parsedBarangayAccountId = barangayAccountId ? parseInt(barangayAccountId, 10) : null;
-
-    if (isNaN(parsedBarangayId)) {
-      showGlobalToast('Invalid barangay. Please go back and try again.', 'error');
-      return;
-    }
-    if (!resolvedCategoryId) {
-      showGlobalToast('Please select a complaint category.', 'error');
-      return;
-    }
-
-    const complaintData = {
-      title:               resolvedTitle,
-      description:         message,
-      barangay_id:         parsedBarangayId,
-      barangay_account_id: parsedBarangayAccountId,
-      latitude:            incidentLocation.latitude,
-      longitude:           incidentLocation.longitude,
-      category_id:         resolvedCategoryId,
-    };
-
-    const formData = new FormData();
-    formData.append('data', JSON.stringify(complaintData));
-    for (const attachment of attachments) {
-      formData.append('attachments', {
-        uri:  attachment.uri,
-        name: attachment.name,
-        type: attachment.mimeType || 'application/octet-stream',
-      } as any);
-    }
-
-    const response = await complaintApiClient.post('/submit-complaint', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-
-    if (response.status !== 201) return;
-
-    // ── Submission succeeded past this point ─────────────────────────────────
-    submissionSuccess = true;
-    showGlobalToast('Complaint submitted successfully!', 'success');
-    resetAttachments();
-    setSelectedPreset(null);
-    setCustomTitle('');
-    setMessage('');
-    setIncidentLocation(null);
-
-    // ── Classify emergency — non-blocking, runs after successful submission ───
     try {
-      const emergencyResponse = await emergencyClassifierClient.post('/classify', {
-        title:       resolvedTitle,
-        description: message,
-        category_id: resolvedCategoryId,
+      if (!incidentLocation) {
+        showGlobalToast('Location unavailable. Please go back and try again.', 'error');
+        return;
+      }
+
+      const parsedBarangayId = parseInt(barangayId, 10);
+      const parsedBarangayAccountId = barangayAccountId ? parseInt(barangayAccountId, 10) : null;
+
+      if (isNaN(parsedBarangayId)) {
+        showGlobalToast('Invalid barangay. Please go back and try again.', 'error');
+        return;
+      }
+      if (!resolvedCategoryId) {
+        showGlobalToast('Please select a complaint category.', 'error');
+        return;
+      }
+
+      // Final safety net — the title must still be valid at submit time.
+      if (validateComplaintTitle(resolvedTitle, t)) {
+        showGlobalToast(validateComplaintTitle(resolvedTitle, t) as string, 'error');
+        return;
+      }
+
+      const complaintData = {
+        title:               resolvedTitle,   // existing backend `title` field — now the user-entered, trimmed title
+        description:         message,
+        barangay_id:         parsedBarangayId,
+        barangay_account_id: parsedBarangayAccountId,
+        latitude:            incidentLocation.latitude,
+        longitude:           incidentLocation.longitude,
+        category_id:         resolvedCategoryId,
+      };
+
+      const formData = new FormData();
+      formData.append('data', JSON.stringify(complaintData));
+      for (const attachment of attachments) {
+        formData.append('attachments', {
+          uri:  attachment.uri,
+          name: attachment.name,
+          type: attachment.mimeType || 'application/octet-stream',
+        } as any);
+      }
+
+      const response = await complaintApiClient.post('/submit-complaint', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      const data = emergencyResponse.data;
+      if (response.status !== 201) return;
 
-      if (
-        data &&
-        typeof data.is_emergency === 'boolean' &&
-        typeof data.agency === 'string' &&
-        data.agency &&
-        data.is_emergency
-      ) {
-        emergencyResult = data;
-      }
-    } catch (err) {
-      // Classification failure is silent — user still navigates to Complaints
-      console.warn('Emergency classification failed:', err);
-    }
+      // ── Submission succeeded past this point ─────────────────────────────────
+      submissionSuccess = true;
+      showGlobalToast('Complaint submitted successfully!', 'success');
+      resetAttachments();
+      setSelectedPreset(null);
+      setTitle('');
+      setMessage('');
+      setIncidentLocation(null);
 
-    // ── Push notification prompt ─────────────────────────────────────────────
-    if (!userData?.push_notifications_enabled) {
-  await new Promise<void>((resolve) => {
-    let settled = false;
-    const done = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-
-    Alert.alert(
-      '🔔 Stay Updated',
-      'Do you want to receive notifications about your complaint status?',
-      [
-        { text: 'No Thanks', style: 'cancel', onPress: done },
-        {
-          text: 'Yes, Notify Me',
-          onPress: async () => {
-            try {
-              const token = await askForNotificationPermission();
-              if (!token) {
-                showGlobalToast('Permission denied for notifications.', 'error');
-                return;
-              }
-              // Let syncPushToken() handle posting the token to avoid duplicates
-              await useCurrentUser.getState().syncPushToken();
-              await userApiClient.post('/enable-push-notifications', { enabled: true });
-              await fetchCurrentUser(true);
-              showGlobalToast('Notifications enabled!', 'success');
-            } catch (err) {
-              showGlobalToast('Failed to enable notifications.', 'error');
-            } finally {
-              done();
-            }
-          },
-        },
-      ],
-      { cancelable: true, onDismiss: done } // safety net for outside-tap / back-button dismiss
-    );
-  });
-}
-
-  } catch (error: any) {
-    const httpStatus = error?.response?.status;
-    const detail = error?.response?.data?.detail;
-
-    if (httpStatus === 403) {
-      showGlobalToast(
-        "Your complaint submission access has been temporarily disabled. This action was taken because multiple submitted complaints were flagged and confirmed as spam, invalid, or incorrect reports by the support team.",
-        'error'
-      );
-      fetchCurrentUser(true);
-      return;
-    }
-
-    showGlobalToast(detail ?? 'Something went wrong. Please try again.', 'error');
-
-  } finally {
-    setIsSubmitting(false);
-  queryClient.invalidateQueries({
-      queryKey: ["complaintDetail"],
-    }); // ← ensure complaints list is fresh after submission
-
-    // ── Only reset form + navigate if submission actually succeeded ──────────
-    if (submissionSuccess) {
-      setShowPreview(false);
-      setStep('instructions');
-
-      if (emergencyResult) {
-        router.replace({
-          pathname: '/(tabs)/Emergency',
-          params: {
-            agency:     emergencyResult.agency,
-            confidence: emergencyResult.confidence,
-            reason:     emergencyResult.reason ?? '',
-          },
+      // ── Classify emergency — non-blocking, runs after successful submission ───
+      try {
+        const emergencyResponse = await emergencyClassifierClient.post('/classify', {
+          title:       resolvedTitle,
+          description: message,
+          category_id: resolvedCategoryId,
         });
-      } else {
-        router.replace('/(tabs)/Complaints');
+
+        const data = emergencyResponse.data;
+
+        if (
+          data &&
+          typeof data.is_emergency === 'boolean' &&
+          typeof data.agency === 'string' &&
+          data.agency &&
+          data.is_emergency
+        ) {
+          emergencyResult = data;
+        }
+      } catch (err) {
+        // Classification failure is silent — user still navigates to Complaints
+        console.warn('Emergency classification failed:', err);
+      }
+
+      // ── Push notification prompt ─────────────────────────────────────────────
+      if (!userData?.push_notifications_enabled) {
+        await new Promise<void>((resolve) => {
+          let settled = false;
+          const done = () => {
+            if (settled) return;
+            settled = true;
+            resolve();
+          };
+
+          Alert.alert(
+            '🔔 Stay Updated',
+            'Do you want to receive notifications about your complaint status?',
+            [
+              { text: 'No Thanks', style: 'cancel', onPress: done },
+              {
+                text: 'Yes, Notify Me',
+                onPress: async () => {
+                  try {
+                    const token = await askForNotificationPermission();
+                    if (!token) {
+                      showGlobalToast('Permission denied for notifications.', 'error');
+                      return;
+                    }
+                    // Let syncPushToken() handle posting the token to avoid duplicates
+                    await useCurrentUser.getState().syncPushToken();
+                    await userApiClient.post('/enable-push-notifications', { enabled: true });
+                    await fetchCurrentUser(true);
+                    showGlobalToast('Notifications enabled!', 'success');
+                  } catch (err) {
+                    showGlobalToast('Failed to enable notifications.', 'error');
+                  } finally {
+                    done();
+                  }
+                },
+              },
+            ],
+            { cancelable: true, onDismiss: done } // safety net for outside-tap / back-button dismiss
+          );
+        });
+      }
+
+    } catch (error: any) {
+      const httpStatus = error?.response?.status;
+      const detail = error?.response?.data?.detail;
+
+      if (httpStatus === 403) {
+        showGlobalToast(
+          "Your complaint submission access has been temporarily disabled. This action was taken because multiple submitted complaints were flagged and confirmed as spam, invalid, or incorrect reports by the support team.",
+          'error'
+        );
+        fetchCurrentUser(true);
+        return;
+      }
+
+      showGlobalToast(detail ?? 'Something went wrong. Please try again.', 'error');
+
+    } finally {
+      setIsSubmitting(false);
+      queryClient.invalidateQueries({
+        queryKey: ["complaintDetail"],
+      }); // ← ensure complaints list is fresh after submission
+
+      // ── Only reset form + navigate if submission actually succeeded ──────────
+      if (submissionSuccess) {
+        setShowPreview(false);
+        setStep('instructions');
+
+        if (emergencyResult) {
+          router.replace({
+            pathname: '/(tabs)/Emergency',
+            params: {
+              agency:     emergencyResult.agency,
+              confidence: emergencyResult.confidence,
+              reason:     emergencyResult.reason ?? '',
+            },
+          });
+        } else {
+          router.replace('/(tabs)/Complaints');
+        }
       }
     }
-  }
-};
+  };
+
   if (showPreview) {
     return (
       <>
@@ -388,14 +408,15 @@ const handleSubmit = async () => {
         barangayName={barangayName}
         hasProfileLocation={hasProfileLocation}
         selectedPreset={selectedPreset}
-        customTitle={customTitle}
+        categoryError={categoryError}
+        title={title}
         titleError={titleError}
         isCategoriesLoading={categoriesLoading}
         showTitlePicker={showTitlePicker}
         onOpenTitlePicker={() => setShowTitlePicker(true)}
         onCloseTitlePicker={() => setShowTitlePicker(false)}
         onSelectPreset={handleSelectPreset}
-        onChangeCustomTitle={handleChangeCustomTitle}
+        onChangeTitle={handleChangeTitle}
         message={message}
         messageError={messageError}
         onChangeMessage={handleChangeMessage}

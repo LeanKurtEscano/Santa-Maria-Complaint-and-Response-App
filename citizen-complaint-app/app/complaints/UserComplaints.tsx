@@ -5,6 +5,7 @@ import { CategoryIcon } from "@/components/complaint/CategoryIcon";
 import { StatusBadge } from "@/components/complaint/StatusBadge";
 import {
   ALL_STATUSES,
+  CATEGORY_LABELS,
   formatDate,
   formatTime,
   getCategoryLabel,
@@ -36,6 +37,7 @@ import {
   FlatList,
   Modal,
   Pressable,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -60,22 +62,16 @@ interface PaginatedComplaints {
 
 function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: () => void }) {
   const { t } = useTranslation();
+
   const catKey = complaint.category?.category_name ?? "";
 
-  const isOther = catKey === "other";
-  const catLabel = isOther
-    ? getCategoryLabel(catKey, complaint.title)
-    : t(`complaints.titles.${catKey}`, { defaultValue: getCategoryLabel(catKey, complaint.title) });
+  // Green text: translated category (same for every category, including "other")
+  const catLabel = t(`complaints.titles.${catKey}`, {
+    defaultValue: getCategoryLabel(catKey),
+  });
 
-  const titleKey = complaint.title
-    ?.split("/")[0]
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_");
-
-  const translatedTitle = isOther
-    ? complaint.title
-    : t(`complaints.titles.${titleKey}`, { defaultValue: complaint.title });
+  // Bold text: the customized title, shown as-is
+  const displayTitle = complaint.title;
 
   return (
     <TouchableOpacity
@@ -91,12 +87,13 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
           <CategoryIcon categoryKey={catKey} size={20} />
         </View>
 
-        <View className="flex-1">
+        <View className="flex-1" style={{ minWidth: 0 }}>
           <View className="flex-row items-center justify-between mb-1 gap-2">
             <Text
               className="text-xs font-semibold uppercase tracking-wide flex-1"
               style={{ color: THEME.primary }}
               numberOfLines={1}
+              ellipsizeMode="tail"
             >
               {catLabel}
             </Text>
@@ -107,12 +104,16 @@ function ComplaintCard({ complaint, onPress }: { complaint: Complaint; onPress: 
             />
           </View>
 
-          <Text className="text-sm font-bold text-gray-900 mb-1" numberOfLines={1}>
-            {translatedTitle}
+          <Text
+            className="text-sm font-bold text-gray-900 mb-1"
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {displayTitle}
           </Text>
 
           {complaint.description && (
-            <Text className="text-xs text-gray-500 mb-2 leading-4" numberOfLines={2}>
+            <Text className="text-xs text-gray-500 mb-2 leading-4" numberOfLines={2} ellipsizeMode="tail">
               {complaint.description}
             </Text>
           )}
@@ -337,19 +338,23 @@ function LoadingState() {
   );
 }
 
-// ─── Filter Modal (single-select) ─────────────────────────────────────────────
+// ─── Filter Modal (single-select status + single-select category) ────────────
 
 function FilterModal({
   visible,
   onClose,
   selectedStatus,
   onSelectStatus,
+  selectedCategory,
+  onSelectCategory,
   onClear,
 }: {
   visible: boolean;
   onClose: () => void;
   selectedStatus: string | null;
   onSelectStatus: (status: string) => void;
+  selectedCategory: string | null;
+  onSelectCategory: (category: string) => void;
   onClear: () => void;
 }) {
   const { t } = useTranslation();
@@ -357,7 +362,7 @@ function FilterModal({
   return (
     <Modal visible={visible} transparent animationType="slide">
       <Pressable className="flex-1 bg-black/30" onPress={onClose} />
-      <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10">
+      <View className="bg-white rounded-t-3xl px-5 pt-5 pb-10" style={{ maxHeight: "80%" }}>
         <View className="w-10 h-1 bg-gray-200 rounded-full self-center mb-5" />
 
         <View className="flex-row items-center justify-between mb-5">
@@ -371,49 +376,92 @@ function FilterModal({
           </TouchableOpacity>
         </View>
 
-        {/* Filter Chips — single select, tapping the active one clears it */}
-        <View className="flex-row flex-wrap gap-2 mb-6">
-          {ALL_STATUSES.map((s) => {
-            const cfg = getStatusConfig(s);
-            const active = selectedStatus === s;
-            return (
-              <TouchableOpacity
-                key={s}
-                onPress={() => onSelectStatus(s)}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: active ? THEME.primary : "#e5e7eb",
-                  backgroundColor: active ? cfg.badge : "#ffffff",
-                }}
-              >
-                <View
+        <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
+          {/* Status — single select, tapping the active one clears it */}
+          <Text className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+            {t("complaints.filter.status", { defaultValue: "Status" })}
+          </Text>
+          <View className="flex-row flex-wrap gap-2 mb-5">
+            {ALL_STATUSES.map((s) => {
+              const cfg = getStatusConfig(s);
+              const active = selectedStatus === s;
+              return (
+                <TouchableOpacity
+                  key={s}
+                  onPress={() => onSelectStatus(s)}
                   style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 999,
-                    backgroundColor: cfg.dot,
-                  }}
-                />
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "600",
-                    color: active ? cfg.text : "#4b5563",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: active ? THEME.primary : "#e5e7eb",
+                    backgroundColor: active ? cfg.badge : "#ffffff",
                   }}
                 >
-                  {t(cfg.labelKey)}
-                </Text>
-                {active && <CheckCircle2 size={14} color={THEME.primary} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+                  <View
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 999,
+                      backgroundColor: cfg.dot,
+                    }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "600",
+                      color: active ? cfg.text : "#4b5563",
+                    }}
+                  >
+                    {t(cfg.labelKey)}
+                  </Text>
+                  {active && <CheckCircle2 size={14} color={THEME.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Category — single select, tapping the active one clears it */}
+          <Text className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+            {t("complaints.filter.category", { defaultValue: "Category" })}
+          </Text>
+          <View className="flex-row flex-wrap gap-2 mb-6">
+            {Object.keys(CATEGORY_LABELS).map((key) => {
+              const active = selectedCategory === key;
+              return (
+                <TouchableOpacity
+                  key={key}
+                  onPress={() => onSelectCategory(key)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: active ? THEME.primary : "#e5e7eb",
+                    backgroundColor: active ? `${THEME.primary}15` : "#ffffff",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "600",
+                      color: active ? THEME.primary : "#4b5563",
+                    }}
+                  >
+                    {t(`complaints.titles.${key}`, { defaultValue: getCategoryLabel(key) })}
+                  </Text>
+                  {active && <CheckCircle2 size={14} color={THEME.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
 
         <TouchableOpacity
           onPress={onClose}
@@ -439,6 +487,7 @@ export default function UserComplaints() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [filterVisible, setFilterVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -452,11 +501,11 @@ export default function UserComplaints() {
   // Reset to page 1 whenever search, status, or order changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearch, selectedStatus, order]);
+  }, [debouncedSearch, selectedStatus, selectedCategory, order]);
 
   // Filtered + paginated list
   const { data, isPending, error, refetch, isPlaceholderData } = useQuery<PaginatedComplaints>({
-    queryKey: ["my-complaints", currentPage, debouncedSearch, selectedStatus, order],
+    queryKey: ["my-complaints", currentPage, debouncedSearch, selectedStatus, selectedCategory, order],
     queryFn: async () => {
       const response = await complaintApiClient.get("/my-complaints", {
         params: {
@@ -464,6 +513,7 @@ export default function UserComplaints() {
           size: PAGE_SIZE,
           search: debouncedSearch || undefined,
           complaint_status: selectedStatus || undefined,
+          category: selectedCategory || undefined, // TODO: confirm param name with backend
           order,
         },
       });
@@ -503,13 +553,18 @@ export default function UserComplaints() {
     setSelectedStatus((prev) => (prev === s ? null : s));
   };
 
+  // Tapping the already-active category clears the filter; otherwise selects it
+  const selectCategory = (c: string) => {
+    setSelectedCategory((prev) => (prev === c ? null : c));
+  };
+
   const handleSearchChange = (text: string) => {
     setSearch(text);
   };
 
   const toggleOrder = () => setOrder((prev) => (prev === "asc" ? "desc" : "asc"));
 
-  const activeFilterCount = selectedStatus ? 1 : 0;
+  const activeFilterCount = (selectedStatus ? 1 : 0) + (selectedCategory ? 1 : 0);
   const isFiltered = search.length > 0 || activeFilterCount > 0;
 
   const goToPrev = () => setCurrentPage((p) => Math.max(1, p - 1));
@@ -623,9 +678,33 @@ export default function UserComplaints() {
         </View>
 
         {/* Active Filter Pill */}
-        {selectedStatus && (
+        {(selectedStatus || selectedCategory) && (
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-            {(() => {
+            {selectedCategory && (
+              <TouchableOpacity
+                onPress={() => setSelectedCategory(null)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 20,
+                  alignSelf: "flex-start",
+                  backgroundColor: `${THEME.primary}15`,
+                  borderWidth: 1,
+                  borderColor: `${THEME.primary}30`,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "600", color: THEME.primary }}>
+                  {t(`complaints.titles.${selectedCategory}`, {
+                    defaultValue: getCategoryLabel(selectedCategory),
+                  })}
+                </Text>
+                <XCircle size={10} color={THEME.primary} />
+              </TouchableOpacity>
+            )}
+            {selectedStatus && (() => {
               const cfg = getStatusConfig(selectedStatus);
               return (
                 <TouchableOpacity
@@ -702,8 +781,11 @@ export default function UserComplaints() {
         onClose={() => setFilterVisible(false)}
         selectedStatus={selectedStatus}
         onSelectStatus={selectStatus}
+        selectedCategory={selectedCategory}
+        onSelectCategory={selectCategory}
         onClear={() => {
           setSelectedStatus(null);
+          setSelectedCategory(null);
         }}
       />
     </View>
